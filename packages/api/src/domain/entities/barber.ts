@@ -5,6 +5,7 @@ export interface BarberEntity {
   lastName: string;
   email: string;
   password: string;
+  phone: string | null;
   avatarUrl: string | null;
   isActive: boolean;
 }

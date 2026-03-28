@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppointment, useCancelAppointment, useChangeAppointment } from '../../api/use-appointment.ts';
 import { useSlots } from '../../api/use-slots.ts';
 import { Button } from '../ui/Button.tsx';
@@ -10,9 +11,12 @@ import { BUSINESS_HOURS, MAX_WEEKS_AHEAD } from '@soberano/shared';
 type View = 'detail' | 'cancel' | 'change';
 
 export function AppointmentView({ token }: { token: string }) {
+  const navigate = useNavigate();
   const { data: appointment, isLoading, isError } = useAppointment(token);
   const cancelMutation = useCancelAppointment(token);
-  const changeMutation = useChangeAppointment(token);
+  const changeMutation = useChangeAppointment(token, (newToken) => {
+    navigate(`/agendamento/${newToken}`, { replace: true });
+  });
 
   const [view, setView] = useState<View>('detail');
   const [phone, setPhone] = useState('');

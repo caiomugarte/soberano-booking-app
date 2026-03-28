@@ -168,10 +168,15 @@ export class WhatsAppNotificationService {
   }
 
   async notifyBarber(appointment: AppointmentWithDetails, event: 'booked' | 'cancelled' | 'changed'): Promise<void> {
+    if (!appointment.barber.phone) {
+      console.log(`[WhatsApp] Barber ${appointment.barber.firstName} has no phone configured, skipping notification`);
+      return;
+    }
+
     const eventLabels = {
       booked: '🆕 *Novo agendamento!*',
-      cancelled: '❌ *Agendamento cancelado*',
-      changed: '🔄 *Agendamento alterado*',
+      cancelled: '❌ *Agendamento cancelado pelo cliente*',
+      changed: '🔄 *Agendamento alterado pelo cliente*',
     };
 
     const message = [
@@ -185,7 +190,7 @@ export class WhatsAppNotificationService {
       `💰 Valor: ${formatCurrency(appointment.priceCents)}`,
     ].join('\n');
 
-    // Send to barber's phone (would need barber phone field; for now log)
-    console.log(`[WhatsApp] Barber notification (${event}):`, message);
+    const barberFullName = `${appointment.barber.firstName} ${appointment.barber.lastName}`;
+    await this.sendWithRetry(appointment.barber.phone, barberFullName, message);
   }
 }

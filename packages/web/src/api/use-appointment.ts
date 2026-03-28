@@ -9,6 +9,7 @@ export interface AppointmentView {
   endTime: string;
   status: string;
   priceCents: number;
+  cancelToken?: string;
   service: { name: string; icon: string };
   barber: { firstName: string; lastName: string };
   customer: { name: string; phoneLast4: string };
@@ -33,13 +34,16 @@ export function useCancelAppointment(token: string) {
   });
 }
 
-export function useChangeAppointment(token: string) {
+export function useChangeAppointment(token: string, onNewToken: (newToken: string) => void) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: { phoneLastFour: string; date: string; startTime: string }) =>
-      api.patch<{ appointment: AppointmentView }>(`/appointment/${token}/change`, data),
-    onSuccess: () => {
+      api.patch<{ appointment: AppointmentView }>(`/appointment/${token}/change`, data).then((r) => r.appointment),
+    onSuccess: (appointment) => {
       queryClient.invalidateQueries({ queryKey: ['appointment', token] });
+      if (appointment.cancelToken) {
+        onNewToken(appointment.cancelToken);
+      }
     },
   });
 }

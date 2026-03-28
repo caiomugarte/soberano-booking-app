@@ -27,7 +27,7 @@ export function formatDateLong(dateStr: string): string {
 
 export function formatPhone(value: string): string {
   const v = value.replace(/\D/g, '').substring(0, 11);
-  if (v.length > 6) return `(${v.slice(0,2)}) ${v.slice(2,7)}-${v.slice(7)}`;
+  if (v.length > 7) return `(${v.slice(0,2)}) ${v.slice(2,7)}-${v.slice(7)}`;
   if (v.length > 2) return `(${v.slice(0,2)}) ${v.slice(2)}`;
   if (v.length) return `(${v}`;
   return v;

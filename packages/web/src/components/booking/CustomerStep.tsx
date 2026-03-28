@@ -29,7 +29,7 @@ export function CustomerStep() {
       />
       <Input
         label="WhatsApp (número cadastrado no app)"
-        placeholder="(61) 98669-1899"
+        placeholder="(11) 99999-9999"
         prefix="🇧🇷 +55"
         value={phone}
         onChange={(e) => setPhone(formatPhone(e.target.value))}

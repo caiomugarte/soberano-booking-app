@@ -12,9 +12,9 @@ const prisma = new PrismaClient();
 const WEEKDAYS = [1, 2, 3, 4, 5];
 
 const BARBERS = [
-  { slug: 'matheus', firstName: 'Matheus', lastName: 'Kemp', email: 'matheus@soberano.com.br' },
-  { slug: 'adenilson', firstName: 'Adenilson', lastName: 'Fogaça', email: 'adenilson@soberano.com.br' },
-  { slug: 'vandson', firstName: 'Vandson', lastName: 'Metélo', email: 'vandson@soberano.com.br' },
+  { slug: 'matheus', firstName: 'Matheus', lastName: 'Kemp', email: 'matheus@soberano.com.br', phone: null },
+  { slug: 'adenilson', firstName: 'Adenilson', lastName: 'Fogaça', email: 'adenilson@soberano.com.br', phone: null },
+  { slug: 'vandson', firstName: 'Vandson', lastName: 'Metélo', email: 'vandson@soberano.com.br', phone: null },
 ];
 
 // Shifts: each entry = one continuous block. Lunch gap = two separate blocks per day.
@@ -72,7 +72,7 @@ async function seed() {
 
     const record = await prisma.barber.upsert({
       where: { slug: barber.slug },
-      update: { firstName: barber.firstName, lastName: barber.lastName },
+      update: { firstName: barber.firstName, lastName: barber.lastName, phone: barber.phone },
       create: { ...barber, password: hashedPassword },
     });
 

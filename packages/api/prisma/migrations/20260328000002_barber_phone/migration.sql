@@ -1,0 +1,1 @@
+ALTER TABLE "barbers" ADD COLUMN "phone" VARCHAR(20);
