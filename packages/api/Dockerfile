@@ -10,8 +10,8 @@ COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/api/package.json ./packages/api/
 
-# Install all dependencies
-RUN npm ci
+# Install all dependencies including devDeps (needed for tsc)
+RUN npm ci --include=dev
 
 # Copy source
 COPY packages/shared ./packages/shared
