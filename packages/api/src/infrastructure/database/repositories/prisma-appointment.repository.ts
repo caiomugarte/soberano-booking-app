@@ -42,7 +42,7 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
       },
       select: { startTime: true },
     });
-    return appointments.map((a) => a.startTime);
+    return appointments.map((a: { startTime: string }) => a.startTime);
   }
 
   async findByBarberAndDate(barberId: string, date: Date): Promise<AppointmentWithDetails[]> {
