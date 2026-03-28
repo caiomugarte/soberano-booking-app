@@ -1,8 +1,10 @@
 import { useAuthStore } from '../stores/auth.store.ts';
 
+export const API_BASE = import.meta.env.VITE_API_URL ?? '';
+
 async function tryRefresh(): Promise<string | null> {
   try {
-    const res = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' });
+    const res = await fetch(`${API_BASE}/api/auth/refresh`, { method: 'POST', credentials: 'include' });
     if (!res.ok) return null;
     const { accessToken } = await res.json();
     useAuthStore.getState().setAccessToken(accessToken);
@@ -14,7 +16,7 @@ async function tryRefresh(): Promise<string | null> {
 
 export async function authRequest<T>(path: string, options?: RequestInit): Promise<T> {
   const makeRequest = (token: string | null) =>
-    fetch(`/api${path}`, {
+    fetch(`${API_BASE}/api${path}`, {
       credentials: 'include',
       ...options,
       headers: {

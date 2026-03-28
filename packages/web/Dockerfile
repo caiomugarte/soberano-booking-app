@@ -14,6 +14,10 @@ RUN npm ci
 COPY packages/shared ./packages/shared
 COPY packages/web ./packages/web
 
+# API URL injected at build time (e.g. https://api.soberano.altion.com.br)
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
 # Build shared types, then the React app
 RUN npm -w @soberano/shared run build
 RUN npm -w @soberano/web run build

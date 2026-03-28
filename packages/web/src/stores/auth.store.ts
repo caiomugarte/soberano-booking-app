@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { API_BASE } from '../api/auth-request.ts';
 
 interface AuthState {
   accessToken: string | null;
@@ -16,14 +17,14 @@ export const useAuthStore = create<AuthState>()((set) => ({
 
   logout: async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      await fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' });
     } catch {}
     set({ accessToken: null, isInitialized: true });
   },
 
   initialize: async () => {
     try {
-      const res = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' });
+      const res = await fetch(`${API_BASE}/api/auth/refresh`, { method: 'POST', credentials: 'include' });
       if (res.ok) {
         const { accessToken } = await res.json();
         set({ accessToken, isInitialized: true });

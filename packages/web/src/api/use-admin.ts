@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/auth.store.ts';
-import { authRequest } from './auth-request.ts';
+import { authRequest, API_BASE } from './auth-request.ts';
 
 export interface AdminAppointment {
   id: string;
@@ -17,7 +17,7 @@ export function useLogin() {
   const setAccessToken = useAuthStore((s) => s.setAccessToken);
   return useMutation({
     mutationFn: (data: { email: string; password: string }) =>
-      fetch('/api/auth/login', {
+      fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
