@@ -1,5 +1,10 @@
 import { PrismaClient } from '@prisma/client';
+import { randomBytes } from 'crypto';
 import { hashPassword } from '../auth/password.service.js';
+
+function generatePassword(): string {
+  return randomBytes(8).toString('hex'); // 16-char hex, e.g. "a3f7c2d1e8b49f20"
+}
 
 const prisma = new PrismaClient();
 
@@ -57,17 +62,26 @@ const SERVICES = [
 
 async function seed() {
   console.log('Seeding database...');
-
-  const defaultPassword = await hashPassword('soberano123');
+  console.log('');
+  console.log('======= BARBER CREDENTIALS =======');
 
   // Upsert barbers + shifts
   for (const barber of BARBERS) {
+    const plainPassword = generatePassword();
+    const hashedPassword = await hashPassword(plainPassword);
+
     const record = await prisma.barber.upsert({
       where: { slug: barber.slug },
       update: { firstName: barber.firstName, lastName: barber.lastName },
-      create: { ...barber, password: defaultPassword },
+      create: { ...barber, password: hashedPassword },
     });
-    console.log(`  Barber: ${barber.firstName} ${barber.lastName} (${record.id})`);
+
+    const isNew = record.createdAt.getTime() === record.updatedAt.getTime();
+    if (isNew) {
+      console.log(`  ${barber.firstName}: ${barber.email} / ${plainPassword}`);
+    } else {
+      console.log(`  ${barber.firstName}: already exists, password unchanged`);
+    }
 
     // Replace shifts: delete existing and recreate
     await prisma.barberShift.deleteMany({ where: { barberId: record.id } });
@@ -88,6 +102,8 @@ async function seed() {
     console.log(`  Service: ${service.name}`);
   }
 
+  console.log('==================================');
+  console.log('');
   console.log('Seed completed!');
 }
 
