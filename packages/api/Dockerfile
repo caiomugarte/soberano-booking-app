@@ -1,5 +1,8 @@
 FROM node:20-slim
 
+# Required by Prisma
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # Copy workspace manifests
@@ -18,10 +21,11 @@ COPY packages/api ./packages/api
 RUN npm -w @soberano/shared run build
 RUN npm -w @soberano/api run build
 
-# Generate Prisma client for the current platform
-RUN npm -w @soberano/api exec -- prisma generate
+# Generate Prisma client (DATABASE_URL not needed at generate time)
+RUN DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder" \
+    npm -w @soberano/api exec -- prisma generate
 
 EXPOSE 3000
 
 # Run pending migrations then start the server
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy --schema=packages/api/prisma/schema.prisma && node packages/api/dist/server.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy --schema=packages/api/prisma/schema.prisma && node packages/api/dist/server.js"]
