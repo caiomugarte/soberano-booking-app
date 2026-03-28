@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useSlots } from '../../api/use-slots.ts';
 import { useBookingStore } from '../../stores/booking.store.ts';
 import { Panel } from '../ui/Panel.tsx';
-import { Button } from '../ui/Button.tsx';
+import { StickyBar } from '../ui/StickyBar.tsx';
 import { Spinner } from '../ui/Spinner.tsx';
-import { getWeekDates, getWeekLabel, dateToString, DAY_NAMES } from '../../lib/format.ts';
+import { getWeekDates, getWeekLabel, dateToString, DAY_NAMES, formatDateLong } from '../../lib/format.ts';
 import { BUSINESS_HOURS, MAX_WEEKS_AHEAD } from '@soberano/shared';
 
 export function TimeStep() {
@@ -17,6 +17,7 @@ export function TimeStep() {
   const weekDates = getWeekDates(weekOffset);
 
   return (
+    <>
     <Panel title="Escolha o horário" subtitle="Selecione uma data e horário disponível">
       {/* Week navigation */}
       <div className="flex items-center justify-between mb-4">
@@ -87,8 +88,16 @@ export function TimeStep() {
         </div>
       )}
 
-      <Button disabled={!slot} onClick={nextStep} className="mt-5">Continuar →</Button>
-      <Button variant="secondary" onClick={prevStep}>← Voltar</Button>
     </Panel>
+
+    <StickyBar
+      visible={!!slot}
+      onNext={nextStep}
+      onBack={prevStep}
+      icon="📅"
+      label={slot ?? ''}
+      sublabel={date ? formatDateLong(date) : undefined}
+    />
+    </>
   );
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useBookingStore } from '../../stores/booking.store.ts';
 import { Panel } from '../ui/Panel.tsx';
-import { Button } from '../ui/Button.tsx';
+import { StickyBar } from '../ui/StickyBar.tsx';
 import { Input } from '../ui/Input.tsx';
 import { formatPhone, stripPhone } from '../../lib/format.ts';
 
@@ -19,25 +19,34 @@ export function CustomerStep() {
   }
 
   return (
-    <Panel title="Seus dados" subtitle="Só precisamos do seu nome e WhatsApp para confirmar">
-      <Input
-        label="Nome completo"
-        placeholder="Ex: João Silva"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        autoComplete="given-name"
+    <>
+      <Panel title="Seus dados" subtitle="Só precisamos do seu nome e WhatsApp para confirmar">
+        <Input
+          label="Nome completo"
+          placeholder="Ex: João Silva"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoComplete="given-name"
+        />
+        <Input
+          label="WhatsApp (número cadastrado no app)"
+          placeholder="(11) 99999-9999"
+          prefix="🇧🇷 +55"
+          value={phone}
+          onChange={(e) => setPhone(formatPhone(e.target.value))}
+          inputMode="tel"
+          autoComplete="tel"
+        />
+      </Panel>
+
+      <StickyBar
+        visible={canContinue}
+        onNext={handleContinue}
+        onBack={prevStep}
+        icon="👤"
+        label={name.trim() || 'Seus dados'}
+        sublabel={phone || undefined}
       />
-      <Input
-        label="WhatsApp (número cadastrado no app)"
-        placeholder="(11) 99999-9999"
-        prefix="🇧🇷 +55"
-        value={phone}
-        onChange={(e) => setPhone(formatPhone(e.target.value))}
-        inputMode="tel"
-        autoComplete="tel"
-      />
-      <Button disabled={!canContinue} onClick={handleContinue}>Continuar →</Button>
-      <Button variant="secondary" onClick={prevStep}>← Voltar</Button>
-    </Panel>
+    </>
   );
 }

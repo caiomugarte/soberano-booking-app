@@ -1,7 +1,7 @@
 import { useBookingStore } from '../../stores/booking.store.ts';
 import { useCreateBooking } from '../../api/use-create-booking.ts';
 import { Panel } from '../ui/Panel.tsx';
-import { Button } from '../ui/Button.tsx';
+import { StickyBar } from '../ui/StickyBar.tsx';
 import { formatCurrency, formatDateLong } from '../../lib/format.ts';
 
 interface ConfirmStepProps {
@@ -38,24 +38,32 @@ export function ConfirmStep({ onSuccess }: ConfirmStepProps) {
   ];
 
   return (
-    <Panel title="Confirmar agendamento" subtitle="Revise os detalhes antes de confirmar">
-      <div className="bg-dark-surface2 border border-dark-border rounded-xl p-5 mb-6">
-        {rows.map(({ key, value, gold }) => (
-          <div key={key} className="flex justify-between items-start py-2.5 text-sm gap-3 border-b border-dark-border last:border-0">
-            <span className="text-muted whitespace-nowrap">{key}</span>
-            <span className={`font-medium text-right ${gold ? 'text-gold font-serif text-base' : ''}`}>{value}</span>
-          </div>
-        ))}
-      </div>
+    <>
+      <Panel title="Confirmar agendamento" subtitle="Revise os detalhes antes de confirmar">
+        <div className="bg-dark-surface2 border border-dark-border rounded-xl p-5">
+          {rows.map(({ key, value, gold }) => (
+            <div key={key} className="flex justify-between items-start py-2.5 text-sm gap-3 border-b border-dark-border last:border-0">
+              <span className="text-muted whitespace-nowrap">{key}</span>
+              <span className={`font-medium text-right ${gold ? 'text-gold font-serif text-base' : ''}`}>{value}</span>
+            </div>
+          ))}
+        </div>
 
-      {createBooking.isError && (
-        <p className="text-red-400 text-sm text-center mb-4">{(createBooking.error as Error).message}</p>
-      )}
+        {createBooking.isError && (
+          <p className="text-red-400 text-sm text-center mt-4">{(createBooking.error as Error).message}</p>
+        )}
+      </Panel>
 
-      <Button loading={createBooking.isPending} onClick={handleConfirm}>
-        ✓ Confirmar agendamento
-      </Button>
-      <Button variant="secondary" onClick={prevStep}>← Voltar</Button>
-    </Panel>
+      <StickyBar
+        visible={true}
+        onNext={handleConfirm}
+        onBack={prevStep}
+        icon={service?.icon}
+        label="Confirmar agendamento"
+        sublabel={service ? `${service.name} · ${formatCurrency(service.priceCents)}` : undefined}
+        nextLabel="✓ Confirmar"
+        loading={createBooking.isPending}
+      />
+    </>
   );
 }
