@@ -1,0 +1,25 @@
+node_modules/
+dist/
+.env
+.env.local
+.env.production
+
+# Prisma
+packages/api/src/infrastructure/database/prisma/migrations/*.sql
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*

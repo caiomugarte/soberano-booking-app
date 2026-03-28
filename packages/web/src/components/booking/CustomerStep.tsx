@@ -1,0 +1,43 @@
+import { useState } from 'react';
+import { useBookingStore } from '../../stores/booking.store.ts';
+import { Panel } from '../ui/Panel.tsx';
+import { Button } from '../ui/Button.tsx';
+import { Input } from '../ui/Input.tsx';
+import { formatPhone, stripPhone } from '../../lib/format.ts';
+
+export function CustomerStep() {
+  const { customerName, customerPhone, setCustomer, nextStep, prevStep } = useBookingStore();
+  const [name, setName] = useState(customerName);
+  const [phone, setPhone] = useState(customerPhone ? formatPhone(customerPhone) : '');
+
+  const rawPhone = stripPhone(phone);
+  const canContinue = name.trim().length >= 2 && rawPhone.length >= 10;
+
+  function handleContinue() {
+    setCustomer(name.trim(), rawPhone);
+    nextStep();
+  }
+
+  return (
+    <Panel title="Seus dados" subtitle="Só precisamos do seu nome e WhatsApp para confirmar">
+      <Input
+        label="Nome completo"
+        placeholder="Ex: João Silva"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        autoComplete="given-name"
+      />
+      <Input
+        label="WhatsApp (número cadastrado no app)"
+        placeholder="(61) 98669-1899"
+        prefix="🇧🇷 +55"
+        value={phone}
+        onChange={(e) => setPhone(formatPhone(e.target.value))}
+        inputMode="tel"
+        autoComplete="tel"
+      />
+      <Button disabled={!canContinue} onClick={handleContinue}>Continuar →</Button>
+      <Button variant="secondary" onClick={prevStep}>← Voltar</Button>
+    </Panel>
+  );
+}

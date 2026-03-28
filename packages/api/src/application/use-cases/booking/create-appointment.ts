@@ -1,0 +1,105 @@
+import crypto from 'node:crypto';
+import { BUSINESS_HOURS } from '@soberano/shared';
+import type { AppointmentRepository } from '../../../domain/repositories/appointment.repository.js';
+import type { ServiceRepository } from '../../../domain/repositories/service.repository.js';
+import type { BarberRepository } from '../../../domain/repositories/barber.repository.js';
+import type { CustomerRepository } from '../../../domain/repositories/customer.repository.js';
+import type { AppointmentWithDetails } from '../../../domain/entities/appointment.js';
+import { NotFoundError, SlotTakenError, ValidationError } from '../../../shared/errors.js';
+import { WhatsAppNotificationService } from '../../../infrastructure/notifications/whatsapp-notification.service.js';
+import { env } from '../../../config/env.js';
+
+interface CreateAppointmentInput {
+  serviceId: string;
+  barberId: string;
+  date: string;
+  startTime: string;
+  customerName: string;
+  customerPhone: string;
+}
+
+export class CreateAppointment {
+  constructor(
+    private appointmentRepo: AppointmentRepository,
+    private serviceRepo: ServiceRepository,
+    private barberRepo: BarberRepository,
+    private customerRepo: CustomerRepository,
+    private notificationService: WhatsAppNotificationService,
+  ) {}
+
+  async execute(input: CreateAppointmentInput): Promise<{ appointment: AppointmentWithDetails; cancelUrl: string }> {
+    // Validate service
+    const service = await this.serviceRepo.findById(input.serviceId);
+    if (!service || !service.isActive) {
+      throw new NotFoundError('Serviço');
+    }
+
+    // Validate barber
+    const barber = await this.barberRepo.findById(input.barberId);
+    if (!barber || !barber.isActive) {
+      throw new NotFoundError('Barbeiro');
+    }
+
+    // Validate date
+    const date = new Date(input.date + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (date < today) {
+      throw new ValidationError('Não é possível agendar em uma data passada.');
+    }
+
+    if (!BUSINESS_HOURS.workDays.includes(date.getDay())) {
+      throw new ValidationError('Não atendemos neste dia da semana.');
+    }
+
+    // Validate time
+    if (input.startTime < BUSINESS_HOURS.openTime || input.startTime >= BUSINESS_HOURS.closeTime) {
+      throw new ValidationError('Horário fora do expediente.');
+    }
+
+    // Calculate end time
+    const [h, m] = input.startTime.split(':').map(Number);
+    const endMinutes = h * 60 + m + service.duration;
+    const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
+
+    // Upsert customer
+    const customer = await this.customerRepo.upsertByPhone(input.customerPhone, input.customerName);
+
+    // Generate cancel token
+    const cancelToken = crypto.randomBytes(32).toString('hex');
+
+    // Create appointment (PG unique constraint prevents double-booking)
+    let appointment: AppointmentWithDetails;
+    try {
+      appointment = await this.appointmentRepo.create({
+        barberId: input.barberId,
+        serviceId: input.serviceId,
+        customerId: customer.id,
+        date,
+        startTime: input.startTime,
+        endTime,
+        priceCents: service.priceCents,
+        cancelToken,
+      });
+    } catch (error: unknown) {
+      // Prisma unique constraint violation
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') {
+        throw new SlotTakenError();
+      }
+      throw error;
+    }
+
+    // Send WhatsApp notification (fire-and-forget)
+    this.notificationService.sendBookingConfirmation(appointment).catch((err) => {
+      console.error('[Notification] Failed to send booking confirmation:', err);
+    });
+
+    this.notificationService.notifyBarber(appointment, 'booked').catch((err) => {
+      console.error('[Notification] Failed to notify barber:', err);
+    });
+
+    const cancelUrl = `${env.BASE_URL}/agendamento/${cancelToken}`;
+    return { appointment, cancelUrl };
+  }
+}

@@ -1,0 +1,16 @@
+import { prisma } from '../../../config/database.js';
+import type { ServiceEntity } from '../../../domain/entities/service.js';
+import type { ServiceRepository } from '../../../domain/repositories/service.repository.js';
+
+export class PrismaServiceRepository implements ServiceRepository {
+  async findAllActive(): Promise<ServiceEntity[]> {
+    return prisma.service.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    });
+  }
+
+  async findById(id: string): Promise<ServiceEntity | null> {
+    return prisma.service.findUnique({ where: { id } });
+  }
+}

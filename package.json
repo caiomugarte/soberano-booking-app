@@ -1,0 +1,21 @@
+{
+  "name": "soberano",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm -w @soberano/api run dev",
+    "dev:web": "npm -w @soberano/web run dev",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "build:api": "npm -w @soberano/api run build",
+    "build:web": "npm -w @soberano/web run build",
+    "db:migrate": "npm -w @soberano/api run db:migrate",
+    "db:seed": "npm -w @soberano/api run db:seed",
+    "db:studio": "npm -w @soberano/api run db:studio"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  }
+}

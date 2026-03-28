@@ -1,0 +1,98 @@
+i w╭─── Claude Code v2.1.85 ──────────────────────────────────────────────────────╮
+│                                                    │ Tips for getting        │
+│                 Welcome back Caio!                 │ started                 │
+│                                                    │ Run /init to create a … │
+│                       ▐▛███▜▌                      │ ─────────────────────── │
+│                      ▝▜█████▛▘                     │ Recent activity         │
+│                        ▘▘ ▝▝                       │ 4h ago  so first of al… │
+│ Sonnet 4.6 · Claude Pro · caio.mugarte@gmail.com's │ /resume for more        │
+│  Organization                                      │                         │
+│           ~/Documents/projetos/soberano            │                         │
+╰──────────────────────────────────────────────────────────────────────────────╯
+
+✻ Conversation compacted (ctrl+o for history)
+
+  ⎿  Read packages/web/src/pages/admin/SchedulePage.tsx (268 lines)
+  ⎿  Read packages/web/src/api/use-schedule.ts (75 lines)
+  ⎿  Read packages/api/src/server.ts (82 lines)
+  ⎿  Read packages/api/src/http/routes/schedule.routes.ts (63 lines)
+  ⎿  Read packages/api/src/http/routes/booking.routes.ts (49 lines)
+  ⎿  Plan file referenced (~/.claude/plans/swirling-jingling-parrot.md)
+
+  Searched for 1 pattern, read 2 files (ctrl+o to expand)
+
+⏺ Update(packages/web/src/App.tsx)
+  ⎿  Added 1 line
+       4  import NotFoundPage from './pages/NotFoundPage.tsx';
+       5  import LoginPage from './pages/admin/LoginPage.tsx';
+       6  import DashboardPage from './pages/admin/DashboardPage.tsx';
+       7 +import SchedulePage from './pages/admin/SchedulePage.tsx';     
+       8  import { ProtectedRoute } from './components/admin/ProtectedRou
+          te.tsx';
+       9  
+      10  export default function App() {
+
+⏺ Update(packages/web/src/App.tsx)
+  ⎿  Added 5 lines
+      19              <DashboardPage />
+      20            </ProtectedRoute>
+      21          } />
+      22 +        <Route path="/admin/schedule" element={                
+      23 +          <ProtectedRoute>                                     
+      24 +            <SchedulePage />                                   
+      25 +          </ProtectedRoute>                                    
+      26 +        } />                                                   
+      27          <Route path="/admin/*" element={<Navigate to="/admin" r
+          eplace />} />
+      28          <Route path="*" element={<NotFoundPage />} />
+      29        </Routes>
+
+⏺ Now add the "Minha Agenda" link to the dashboard header:
+
+⏺ Update(packages/web/src/pages/admin/DashboardPage.tsx)
+  ⎿  Added 14 lines, removed 6 lines
+       95            </svg>
+       96            <span className="font-serif text-sm tracking-widest 
+           uppercase text-gold">Soberano</span>
+       97          </div>
+       98 -        <button                                               
+       99 -          onClick={handleLogout}                              
+      100 -          className="text-xs text-muted hover:text-[#F0EDE8] t
+          -ransition-colors cursor-pointer bg-transparent border-none"   
+      101 -        >                                                     
+      102 -          Sair                                                
+      103 -        </button>                                             
+       98 +        <div className="flex items-center gap-4">             
+       99 +          <button                                             
+      100 +            onClick={() => navigate('/admin/schedule')}       
+      101 +            className="text-xs text-muted hover:text-[#F0EDE8]
+          + transition-colors cursor-pointer bg-transparent border-none" 
+      102 +          >                                                   
+      103 +            Agenda                                            
+      104 +          </button>                                           
+      105 +          <button                                             
+      106 +            onClick={handleLogout}                            
+      107 +            className="text-xs text-muted hover:text-[#F0EDE8]
+          + transition-colors cursor-pointer bg-transparent border-none" 
+      108 +          >                                                   
+      109 +            Sair                                              
+      110 +          </button>                                           
+      111 +        </div>                                                
+      112        </div>
+      113  
+      114        {/* Date picker */}
+
+⏺ Done. Now run the migration and re-seed:
+
+  npm -w @soberano/api run db:migrate
+  # when prompted for a name, enter: barber_shifts_and_absences
+
+  npm -w @soberano/api run db:generate
+
+  npm -w @soberano/api run db:seed
+
+  After that, the dashboard will have an "Agenda" link in the top-right that
+  takes each barber to /admin/schedule where they can manage their shifts and
+  absences.
+
+✻ Brewed for 5m 19s

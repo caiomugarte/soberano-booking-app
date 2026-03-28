@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Soberano Barbearia — Agendar Horário</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --gold: #C9A96E;
+            --gold-light: #E8C98A;
+            --dark: #0C0C0C;
+            --surface: #161616;
+            --surface2: #1E1E1E;
+            --border: #2A2A2A;
+            --text: #F0EDE8;
+            --muted: #7A7672;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--dark);
+            color: var(--text);
+            font-family: 'DM Sans', sans-serif;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                    radial-gradient(ellipse 80% 60% at 20% 0%, rgba(201,169,110,0.06) 0%, transparent 60%),
+                    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(201,169,110,0.04) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .wrap {
+            position: relative;
+            z-index: 1;
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 40px 20px 80px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 52px;
+        }
+
+        .logo-mark {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .logo-mark svg {
+            width: 28px;
+            height: 28px;
+            fill: var(--gold);
+        }
+
+        .logo-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 15px;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--gold);
+        }
+
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(36px, 8vw, 56px);
+            font-weight: 900;
+            line-height: 1.05;
+            letter-spacing: -0.02em;
+        }
+
+        h1 em { font-style: italic; color: var(--gold); }
+
+        .subtitle {
+            margin-top: 14px;
+            color: var(--muted);
+            font-size: 15px;
+            font-weight: 300;
+            letter-spacing: 0.02em;
+        }
+
+        /* Steps */
+        .steps-wrap {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 36px;
+        }
+
+        .steps-inner {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 0;
+            width: 100%;
+            max-width: 480px;
+        }
+
+        .step-dot {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            position: relative;
+        }
+
+        .step-dot:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            top: 14px;
+            left: calc(50% + 14px);
+            width: calc(100% - 28px);
+            height: 1px;
+            background: var(--border);
+            transition: background 0.4s;
+        }
+
+        .step-dot.completed:not(:last-child)::after { background: var(--gold); }
+
+        .step-circle {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            border: 1.5px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--muted);
+            transition: all 0.3s;
+            background: var(--dark);
+        }
+
+        .step-dot.active .step-circle {
+            border-color: var(--gold);
+            color: var(--gold);
+            box-shadow: 0 0 16px rgba(201,169,110,0.25);
+        }
+
+        .step-dot.completed .step-circle {
+            background: var(--gold);
+            border-color: var(--gold);
+            color: var(--dark);
+        }
+
+        .step-label {
+            font-size: 8px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        .step-dot.active .step-label { color: var(--gold); }
+
+        /* Panels */
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 20px;
+            display: none;
+            animation: fadeUp 0.4s ease;
+        }
+
+        .panel.active { display: block; }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(12px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .panel-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .panel-sub {
+            font-size: 13px;
+            color: var(--muted);
+            margin-bottom: 22px;
+        }
+
+        /* Service Cards */
+        .services-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        @media (max-width: 480px) { .services-grid { grid-template-columns: 1fr; } }
+
+        .service-card {
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            padding: 18px 16px;
+            cursor: pointer;
+            transition: all 0.25s;
+            background: var(--surface2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .service-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(201,169,110,0.08), transparent);
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+
+        .service-card:hover { border-color: rgba(201,169,110,0.4); transform: translateY(-1px); }
+        .service-card:hover::before { opacity: 1; }
+        .service-card.selected { border-color: var(--gold); background: rgba(201,169,110,0.06); }
+        .service-card.selected::before { opacity: 1; }
+        .service-card.selected .check-badge { display: flex; }
+
+        .service-icon { font-size: 22px; margin-bottom: 10px; }
+
+        .service-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            line-height: 1.3;
+        }
+
+        .service-price { font-size: 18px; font-weight: 500; color: var(--gold); }
+
+        .check-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: var(--gold);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            color: var(--dark);
+        }
+
+        /* Barber Cards */
+        .barbers-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        @media (max-width: 420px) { .barbers-grid { grid-template-columns: 1fr; } }
+
+        .barber-card {
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            padding: 24px 12px 20px;
+            cursor: pointer;
+            transition: all 0.25s;
+            background: var(--surface2);
+            position: relative;
+            overflow: hidden;
+            text-align: center;
+        }
+
+        .barber-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(201,169,110,0.08), transparent);
+            opacity: 0;
+            transition: opacity 0.25s;
+        }
+
+        .barber-card:hover { border-color: rgba(201,169,110,0.4); transform: translateY(-1px); }
+        .barber-card:hover::before { opacity: 1; }
+        .barber-card.selected { border-color: var(--gold); background: rgba(201,169,110,0.06); }
+        .barber-card.selected::before { opacity: 1; }
+        .barber-card.selected .check-badge { display: flex; }
+        .barber-card.selected .barber-avatar { border-color: var(--gold); }
+
+        .barber-avatar {
+            width: 58px;
+            height: 58px;
+            border-radius: 50%;
+            background: var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin: 0 auto 12px;
+            border: 2px solid var(--border);
+            transition: border-color 0.25s;
+        }
+
+        .barber-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 13px;
+            font-weight: 700;
+            line-height: 1.4;
+        }
+
+        /* Date Picker */
+        .week-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .week-label {
+            font-family: 'Playfair Display', serif;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .nav-btn {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            width: 34px; height: 34px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+        .days-row {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+            margin-bottom: 24px;
+        }
+
+        .day-cell {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 10px 4px;
+            border-radius: 10px;
+            border: 1.5px solid var(--border);
+            cursor: pointer;
+            transition: all 0.2s;
+            background: var(--surface2);
+        }
+
+        .day-cell:hover:not(.disabled) { border-color: rgba(201,169,110,0.4); }
+        .day-cell.selected { border-color: var(--gold); background: rgba(201,169,110,0.08); }
+        .day-cell.disabled { opacity: 0.3; cursor: not-allowed; }
+
+        .day-name { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+        .day-num { font-family: 'Playfair Display', serif; font-size: 18px; font-weight: 700; }
+        .day-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--gold); }
+
+        /* Slots */
+        .slots-label {
+            font-size: 12px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 12px;
+        }
+
+        .slots-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+        }
+
+        @media (max-width: 400px) { .slots-grid { grid-template-columns: repeat(4, 1fr); } }
+
+        .slot {
+            padding: 10px 6px;
+            border-radius: 8px;
+            border: 1.5px solid var(--border);
+            text-align: center;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            background: var(--surface2);
+            transition: all 0.2s;
+        }
+
+        .slot:hover { border-color: rgba(201,169,110,0.4); }
+        .slot.selected { border-color: var(--gold); background: rgba(201,169,110,0.08); color: var(--gold); }
+
+        .no-slots { text-align: center; padding: 20px; color: var(--muted); font-size: 14px; }
+
+        /* Fields */
+        .field-group { margin-bottom: 20px; }
+
+        .field-label {
+            display: block;
+            font-size: 11px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        .field-input {
+            width: 100%;
+            background: var(--surface2);
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            padding: 14px 16px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 16px;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .field-input:focus { border-color: var(--gold); }
+        .field-input::placeholder { color: var(--muted); }
+
+        .field-input-phone { display: flex; gap: 10px; }
+
+        .phone-prefix {
+            background: var(--surface2);
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            padding: 14px 16px;
+            font-size: 16px;
+            color: var(--muted);
+            white-space: nowrap;
+            min-width: 72px;
+            text-align: center;
+        }
+
+        /* Summary */
+        .summary-box {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 9px 0;
+            font-size: 14px;
+            gap: 12px;
+        }
+
+        .summary-row:not(:last-child) { border-bottom: 1px solid var(--border); }
+        .summary-key { color: var(--muted); white-space: nowrap; }
+        .summary-val { font-weight: 500; text-align: right; }
+        .summary-val.gold { color: var(--gold); font-family: 'Playfair Display', serif; font-size: 16px; }
+
+        /* Buttons */
+        .btn-primary {
+            width: 100%;
+            padding: 16px;
+            background: var(--gold);
+            color: var(--dark);
+            border: none;
+            border-radius: 10px;
+            font-family: 'DM Sans', sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.25s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+        }
+
+        .btn-primary:hover {
+            background: var(--gold-light);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(201,169,110,0.3);
+        }
+
+        .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .btn-secondary {
+            background: transparent;
+            border: none;
+            color: var(--muted);
+            font-family: 'DM Sans', sans-serif;
+            font-size: 13px;
+            cursor: pointer;
+            padding: 8px;
+            margin-top: 10px;
+            display: block;
+            width: 100%;
+            text-align: center;
+            transition: color 0.2s;
+        }
+
+        .btn-secondary:hover { color: var(--text); }
+
+        .spinner {
+            display: inline-block;
+            width: 16px; height: 16px;
+            border: 2px solid rgba(12,12,12,0.3);
+            border-top-color: var(--dark);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        #successScreen {
+            display: none;
+            text-align: center;
+            padding: 60px 20px;
+            animation: fadeUp 0.5s ease;
+        }
+
+        .success-icon {
+            width: 72px; height: 72px;
+            border-radius: 50%;
+            background: rgba(201,169,110,0.1);
+            border: 2px solid var(--gold);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            font-size: 28px;
+        }
+
+        .success-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 32px;
+            font-weight: 900;
+            margin-bottom: 12px;
+        }
+
+        .success-msg {
+            color: var(--muted);
+            font-size: 15px;
+            line-height: 1.6;
+            max-width: 320px;
+            margin: 0 auto 32px;
+        }
+
+        .success-detail {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            max-width: 360px;
+            margin: 0 auto 32px;
+            text-align: left;
+        }
+
+        @media (max-width: 500px) {
+            .panel { padding: 20px 16px; }
+            .days-row { gap: 4px; }
+            .day-num { font-size: 15px; }
+        }
+    </style>
+</head>
+<body>
+<div class="wrap">
+
+    <header>
+        <div class="logo-mark">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M9.5 3C8.1 3 7 4.1 7 5.5c0 .9.5 1.7 1.2 2.2L5 19h2l.8-3h8.4l.8 3h2L15.8 7.7c.7-.5 1.2-1.3 1.2-2.2C17 4.1 15.9 3 14.5 3c-.8 0-1.5.4-2 1h-1c-.5-.6-1.2-1-2-1zm0 2c.3 0 .5.2.5.5S9.8 6 9.5 6 9 5.8 9 5.5 9.2 5 9.5 5zm5 0c.3 0 .5.2.5.5S14.8 6 14.5 6 14 5.8 14 5.5s.2-.5.5-.5zM12 7.5l.2.5h-2l.2-.5h1.6zM8.2 14l1.1-4h5.4l1.1 4H8.2z"/>
+            </svg>
+            <span class="logo-name">Soberano Barbearia</span>
+        </div>
+        <h1>Agende seu<br><em>horário</em></h1>
+        <p class="subtitle">Escolha o serviço e o melhor horário para você</p>
+    </header>
+
+    <!-- Steps -->
+    <div class="steps-wrap" id="stepsWrap">
+        <div class="steps-inner">
+            <div class="step-dot active" id="step1dot">
+                <div class="step-circle">1</div>
+                <span class="step-label">Serviço</span>
+            </div>
+            <div class="step-dot" id="step2dot">
+                <div class="step-circle">2</div>
+                <span class="step-label">Barbeiro</span>
+            </div>
+            <div class="step-dot" id="step3dot">
+                <div class="step-circle">3</div>
+                <span class="step-label">Horário</span>
+            </div>
+            <div class="step-dot" id="step4dot">
+                <div class="step-circle">4</div>
+                <span class="step-label">Seus dados</span>
+            </div>
+            <div class="step-dot" id="step5dot">
+                <div class="step-circle">5</div>
+                <span class="step-label">Confirmar</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- STEP 1: SERVIÇO -->
+    <div class="panel active" id="panelService">
+        <div class="panel-title">Qual serviço?</div>
+        <p class="panel-sub">Selecione o que você deseja hoje</p>
+        <div class="services-grid" id="servicesGrid"></div>
+        <button class="btn-primary" id="btnService" disabled onclick="goToStep(2)" style="margin-top:20px;">
+            Continuar →
+        </button>
+    </div>
+
+    <!-- STEP 2: BARBEIRO -->
+    <div class="panel" id="panelBarber">
+        <div class="panel-title">Escolha o barbeiro</div>
+        <p class="panel-sub">Com quem você prefere ser atendido?</p>
+        <div class="barbers-grid" id="barbersGrid"></div>
+        <button class="btn-primary" id="btnBarber" disabled onclick="goToStep(3)" style="margin-top:24px;">
+            Continuar →
+        </button>
+        <button class="btn-secondary" onclick="goToStep(1)">← Voltar</button>
+    </div>
+
+    <!-- STEP 3: HORÁRIO -->
+    <div class="panel" id="panelTime">
+        <div class="panel-title">Escolha o horário</div>
+        <p class="panel-sub">Selecione uma data e horário disponível</p>
+        <div class="week-nav">
+            <button class="nav-btn" onclick="prevWeek()">‹</button>
+            <span class="week-label" id="weekLabel"></span>
+            <button class="nav-btn" onclick="nextWeek()">›</button>
+        </div>
+        <div class="days-row" id="daysRow"></div>
+        <div class="slots-label">Horários disponíveis</div>
+        <div id="slotsContainer">
+            <div class="no-slots">Selecione uma data acima</div>
+        </div>
+        <button class="btn-primary" id="btnTime" disabled onclick="goToStep(4)" style="margin-top:20px;">
+            Continuar →
+        </button>
+        <button class="btn-secondary" onclick="goToStep(2)">← Voltar</button>
+    </div>
+
+    <!-- STEP 4: DADOS -->
+    <div class="panel" id="panelName">
+        <div class="panel-title">Seus dados</div>
+        <p class="panel-sub">Só precisamos do seu nome e WhatsApp para confirmar</p>
+        <div class="field-group">
+            <label class="field-label" for="inputName">Nome completo</label>
+            <input type="text" class="field-input" id="inputName" placeholder="Ex: João Silva" oninput="checkNameStep()" autocomplete="given-name">
+        </div>
+        <div class="field-group">
+            <label class="field-label" for="inputPhone">WhatsApp</label>
+            <div class="field-input-phone">
+                <span class="phone-prefix">🇧🇷 +55</span>
+                <input type="tel" class="field-input" id="inputPhone" placeholder="(67) 99999-9999" oninput="checkNameStep(); formatPhone(this)" autocomplete="tel">
+            </div>
+        </div>
+        <button class="btn-primary" id="btnName" disabled onclick="goToStep(5)">
+            Continuar →
+        </button>
+        <button class="btn-secondary" onclick="goToStep(3)">← Voltar</button>
+    </div>
+
+    <!-- STEP 5: CONFIRMAR -->
+    <div class="panel" id="panelConfirm">
+        <div class="panel-title">Confirmar agendamento</div>
+        <p class="panel-sub">Revise os detalhes antes de confirmar</p>
+        <div class="summary-box" id="summaryBox"></div>
+        <button class="btn-primary" id="btnConfirm" onclick="confirmBooking()">
+            ✓ Confirmar agendamento
+        </button>
+        <button class="btn-secondary" onclick="goToStep(4)">← Voltar</button>
+    </div>
+
+    <!-- SUCCESS -->
+    <div id="successScreen">
+        <div class="success-icon">✓</div>
+        <div class="success-title">Agendado!</div>
+        <p class="success-msg">Você vai receber uma confirmação no WhatsApp em instantes. Até lá! ✂️</p>
+        <div class="success-detail" id="successDetail"></div>
+        <button class="btn-primary" style="max-width:280px;margin:0 auto;" onclick="resetBooking()">
+            Fazer outro agendamento
+        </button>
+    </div>
+
+</div>
+<script>
+    // ============================================================
+    //  CONFIGURAÇÃO
+    // ============================================================
+    const CONFIG = {
+        nomeBarbearia: "Soberano Barbearia",
+        webhookGetSlots: "", // Ex: "https://seu-n8n.com/webhook/get-slots"
+        webhookConfirm:  "", // Ex: "https://seu-n8n.com/webhook/confirmar"
+        demoMode: true,
+    };
+
+    // ============================================================
+    //  SERVIÇOS
+    // ============================================================
+    const SERVICES = [
+        { id: "cabelo",           icon: "✂️",  name: "Cabelo",                                                          price: "R$ 50"  },
+        { id: "barba",            icon: "🪒",  name: "Barba",                                                           price: "R$ 50"  },
+        { id: "cabelo_barba",     icon: "⭐",  name: "Cabelo e Barba",                                                  price: "R$ 80"  },
+        { id: "cabelo_dep",       icon: "✨",  name: "Cabelo e Depilação (nariz e orelha)",                             price: "R$ 70"  },
+        { id: "barba_dep",        icon: "💎",  name: "Barba e Depilação (nariz e orelha)",                              price: "R$ 70"  },
+        { id: "cabelo_barba_dep", icon: "👑",  name: "Cabelo, Barba e Depilação (nariz e orelha)",                      price: "R$ 100" },
+        { id: "novo_de_novo",     icon: "🔥",  name: "Novo de Novo! (Cabelo, Barba, Sobrancelha, Dep. nariz e orelha)", price: "R$ 120" },
+        { id: "cabelo_sob",       icon: "🎯",  name: "Cabelo e Sobrancelha",                                           price: "R$ 70"  },
+        { id: "barba_sob",        icon: "🪄",  name: "Barba e Sobrancelha",                                            price: "R$ 70"  },
+    ];
+
+    // ============================================================
+    //  BARBEIROS
+    // ============================================================
+    const BARBERS = [
+        { id: "matheus",   firstName: "Matheus",   lastName: "Kemp",    emoji: "💈" },
+        { id: "adenilson", firstName: "Adenilson", lastName: "Fogaça",  emoji: "✂️" },
+        { id: "vandson",   firstName: "Vandson",   lastName: "Metélo",  emoji: "🪒" },
+    ];
+
+    // ============================================================
+    //  STATE
+    // ============================================================
+    let state = {
+        step: 1,
+        service: null,
+        barber: null,
+        date: null,
+        slot: null,
+        name: "",
+        phone: "",
+    };
+
+    let currentWeekOffset = 0;
+
+    // ============================================================
+    //  INIT
+    // ============================================================
+    document.addEventListener('DOMContentLoaded', () => {
+        renderServices();
+        renderBarbers();
+        renderWeek();
+    });
+
+    // ============================================================
+    //  SERVIÇOS
+    // ============================================================
+    function renderServices() {
+        document.getElementById('servicesGrid').innerHTML = SERVICES.map(s => `
+    <div class="service-card" id="svc-${s.id}" onclick="selectService('${s.id}')">
+      <div class="check-badge">✓</div>
+      <div class="service-icon">${s.icon}</div>
+      <div class="service-name">${s.name}</div>
+      <div class="service-price">${s.price}</div>
+    </div>
+  `).join('');
+    }
+
+    function selectService(id) {
+        state.service = SERVICES.find(s => s.id === id);
+        document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
+        document.getElementById('svc-' + id).classList.add('selected');
+        document.getElementById('btnService').disabled = false;
+    }
+
+    // ============================================================
+    //  BARBEIROS
+    // ============================================================
+    function renderBarbers() {
+        document.getElementById('barbersGrid').innerHTML = BARBERS.map(b => `
+    <div class="barber-card" id="brb-${b.id}" onclick="selectBarber('${b.id}')">
+      <div class="check-badge">✓</div>
+      <div class="barber-avatar">${b.emoji}</div>
+      <div class="barber-name">${b.firstName}<br>${b.lastName}</div>
+    </div>
+  `).join('');
+    }
+
+    function selectBarber(id) {
+        state.barber = BARBERS.find(b => b.id === id);
+        document.querySelectorAll('.barber-card').forEach(c => c.classList.remove('selected'));
+        document.getElementById('brb-' + id).classList.add('selected');
+        document.getElementById('btnBarber').disabled = false;
+    }
+
+    // ============================================================
+    //  DATE PICKER — Seg a Sáb, 09:00–18:30 (slots de 30 min)
+    // ============================================================
+    const DAY_NAMES   = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+    const MONTH_NAMES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+    function generateDemoSlots() {
+        const slots = [];
+        for (let h = 9; h <= 18; h++) {
+            slots.push(⁠ ${String(h).padStart(2,'0')}:00 ⁠);
+            if (h < 18) slots.push(⁠ ${String(h).padStart(2,'0')}:30 ⁠);
+        }
+        return slots; // 09:00 … 18:00
+    }
+
+    function getWeekDates(offset) {
+        const today = new Date(); today.setHours(0,0,0,0);
+        const start = new Date(today);
+        start.setDate(start.getDate() + offset * 7);
+        return Array.from({length:7}, (_,i) => { const d = new Date(start); d.setDate(d.getDate()+i); return d; });
+    }
+
+    function renderWeek() {
+        const days  = getWeekDates(currentWeekOffset);
+        const today = new Date(); today.setHours(0,0,0,0);
+        const [first, last] = [days[0], days[6]];
+        document.getElementById('weekLabel').textContent =
+    ⁠ ${first.getDate()} ${MONTH_NAMES[first.getMonth()]} — ${last.getDate()} ${MONTH_NAMES[last.getMonth()]} ⁠;
+
+        document.getElementById('daysRow').innerHTML = days.map(d => {
+            const disabled   = d < today || d.getDay() === 0; // desabilita domingo e passado
+            const isSelected = state.date && d.toDateString() === state.date.toDateString();
+            return `
+      <div class="day-cell ${disabled?'disabled':''} ${isSelected?'selected':''}"
+           onclick="${disabled ? '' : 'selectDate(new Date('+d.getTime()+'))'}">
+        <span class="day-name">${DAY_NAMES[d.getDay()]}</span>
+        <span class="day-num">${d.getDate()}</span>
+        ${!disabled ? '<span class="day-dot"></span>' : '<span style="width:4px;height:4px"></span>'}
+      </div>`;
+        }).join('');
+    }
+
+    function prevWeek() { if (currentWeekOffset > 0) { currentWeekOffset--; renderWeek(); } }
+    function nextWeek() { if (currentWeekOffset < 3) { currentWeekOffset++; renderWeek(); } }
+
+    async function selectDate(date) {
+        state.date = date; state.slot = null;
+        document.getElementById('btnTime').disabled = true;
+        renderWeek();
+        document.getElementById('slotsContainer').innerHTML =
+            '<div class="no-slots"><span class="spinner"></span> Buscando horários...</div>';
+        renderSlots(await fetchSlots(date));
+    }
+
+    async function fetchSlots(date) {
+        if (CONFIG.demoMode || !CONFIG.webhookGetSlots) {
+            await new Promise(r => setTimeout(r, 500));
+            return generateDemoSlots();
+        }
+        try {
+            const res = await fetch(CONFIG.webhookGetSlots, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    data:      date.toISOString().split('T')[0],
+                    servico:   state.service?.id,
+                    barbeiro:  state.barber?.id,
+                })
+            });
+            return (await res.json()).slots || [];
+        } catch { return []; }
+    }
+
+    function renderSlots(slots) {
+        const c = document.getElementById('slotsContainer');
+        if (!slots.length) { c.innerHTML = '<div class="no-slots">Sem horários disponíveis neste dia</div>'; return; }
+        c.innerHTML = '<div class="slots-grid">' +
+            slots.map(t => ⁠ <div class="slot ${state.slot===t?'selected':''}" onclick="selectSlot('${t}')">${t}</div> ⁠).join('') +
+        '</div>';
+    }
+
+    function selectSlot(time) {
+        state.slot = time;
+        document.querySelectorAll('.slot').forEach(s => s.classList.toggle('selected', s.textContent === time));
+        document.getElementById('btnTime').disabled = false;
+    }
+
+    // ============================================================
+    //  DADOS
+    // ============================================================
+    function checkNameStep() {
+        const name  = document.getElementById('inputName').value.trim();
+        const phone = document.getElementById('inputPhone').value.replace(/\D/g,'');
+        document.getElementById('btnName').disabled = name.length < 2 || phone.length < 10;
+    }
+
+    function formatPhone(input) {
+        let v = input.value.replace(/\D/g,'').substring(0,11);
+        if (v.length > 6) v = '('+v.substring(0,2)+') '+v.substring(2,7)+'-'+v.substring(7);
+        else if (v.length > 2) v = '('+v.substring(0,2)+') '+v.substring(2);
+        else if (v.length) v = '('+v;
+        input.value = v;
+    }
+
+    // ============================================================
+    //  NAVEGAÇÃO
+    // ============================================================
+    const PANELS = ['panelService','panelBarber','panelTime','panelName','panelConfirm'];
+
+    function goToStep(n) {
+        state.step = n;
+        PANELS.forEach((id,i) => document.getElementById(id).classList.toggle('active', i+1 === n));
+        for (let i = 1; i <= 5; i++) {
+            const dot = document.getElementById('step'+i+'dot');
+            dot.classList.remove('active','completed');
+            if (i < n) dot.classList.add('completed');
+            if (i === n) dot.classList.add('active');
+        }
+        if (n === 5) buildSummary();
+        window.scrollTo({ top:0, behavior:'smooth' });
+    }
+
+    function buildSummary() {
+        state.name  = document.getElementById('inputName').value.trim();
+        state.phone = document.getElementById('inputPhone').value.trim();
+        const dateStr = state.date
+            ? state.date.toLocaleDateString('pt-BR', { weekday:'long', day:'numeric', month:'long' })
+            : '—';
+        const barberFull = state.barber ? ⁠ ${state.barber.firstName} ${state.barber.lastName} ⁠ : '—';
+        document.getElementById('summaryBox').innerHTML = `
+    <div class="summary-row"><span class="summary-key">Serviço</span><span class="summary-val gold">${state.service?.name}</span></div>
+    <div class="summary-row"><span class="summary-key">Barbeiro</span><span class="summary-val">${barberFull}</span></div>
+    <div class="summary-row"><span class="summary-key">Data</span><span class="summary-val">${dateStr}</span></div>
+    <div class="summary-row"><span class="summary-key">Horário</span><span class="summary-val">${state.slot}</span></div>
+    <div class="summary-row"><span class="summary-key">Nome</span><span class="summary-val">${state.name}</span></div>
+    <div class="summary-row"><span class="summary-key">WhatsApp</span><span class="summary-val">+55 ${state.phone}</span></div>
+    <div class="summary-row"><span class="summary-key">Valor</span><span class="summary-val gold">${state.service?.price}</span></div>
+  `;
+    }
+
+    // ============================================================
+    //  CONFIRMAR
+    // ============================================================
+    async function confirmBooking() {
+        const btn = document.getElementById('btnConfirm');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner"></span> Confirmando...';
+
+        const payload = {
+            nome:       state.name,
+            telefone:   state.phone,
+            servico:    state.service?.name,
+            servicoId:  state.service?.id,
+            barbeiro:   ⁠ ${state.barber?.firstName} ${state.barber?.lastName} ⁠,
+        barbeiroId: state.barber?.id,
+            data:       state.date?.toISOString().split('T')[0],
+            horario:    state.slot,
+            preco:      state.service?.price,
+    };
+
+        if (!CONFIG.demoMode && CONFIG.webhookConfirm) {
+            try {
+                await fetch(CONFIG.webhookConfirm, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+            } catch(e) { console.error("Webhook error:", e); }
+        } else {
+            await new Promise(r => setTimeout(r, 1200));
+        }
+
+        showSuccess();
+    }
+
+    function showSuccess() {
+        PANELS.forEach(id => document.getElementById(id).classList.remove('active'));
+        document.getElementById('stepsWrap').style.display = 'none';
+        document.getElementById('successScreen').style.display = 'block';
+        const dateStr = state.date.toLocaleDateString('pt-BR', { weekday:'long', day:'numeric', month:'long' });
+        const barberFull = ⁠ ${state.barber?.firstName} ${state.barber?.lastName} ⁠;
+        document.getElementById('successDetail').innerHTML = `
+    <div class="summary-row"><span class="summary-key">Serviço</span><span class="summary-val">${state.service?.name}</span></div>
+    <div class="summary-row"><span class="summary-key">Barbeiro</span><span class="summary-val">${barberFull}</span></div>
+    <div class="summary-row"><span class="summary-key">Data</span><span class="summary-val">${dateStr}</span></div>
+    <div class="summary-row"><span class="summary-key">Horário</span><span class="summary-val">${state.slot}</span></div>
+    <div class="summary-row"><span class="summary-key">Valor</span><span class="summary-val gold">${state.service?.price}</span></div>
+  `;
+    }
+
+    function resetBooking() {
+        state = { step:1, service:null, barber:null, date:null, slot:null, name:'', phone:'' };
+        currentWeekOffset = 0;
+        document.getElementById('inputName').value = '';
+        document.getElementById('inputPhone').value = '';
+        ['btnService','btnBarber','btnTime','btnName'].forEach(id => document.getElementById(id).disabled = true);
+        document.querySelectorAll('.service-card,.barber-card').forEach(c => c.classList.remove('selected'));
+        document.getElementById('slotsContainer').innerHTML = '<div class="no-slots">Selecione uma data acima</div>';
+        document.getElementById('successScreen').style.display = 'none';
+        document.getElementById('stepsWrap').style.display = 'flex';
+        renderServices();
+        renderBarbers();
+        renderWeek();
+        goToStep(1);
+    }
+</script>
+</body>
+</html>
