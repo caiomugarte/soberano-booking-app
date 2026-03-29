@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useBookingStore } from '../../stores/booking.store.ts';
 import { Panel } from '../ui/Panel.tsx';
 import { StickyBar } from '../ui/StickyBar.tsx';
@@ -37,6 +38,10 @@ export function CustomerStep() {
           inputMode="tel"
           autoComplete="tel"
         />
+        <p className="text-[11px] text-muted mt-1">
+          Seus dados são usados apenas para confirmar seu agendamento.{' '}
+          <Link to="/privacidade" className="underline hover:text-gold transition-colors">Política de privacidade</Link>
+        </p>
       </Panel>
 
       <StickyBar

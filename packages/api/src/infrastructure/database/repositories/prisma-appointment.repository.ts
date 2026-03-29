@@ -6,7 +6,17 @@ import type {
 } from '../../../domain/repositories/appointment.repository.js';
 
 const includeRelations = {
-  barber: true,
+  barber: {
+    select: {
+      id: true,
+      slug: true,
+      firstName: true,
+      lastName: true,
+      phone: true,
+      avatarUrl: true,
+      isActive: true,
+    },
+  },
   service: true,
   customer: true,
 } as const;
