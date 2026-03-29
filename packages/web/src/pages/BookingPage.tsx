@@ -1,4 +1,5 @@
 import { BookingWizard } from '../components/booking/BookingWizard.tsx';
+import { Footer } from '../components/ui/Footer.tsx';
 
 export default function BookingPage() {
   return (
@@ -17,6 +18,7 @@ export default function BookingPage() {
       </header>
 
       <BookingWizard />
+      <Footer />
     </div>
   );
 }

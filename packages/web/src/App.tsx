@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import BookingPage from './pages/BookingPage.tsx';
 import AppointmentPage from './pages/AppointmentPage.tsx';
+import PrivacyPage from './pages/PrivacyPage.tsx';
 import NotFoundPage from './pages/NotFoundPage.tsx';
 import LoginPage from './pages/admin/LoginPage.tsx';
 import DashboardPage from './pages/admin/DashboardPage.tsx';
@@ -15,6 +16,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<BookingPage />} />
       <Route path="/agendamento/:token" element={<AppointmentPage />} />
+      <Route path="/privacidade" element={<PrivacyPage />} />
       <Route path="/admin/login" element={<LoginPage />} />
       <Route path="/admin" element={
         <ProtectedRoute>
