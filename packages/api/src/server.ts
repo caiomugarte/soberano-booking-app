@@ -2,6 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
+import { ZodError } from 'zod';
 import { env } from './config/env.js';
 import { prisma } from './config/database.js';
 import { AppError } from './shared/errors.js';
@@ -38,6 +39,21 @@ app.setErrorHandler((error, _request, reply) => {
     return reply.status(error.statusCode).send({
       error: error.code,
       message: error.message,
+    });
+  }
+
+  if (error instanceof ZodError) {
+    return reply.status(400).send({
+      error: 'VALIDATION_ERROR',
+      message: error.errors[0]?.message ?? 'Dados inválidos.',
+    });
+  }
+
+  // @fastify/rate-limit throws 429
+  if (error.statusCode === 429) {
+    return reply.status(429).send({
+      error: 'TOO_MANY_REQUESTS',
+      message: 'Muitas tentativas. Tente novamente em instantes.',
     });
   }
 
