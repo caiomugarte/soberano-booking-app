@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatPhone, stripPhone, formatCurrency, formatDateShort, dateToString } from '../format.ts';
+import { formatPhone, stripPhone, formatCurrency, dateToString } from '../format.ts';
 
 describe('formatPhone', () => {
   it('returns empty string for empty input', () => {

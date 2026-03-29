@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { GetAvailableSlots } from '../get-available-slots.js';
 import type { AppointmentRepository } from '../../../../domain/repositories/appointment.repository.js';
 import type { BarberShiftRepository } from '../../../../domain/repositories/barber-shift.repository.js';
