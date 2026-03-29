@@ -1,4 +1,4 @@
-import Fastify from 'fastify';
+import Fastify, { type FastifyError } from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
@@ -34,7 +34,7 @@ await app.register(rateLimit, {
 });
 
 // Error handler
-app.setErrorHandler((error, _request, reply) => {
+app.setErrorHandler((error: FastifyError, _request, reply) => {
   if (error instanceof AppError) {
     return reply.status(error.statusCode).send({
       error: error.code,
@@ -49,7 +49,6 @@ app.setErrorHandler((error, _request, reply) => {
     });
   }
 
-  // @fastify/rate-limit throws 429
   if (error.statusCode === 429) {
     return reply.status(429).send({
       error: 'TOO_MANY_REQUESTS',
