@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSlots } from '../../api/use-slots.ts';
 import { useBookingStore } from '../../stores/booking.store.ts';
 import { Panel } from '../ui/Panel.tsx';
@@ -15,6 +15,16 @@ export function TimeStep() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const weekDates = getWeekDates(weekOffset);
+
+  useEffect(() => {
+    if (!date) {
+      const d = new Date(today);
+      while (!BUSINESS_HOURS.workDays.includes(d.getDay())) {
+        d.setDate(d.getDate() + 1);
+      }
+      setDate(dateToString(d));
+    }
+  }, []);
 
   return (
     <>

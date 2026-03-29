@@ -9,7 +9,7 @@ import { ConfirmStep } from './ConfirmStep.tsx';
 import { SuccessScreen } from './SuccessScreen.tsx';
 
 export function BookingWizard() {
-  const { step, reset } = useBookingStore();
+  const { step, reset, prevStep } = useBookingStore();
   const [cancelUrl, setCancelUrl] = useState<string | null>(null);
 
   function handleSuccess(url: string) {
@@ -28,7 +28,18 @@ export function BookingWizard() {
 
   return (
     <>
-      <StepIndicator current={step} />
+      <div className="mb-9">
+        {step > 1 && (
+          <button
+            onClick={prevStep}
+            className="flex items-center gap-1.5 text-muted hover:text-gold transition-colors text-[13px] cursor-pointer mb-4"
+          >
+            <span className="text-base leading-none">←</span>
+            <span>Voltar</span>
+          </button>
+        )}
+        <StepIndicator current={step} />
+      </div>
       {step === 1 && <ServiceStep />}
       {step === 2 && <BarberStep />}
       {step === 3 && <TimeStep />}

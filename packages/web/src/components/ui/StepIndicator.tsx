@@ -2,7 +2,7 @@ const LABELS = ['Serviço', 'Barbeiro', 'Horário', 'Seus dados', 'Confirmar'];
 
 export function StepIndicator({ current }: { current: number }) {
   return (
-    <div className="flex justify-center mb-9">
+    <div className="flex justify-center">
       <div className="grid gap-0 w-full max-w-[480px]" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
         {LABELS.map((label, i) => {
           const step = i + 1;
