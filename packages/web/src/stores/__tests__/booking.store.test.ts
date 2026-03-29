@@ -9,6 +9,7 @@ const mockService: Service = {
   icon: '✂️',
   priceCents: 3500,
   duration: 30,
+  isActive: true,
   sortOrder: 1,
 };
 
