@@ -12,7 +12,8 @@
     "build:web": "npm -w @soberano/web run build",
     "db:migrate": "npm -w @soberano/api run db:migrate",
     "db:seed": "npm -w @soberano/api run db:seed",
-    "db:studio": "npm -w @soberano/api run db:studio"
+    "db:studio": "npm -w @soberano/api run db:studio",
+    "test": "npm -w @soberano/shared run test && npm -w @soberano/api run test && npm -w @soberano/web run test"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",
