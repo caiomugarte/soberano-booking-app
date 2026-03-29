@@ -11,7 +11,8 @@
     "db:migrate:prod": "prisma migrate deploy",
     "db:seed": "tsx src/infrastructure/database/seed.ts",
     "db:studio": "prisma studio",
-    "db:generate": "prisma generate"
+    "db:generate": "prisma generate",
+    "test": "vitest run"
   },
   "dependencies": {
     "@fastify/cors": "^10.0.2",
@@ -31,6 +32,7 @@
     "@types/node": "^22.13.14",
     "@types/node-cron": "^3.0.11",
     "prisma": "^6.5.0",
-    "tsx": "^4.19.3"
+    "tsx": "^4.19.3",
+    "vitest": "^3.0.0"
   }
 }
