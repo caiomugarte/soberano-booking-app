@@ -17,6 +17,10 @@ RUN npm ci --include=dev
 COPY packages/shared ./packages/shared
 COPY packages/api ./packages/api
 
+# Run tests — fails the build if any test fails
+RUN npm -w @soberano/shared run test
+RUN npm -w @soberano/api run test
+
 # Build shared types, then API
 RUN npm -w @soberano/shared run build
 RUN npm -w @soberano/api run build
