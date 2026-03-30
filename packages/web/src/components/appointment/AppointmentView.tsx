@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppointment, useCancelAppointment, useChangeAppointment } from '../../api/use-appointment.ts';
-import { useSlots } from '../../api/use-slots.ts';
+import { useSlots, type Slot } from '../../api/use-slots.ts';
 import { Button } from '../ui/Button.tsx';
 import { Input } from '../ui/Input.tsx';
 import { Spinner } from '../ui/Spinner.tsx';
 import { formatCurrency, formatDateLong, getWeekDates, getWeekLabel, dateToString, DAY_NAMES } from '../../lib/format.ts';
-import { BUSINESS_HOURS, MAX_WEEKS_AHEAD } from '@soberano/shared';
+import { MAX_WEEKS_AHEAD } from '@soberano/shared';
 
 type View = 'detail' | 'cancel' | 'change';
 
@@ -131,7 +131,7 @@ export function AppointmentView({ token }: { token: string }) {
             </div>
             <div className="grid grid-cols-7 gap-1.5 mb-6">
               {weekDates.map((d) => {
-                const disabled = d < today || !BUSINESS_HOURS.workDays.includes(d.getDay());
+                const disabled = d < today;
                 const ds = dateToString(d);
                 return (
                   <button key={ds} disabled={disabled} onClick={() => { setNewDate(ds); setNewSlot(null); }}
@@ -147,10 +147,16 @@ export function AppointmentView({ token }: { token: string }) {
               <div className="flex items-center gap-2 text-muted text-sm py-3"><Spinner /> Buscando horários...</div>
             ) : (
               <div className="grid grid-cols-5 gap-2 mb-4">
-                {(slots ?? []).map((t) => (
-                  <button key={t} onClick={() => setNewSlot(t)}
-                    className={`py-2.5 px-1.5 rounded-lg border text-[13px] font-medium text-center cursor-pointer transition-all ${newSlot === t ? 'border-gold bg-gold/[0.08] text-gold' : 'border-dark-border bg-dark-surface2 hover:border-gold/40'}`}>
-                    {t}
+                {(slots ?? []).map((s: Slot) => (
+                  <button key={s.time} onClick={() => s.available && setNewSlot(s.time)}
+                    disabled={!s.available}
+                    className={`py-2.5 px-1.5 rounded-lg border text-[13px] font-medium text-center transition-all
+                      ${!s.available
+                        ? 'border-dark-border bg-dark-surface2 text-muted/40 cursor-not-allowed line-through'
+                        : newSlot === s.time
+                          ? 'border-gold bg-gold/[0.08] text-gold cursor-pointer'
+                          : 'border-dark-border bg-dark-surface2 hover:border-gold/40 cursor-pointer'}`}>
+                    {s.time}
                   </button>
                 ))}
               </div>
