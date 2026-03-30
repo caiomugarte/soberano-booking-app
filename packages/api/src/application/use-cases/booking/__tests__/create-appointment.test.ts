@@ -5,6 +5,7 @@ import type { AppointmentRepository } from '../../../../domain/repositories/appo
 import type { ServiceRepository } from '../../../../domain/repositories/service.repository.js';
 import type { BarberRepository } from '../../../../domain/repositories/barber.repository.js';
 import type { CustomerRepository } from '../../../../domain/repositories/customer.repository.js';
+import type { BarberShiftRepository } from '../../../../domain/repositories/barber-shift.repository.js';
 import type { WhatsAppNotificationService } from '../../../../infrastructure/notifications/whatsapp-notification.service.js';
 
 const FUTURE_TUESDAY = '2026-06-16'; // Tuesday — a work day
@@ -71,7 +72,14 @@ function makeUseCase(overrides?: {
     notifyBarber: vi.fn().mockResolvedValue(undefined),
   } as unknown as WhatsAppNotificationService;
 
-  return new CreateAppointment(appointmentRepo, serviceRepo, barberRepo, customerRepo, notificationService);
+  const shiftRepo = {
+    findByBarberAndDay: vi.fn().mockImplementation((_, day: number) =>
+      // Simulate Mon–Sat (1–6) with a full-day shift; Sun (0) has no shifts
+      Promise.resolve(day === 0 ? [] : [{ id: 's1', barberId: 'barber-1', dayOfWeek: day, startTime: '09:00', endTime: '18:30' }])
+    ),
+  } as unknown as BarberShiftRepository;
+
+  return new CreateAppointment(appointmentRepo, serviceRepo, barberRepo, customerRepo, notificationService, shiftRepo);
 }
 
 const validInput = {

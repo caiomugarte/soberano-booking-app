@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
-import { APPOINTMENT_STATUS, BUSINESS_HOURS } from '@soberano/shared';
+import { APPOINTMENT_STATUS } from '@soberano/shared';
 import type { AppointmentRepository } from '../../../domain/repositories/appointment.repository.js';
+import type { BarberShiftRepository } from '../../../domain/repositories/barber-shift.repository.js';
 import type { AppointmentWithDetails } from '../../../domain/entities/appointment.js';
 import { NotFoundError, SlotTakenError, ValidationError } from '../../../shared/errors.js';
 import { WhatsAppNotificationService } from '../../../infrastructure/notifications/whatsapp-notification.service.js';
@@ -9,6 +10,7 @@ export class ChangeAppointment {
   constructor(
     private appointmentRepo: AppointmentRepository,
     private notificationService: WhatsAppNotificationService,
+    private shiftRepo: BarberShiftRepository,
   ) {}
 
   async execute(
@@ -39,12 +41,16 @@ export class ChangeAppointment {
       throw new ValidationError('Não é possível agendar em uma data passada.');
     }
 
-    if (!BUSINESS_HOURS.workDays.includes(date.getDay())) {
-      throw new ValidationError('Não atendemos neste dia da semana.');
+    // Validate that barber has a shift covering the requested slot
+    const shifts = await this.shiftRepo.findByBarberAndDay(appointment.barberId, date.getDay());
+    if (!shifts.length) {
+      throw new ValidationError('Barbeiro não atende neste dia da semana.');
     }
-
-    if (newStartTime < BUSINESS_HOURS.openTime || newStartTime >= BUSINESS_HOURS.closeTime) {
-      throw new ValidationError('Horário fora do expediente.');
+    const slotCovered = shifts.some(
+      (s) => newStartTime >= s.startTime && newStartTime < s.endTime,
+    );
+    if (!slotCovered) {
+      throw new ValidationError('Horário fora do expediente do barbeiro.');
     }
 
     // Calculate new end time using original service duration

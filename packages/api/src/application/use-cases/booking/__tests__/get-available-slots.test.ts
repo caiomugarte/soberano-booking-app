@@ -47,36 +47,44 @@ describe('GetAvailableSlots', () => {
     const { shiftRepo, appointmentRepo } = makeRepos();
     const useCase = new GetAvailableSlots(appointmentRepo, shiftRepo);
     const slots = await useCase.execute('barber-1', FUTURE_MONDAY);
-    expect(slots).toEqual(['09:00', '09:30', '10:00', '10:30', '11:00', '11:30']);
+    expect(slots).toEqual([
+      { time: '09:00', available: true },
+      { time: '09:30', available: true },
+      { time: '10:00', available: true },
+      { time: '10:30', available: true },
+      { time: '11:00', available: true },
+      { time: '11:30', available: true },
+    ]);
   });
 
-  it('excludes booked slots', async () => {
+  it('marks booked slots as unavailable', async () => {
     const { shiftRepo, appointmentRepo } = makeRepos({ booked: ['10:00', '11:00'] });
     const useCase = new GetAvailableSlots(appointmentRepo, shiftRepo);
     const slots = await useCase.execute('barber-1', FUTURE_MONDAY);
-    expect(slots).not.toContain('10:00');
-    expect(slots).not.toContain('11:00');
-    expect(slots).toContain('09:00');
+    expect(slots.find((s) => s.time === '10:00')).toEqual({ time: '10:00', available: false });
+    expect(slots.find((s) => s.time === '11:00')).toEqual({ time: '11:00', available: false });
+    expect(slots.find((s) => s.time === '09:00')).toEqual({ time: '09:00', available: true });
   });
 
-  it('returns empty array on full-day absence (no startTime/endTime)', async () => {
+  it('returns all slots as unavailable on full-day absence', async () => {
     const { shiftRepo, appointmentRepo } = makeRepos({
       absences: [{ startTime: null, endTime: null }],
     });
     const useCase = new GetAvailableSlots(appointmentRepo, shiftRepo);
     const slots = await useCase.execute('barber-1', FUTURE_MONDAY);
-    expect(slots).toEqual([]);
+    expect(slots.every((s) => !s.available)).toBe(true);
+    expect(slots.length).toBeGreaterThan(0);
   });
 
-  it('excludes slots within an absence window', async () => {
+  it('marks slots within an absence window as unavailable', async () => {
     const { shiftRepo, appointmentRepo } = makeRepos({
       absences: [{ startTime: '09:00', endTime: '10:30' }],
     });
     const useCase = new GetAvailableSlots(appointmentRepo, shiftRepo);
     const slots = await useCase.execute('barber-1', FUTURE_MONDAY);
-    expect(slots).not.toContain('09:00');
-    expect(slots).not.toContain('09:30');
-    expect(slots).toContain('10:30');
-    expect(slots).toContain('11:00');
+    expect(slots.find((s) => s.time === '09:00')).toEqual({ time: '09:00', available: false });
+    expect(slots.find((s) => s.time === '09:30')).toEqual({ time: '09:30', available: false });
+    expect(slots.find((s) => s.time === '10:30')).toEqual({ time: '10:30', available: true });
+    expect(slots.find((s) => s.time === '11:00')).toEqual({ time: '11:00', available: true });
   });
 });

@@ -55,8 +55,16 @@ export async function scheduleRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Delete absence
-  app.delete<{ Params: { id: string } }>('/admin/schedule/absences/:id', async (request) => {
-    await shiftRepo.deleteAbsence(request.params.id);
+  app.delete<{ Params: { id: string } }>('/admin/schedule/absences/:id', async (request, reply) => {
+    try {
+      await shiftRepo.deleteAbsence(request.params.id);
+    } catch (err: unknown) {
+      // Prisma P2025: record not found
+      if (err && typeof err === 'object' && 'code' in err && err.code === 'P2025') {
+        return reply.status(404).send({ error: 'NOT_FOUND', message: 'Ausência não encontrada.' });
+      }
+      throw err;
+    }
     return { message: 'Ausência removida.' };
   });
 }

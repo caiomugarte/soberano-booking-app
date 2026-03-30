@@ -1,9 +1,9 @@
 import crypto from 'node:crypto';
-import { BUSINESS_HOURS } from '@soberano/shared';
 import type { AppointmentRepository } from '../../../domain/repositories/appointment.repository.js';
 import type { ServiceRepository } from '../../../domain/repositories/service.repository.js';
 import type { BarberRepository } from '../../../domain/repositories/barber.repository.js';
 import type { CustomerRepository } from '../../../domain/repositories/customer.repository.js';
+import type { BarberShiftRepository } from '../../../domain/repositories/barber-shift.repository.js';
 import type { AppointmentWithDetails } from '../../../domain/entities/appointment.js';
 import { NotFoundError, SlotTakenError, ValidationError } from '../../../shared/errors.js';
 import { WhatsAppNotificationService } from '../../../infrastructure/notifications/whatsapp-notification.service.js';
@@ -25,6 +25,7 @@ export class CreateAppointment {
     private barberRepo: BarberRepository,
     private customerRepo: CustomerRepository,
     private notificationService: WhatsAppNotificationService,
+    private shiftRepo: BarberShiftRepository,
   ) {}
 
   async execute(input: CreateAppointmentInput): Promise<{ appointment: AppointmentWithDetails; cancelUrl: string }> {
@@ -49,13 +50,16 @@ export class CreateAppointment {
       throw new ValidationError('Não é possível agendar em uma data passada.');
     }
 
-    if (!BUSINESS_HOURS.workDays.includes(date.getDay())) {
-      throw new ValidationError('Não atendemos neste dia da semana.');
+    // Validate that barber has a shift covering the requested slot
+    const shifts = await this.shiftRepo.findByBarberAndDay(input.barberId, date.getDay());
+    if (!shifts.length) {
+      throw new ValidationError('Barbeiro não atende neste dia da semana.');
     }
-
-    // Validate time
-    if (input.startTime < BUSINESS_HOURS.openTime || input.startTime >= BUSINESS_HOURS.closeTime) {
-      throw new ValidationError('Horário fora do expediente.');
+    const slotCovered = shifts.some(
+      (s) => input.startTime >= s.startTime && input.startTime < s.endTime,
+    );
+    if (!slotCovered) {
+      throw new ValidationError('Horário fora do expediente do barbeiro.');
     }
 
     // Calculate end time

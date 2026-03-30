@@ -9,6 +9,7 @@ interface StickyBarProps {
   sublabel?: string;
   nextLabel?: string;
   loading?: boolean;
+  variant?: 'gold' | 'confirm';
 }
 
 export function StickyBar({
@@ -20,11 +21,14 @@ export function StickyBar({
   sublabel,
   nextLabel = 'Continuar →',
   loading = false,
+  variant = 'gold',
 }: StickyBarProps) {
+  const barColor = variant === 'confirm' ? 'bg-[#3D8B5E] text-white' : 'bg-gold text-dark';
+
   return (
     <div className={`fixed bottom-0 left-0 right-0 z-50 bg-[#0C0C0C] transition-[transform,opacity] duration-300 ease-in-out ${visible ? 'translate-y-0 opacity-100 pointer-events-auto' : 'translate-y-full opacity-0 pointer-events-none'}`}>
       <div className="max-w-[680px] mx-auto px-5 pb-6 pt-3">
-        <div className="flex items-stretch bg-gold text-dark rounded-xl shadow-[0_-8px_32px_rgba(0,0,0,0.5)] overflow-hidden">
+        <div className={`flex items-stretch ${barColor} rounded-xl shadow-[0_-8px_32px_rgba(0,0,0,0.5)] overflow-hidden`}>
           {onBack && (
             <>
               <button

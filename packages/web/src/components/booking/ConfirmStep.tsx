@@ -63,6 +63,7 @@ export function ConfirmStep({ onSuccess }: ConfirmStepProps) {
         sublabel={service ? `${service.name} · ${formatCurrency(service.priceCents)}` : undefined}
         nextLabel="✓ Confirmar"
         loading={createBooking.isPending}
+        variant="confirm"
       />
     </>
   );
