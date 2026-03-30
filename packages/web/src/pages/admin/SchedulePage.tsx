@@ -38,6 +38,7 @@ function ShiftRow({
 }
 
 export default function SchedulePage() {
+  const today = new Date().toISOString().slice(0, 10);
   const navigate = useNavigate();
   const { data: savedShifts, isLoading: loadingShifts } = useShifts();
   const { data: absences, isLoading: loadingAbsences } = useAbsences();
@@ -197,9 +198,9 @@ export default function SchedulePage() {
 
         {loadingAbsences ? (
           <div className="flex items-center gap-2 text-muted py-4"><Spinner /> Carregando...</div>
-        ) : absences?.length ? (
+        ) : absences?.filter((a) => a.date.slice(0, 10) >= today).length ? (
           <div className="mb-5 space-y-2">
-            {absences.map((a) => (
+            {absences.filter((a) => a.date.slice(0, 10) >= today).map((a) => (
               <div key={a.id} className="flex items-center justify-between gap-3 py-2.5 border-b border-dark-border last:border-0">
                 <div>
                   <p className="text-sm font-medium">
@@ -233,6 +234,7 @@ export default function SchedulePage() {
             <input
               type="date"
               value={absDate}
+              min={today}
               onChange={(e) => setAbsDate(e.target.value)}
               className="bg-dark border border-dark-border rounded-lg px-3 py-2 text-sm text-[#F0EDE8] outline-none focus:border-gold"
             />

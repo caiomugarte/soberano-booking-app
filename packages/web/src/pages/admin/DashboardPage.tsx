@@ -22,13 +22,17 @@ const STATUS_COLOR: Record<string, string> = {
 
 function AppointmentCard({
   appointment,
+  timePassed,
   onCancelClick,
+  onNoShowClick,
 }: {
   appointment: AdminAppointment;
+  timePassed: boolean;
   onCancelClick: (id: string) => void;
+  onNoShowClick: (id: string) => void;
 }) {
   const updateStatus = useUpdateAppointmentStatus();
-  const isActive = appointment.status === 'confirmed';
+  const isConfirmed = appointment.status === 'confirmed';
 
   return (
     <div className={`bg-dark-surface border rounded-xl p-5 transition-opacity ${appointment.status === 'cancelled' ? 'opacity-50' : ''} border-dark-border`}>
@@ -51,29 +55,31 @@ function AppointmentCard({
         </div>
       </div>
 
-      {isActive && (
+      {isConfirmed && (
         <div className="flex gap-1.5">
           <button
             onClick={() => updateStatus.mutate({ id: appointment.id, status: 'completed' })}
-            disabled={updateStatus.isPending}
-            className="flex-1 py-2 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 transition-colors cursor-pointer disabled:opacity-50 text-xs font-medium"
+            disabled={updateStatus.isPending || !timePassed}
+            className="flex-1 py-2 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed text-xs font-medium"
           >
             ✓ Concluído
           </button>
           <button
-            onClick={() => updateStatus.mutate({ id: appointment.id, status: 'no_show' })}
-            disabled={updateStatus.isPending}
-            className="flex-1 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50 text-xs font-medium"
+            onClick={() => onNoShowClick(appointment.id)}
+            disabled={updateStatus.isPending || !timePassed}
+            className="flex-1 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed text-xs font-medium"
           >
             ✗ Não veio
           </button>
-          <button
-            onClick={() => onCancelClick(appointment.id)}
-            disabled={updateStatus.isPending}
-            className="flex-1 py-2 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500/20 transition-colors cursor-pointer disabled:opacity-50 text-xs font-medium"
-          >
-            ✕ Cancelar
-          </button>
+          {!timePassed && (
+            <button
+              onClick={() => onCancelClick(appointment.id)}
+              disabled={updateStatus.isPending}
+              className="flex-1 py-2 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500/20 transition-colors cursor-pointer disabled:opacity-50 text-xs font-medium"
+            >
+              ✕ Cancelar
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -124,14 +130,50 @@ function CancelModal({
   );
 }
 
+function NoShowModal({ onConfirm, onClose, isPending }: { onConfirm: () => void; onClose: () => void; isPending: boolean }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="bg-dark-surface border border-dark-border rounded-2xl p-6 w-full max-w-sm">
+        <h3 className="text-lg font-bold mb-1">Confirmar não comparecimento</h3>
+        <p className="text-muted text-sm mb-6">Tem certeza que o cliente não compareceu? Esta ação não pode ser desfeita.</p>
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            disabled={isPending}
+            className="flex-1 py-2.5 rounded-xl border border-dark-border text-muted hover:text-[#F0EDE8] transition-colors text-sm cursor-pointer bg-transparent disabled:opacity-50"
+          >
+            Voltar
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isPending}
+            className="flex-1 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors text-sm font-medium cursor-pointer disabled:opacity-50"
+          >
+            {isPending ? <Spinner /> : '✗ Confirmar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
   const today = dateToString(new Date());
   const [date, setDate] = useState(today);
+  const [page, setPage] = useState(1);
   const [cancelId, setCancelId] = useState<string | null>(null);
+  const [noShowId, setNoShowId] = useState<string | null>(null);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
-  const { data: appointments, isLoading, refetch } = useAdminAppointments(date);
+  const { data, isLoading, refetch } = useAdminAppointments(date, page);
+  const appointments = data?.appointments;
   const cancelAppointment = useAdminCancelAppointment();
+  const updateStatus = useUpdateAppointmentStatus();
+
+  function handleDateChange(newDate: string) {
+    setDate(newDate);
+    setPage(1);
+  }
 
   async function handleLogout() {
     await logout();
@@ -145,7 +187,24 @@ export default function DashboardPage() {
     });
   }
 
+  function handleNoShowConfirm() {
+    if (!noShowId) return;
+    updateStatus.mutate({ id: noShowId, status: 'no_show' }, {
+      onSuccess: () => setNoShowId(null),
+    });
+  }
+
+  function hasTimePassed(apptDate: string, endTime: string): boolean {
+    if (apptDate.slice(0, 10) < today) return true;
+    if (apptDate.slice(0, 10) > today) return false;
+    const now = new Date();
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    return endTime <= currentTime;
+  }
+
   const confirmed = appointments?.filter((a) => a.status === 'confirmed') ?? [];
+  const upcoming = confirmed.filter((a) => !hasTimePassed(a.date, a.endTime));
+  const overdue = confirmed.filter((a) => hasTimePassed(a.date, a.endTime));
   const done = appointments?.filter((a) => a.status !== 'confirmed') ?? [];
 
   return (
@@ -155,6 +214,13 @@ export default function DashboardPage() {
           onConfirm={handleCancelConfirm}
           onClose={() => setCancelId(null)}
           isPending={cancelAppointment.isPending}
+        />
+      )}
+      {noShowId && (
+        <NoShowModal
+          onConfirm={handleNoShowConfirm}
+          onClose={() => setNoShowId(null)}
+          isPending={updateStatus.isPending}
         />
       )}
       {/* Header */}
@@ -187,11 +253,11 @@ export default function DashboardPage() {
         <input
           type="date"
           value={date}
-          onChange={(e) => setDate(e.target.value)}
+          onChange={(e) => handleDateChange(e.target.value)}
           className="bg-dark-surface2 border border-dark-border rounded-xl px-4 py-2.5 text-sm text-[#F0EDE8] outline-none focus:border-gold transition-colors"
         />
         <button
-          onClick={() => setDate(today)}
+          onClick={() => handleDateChange(today)}
           className={`text-xs px-3 py-2.5 rounded-xl border transition-colors cursor-pointer ${date === today ? 'border-gold text-gold bg-gold/10' : 'border-dark-border text-muted hover:border-gold/40'}`}
         >
           Hoje
@@ -208,7 +274,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-center py-20 gap-3 text-muted">
           <Spinner /> Carregando...
         </div>
-      ) : !appointments?.length ? (
+      ) : !data?.total ? (
         <div className="text-center py-20">
           <p className="text-muted text-lg">Sem agendamentos neste dia.</p>
         </div>
@@ -217,17 +283,9 @@ export default function DashboardPage() {
           {/* Summary */}
           <div className="grid grid-cols-3 gap-3 mb-6">
             {[
-              { label: 'Agendados', value: confirmed.length, color: 'text-gold' },
-              { label: 'Concluídos', value: appointments.filter((a) => a.status === 'completed').length, color: 'text-green-400' },
-              {
-                label: 'Faturamento',
-                value: formatCurrency(
-                  appointments
-                    .filter((a) => a.status === 'completed')
-                    .reduce((sum, a) => sum + a.priceCents, 0)
-                ),
-                color: 'text-gold',
-              },
+              { label: 'Agendados', value: data!.summary.confirmed, color: 'text-gold' },
+              { label: 'Concluídos', value: data!.summary.completed, color: 'text-green-400' },
+              { label: 'Faturamento', value: formatCurrency(data!.summary.revenueCents), color: 'text-gold' },
             ].map(({ label, value, color }) => (
               <div key={label} className="bg-dark-surface border border-dark-border rounded-xl p-4 text-center">
                 <p className={`text-base font-bold ${color}`}>{value}</p>
@@ -236,12 +294,22 @@ export default function DashboardPage() {
             ))}
           </div>
 
+          {/* Overdue — time passed, needs action */}
+          {overdue.length > 0 && (
+            <section className="mb-6">
+              <h2 className="text-xs tracking-widest uppercase text-orange-400 mb-3">Aguardando confirmação</h2>
+              <div className="flex flex-col gap-3">
+                {overdue.map((a) => <AppointmentCard key={a.id} appointment={a} timePassed={true} onCancelClick={setCancelId} onNoShowClick={setNoShowId} />)}
+              </div>
+            </section>
+          )}
+
           {/* Upcoming */}
-          {confirmed.length > 0 && (
+          {upcoming.length > 0 && (
             <section className="mb-6">
               <h2 className="text-xs tracking-widest uppercase text-muted mb-3">Próximos</h2>
               <div className="flex flex-col gap-3">
-                {confirmed.map((a) => <AppointmentCard key={a.id} appointment={a} onCancelClick={setCancelId} />)}
+                {upcoming.map((a) => <AppointmentCard key={a.id} appointment={a} timePassed={false} onCancelClick={setCancelId} onNoShowClick={setNoShowId} />)}
               </div>
             </section>
           )}
@@ -251,9 +319,32 @@ export default function DashboardPage() {
             <section>
               <h2 className="text-xs tracking-widest uppercase text-muted mb-3">Concluídos / Outros</h2>
               <div className="flex flex-col gap-3">
-                {done.map((a) => <AppointmentCard key={a.id} appointment={a} onCancelClick={setCancelId} />)}
+                {done.map((a) => <AppointmentCard key={a.id} appointment={a} timePassed={true} onCancelClick={setCancelId} onNoShowClick={setNoShowId} />)}
               </div>
             </section>
+          )}
+
+          {/* Pagination */}
+          {data && data.totalPages > 1 && (
+            <div className="flex items-center justify-between mt-6 pt-4 border-t border-dark-border">
+              <button
+                onClick={() => setPage((p) => p - 1)}
+                disabled={page <= 1}
+                className="px-4 py-2 rounded-lg border border-dark-border text-sm text-muted hover:text-[#F0EDE8] hover:border-gold/40 transition-colors disabled:opacity-30 cursor-pointer bg-transparent"
+              >
+                ← Anterior
+              </button>
+              <span className="text-xs text-muted">
+                Página {page} de {data.totalPages} · {data.total} agendamentos
+              </span>
+              <button
+                onClick={() => setPage((p) => p + 1)}
+                disabled={page >= data.totalPages}
+                className="px-4 py-2 rounded-lg border border-dark-border text-sm text-muted hover:text-[#F0EDE8] hover:border-gold/40 transition-colors disabled:opacity-30 cursor-pointer bg-transparent"
+              >
+                Próxima →
+              </button>
+            </div>
           )}
         </>
       )}

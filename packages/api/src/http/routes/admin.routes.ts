@@ -12,16 +12,19 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   // All admin routes require authentication
   app.addHook('onRequest', authGuard);
 
-  // Get barber's appointments for a date
+  // Get barber's appointments for a date (paginated)
   app.get('/admin/appointments', async (request: FastifyRequest & { barberId?: string }) => {
-    const { date } = request.query as { date?: string };
+    const { date, page = '1', limit = '15' } = request.query as { date?: string; page?: string; limit?: string };
     const barberId = request.barberId!;
 
     const targetDate = date ? new Date(date + 'T00:00:00') : new Date();
     targetDate.setHours(0, 0, 0, 0);
 
-    const appointments = await appointmentRepo.findByBarberAndDate(barberId, targetDate);
-    return { appointments };
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
+
+    const { appointments, total, summary } = await appointmentRepo.findByBarberAndDate(barberId, targetDate, pageNum, limitNum);
+    return { appointments, total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum), summary };
   });
 
   // Update appointment status (completed / no_show)

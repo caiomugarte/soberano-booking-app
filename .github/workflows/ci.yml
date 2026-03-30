@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build shared package
+        run: npm -w @soberano/shared run build
+
+      - name: Run tests
+        run: npm -w @soberano/api run test
+        env:
+          DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
+          JWT_SECRET: placeholder-secret-that-is-at-least-32-characters-long
+          JWT_REFRESH_SECRET: placeholder-refresh-secret-that-is-at-least-32-chars

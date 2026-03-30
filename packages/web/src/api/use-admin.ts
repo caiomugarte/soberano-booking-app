@@ -32,13 +32,20 @@ export function useLogin() {
   });
 }
 
-export function useAdminAppointments(date: string) {
+export interface AppointmentPage {
+  appointments: AdminAppointment[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  summary: { confirmed: number; completed: number; revenueCents: number };
+}
+
+export function useAdminAppointments(date: string, page: number = 1) {
   return useQuery({
-    queryKey: ['admin-appointments', date],
-    queryFn: () =>
-      authRequest<{ appointments: AdminAppointment[] }>(`/admin/appointments?date=${date}`)
-        .then((r) => r.appointments),
-    refetchInterval: 1000 * 60, // refresh every minute
+    queryKey: ['admin-appointments', date, page],
+    queryFn: () => authRequest<AppointmentPage>(`/admin/appointments?date=${date}&page=${page}`),
+    refetchInterval: 1000 * 60,
   });
 }
 

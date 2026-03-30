@@ -55,16 +55,38 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
     return appointments.map((a: { startTime: string }) => a.startTime);
   }
 
-  async findByBarberAndDate(barberId: string, date: Date): Promise<AppointmentWithDetails[]> {
-    return prisma.appointment.findMany({
-      where: {
-        barberId,
-        date,
-        status: { in: ['confirmed', 'completed'] },
+  async findByBarberAndDate(
+    barberId: string,
+    date: Date,
+    page: number,
+    limit: number,
+  ): Promise<{ appointments: AppointmentWithDetails[]; total: number; summary: { confirmed: number; completed: number; revenueCents: number } }> {
+    const where = { barberId, date };
+    const [appointments, total, confirmedCount, completedAgg] = await prisma.$transaction([
+      prisma.appointment.findMany({
+        where,
+        include: includeRelations,
+        orderBy: { startTime: 'asc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.appointment.count({ where }),
+      prisma.appointment.count({ where: { barberId, date, status: 'confirmed' } }),
+      prisma.appointment.aggregate({
+        where: { barberId, date, status: 'completed' },
+        _sum: { priceCents: true },
+        _count: true,
+      }),
+    ]);
+    return {
+      appointments: appointments as unknown as AppointmentWithDetails[],
+      total,
+      summary: {
+        confirmed: confirmedCount,
+        completed: completedAgg._count,
+        revenueCents: completedAgg._sum.priceCents ?? 0,
       },
-      include: includeRelations,
-      orderBy: { startTime: 'asc' },
-    }) as unknown as AppointmentWithDetails[];
+    };
   }
 
   async findUpcomingWithoutReminder(minutesAhead: number): Promise<AppointmentWithDetails[]> {

@@ -18,6 +18,7 @@ export interface Barber {
   lastName: string;
   avatarUrl: string | null;
   isActive: boolean;
+  workDays: number[];
 }
 
 export interface Customer {

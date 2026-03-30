@@ -16,7 +16,7 @@ export interface AppointmentRepository {
   findByCancelToken(token: string): Promise<AppointmentWithDetails | null>;
   findById(id: string): Promise<AppointmentWithDetails | null>;
   findBookedSlots(barberId: string, date: Date): Promise<string[]>;
-  findByBarberAndDate(barberId: string, date: Date): Promise<AppointmentWithDetails[]>;
+  findByBarberAndDate(barberId: string, date: Date, page: number, limit: number): Promise<{ appointments: AppointmentWithDetails[]; total: number; summary: { confirmed: number; completed: number; revenueCents: number } }>;
   findUpcomingWithoutReminder(minutesAhead: number): Promise<AppointmentWithDetails[]>;
   updateStatus(id: string, status: string, cancelledAt?: Date): Promise<void>;
   updateDateTime(id: string, date: Date, startTime: string, endTime: string, cancelToken: string): Promise<AppointmentWithDetails>;
