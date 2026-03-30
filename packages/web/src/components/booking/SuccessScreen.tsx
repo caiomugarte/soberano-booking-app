@@ -15,7 +15,7 @@ export function SuccessScreen({ onReset }: SuccessScreenProps) {
       <div className="w-18 h-18 rounded-full bg-gold/10 border-2 border-gold flex items-center justify-center text-[28px] mx-auto mb-6">
         ✓
       </div>
-      <h2 className="font-serif text-[32px] font-black mb-3">Agendado!</h2>
+      <h2 className="text-[32px] font-black mb-3">Agendado!</h2>
       <p className="text-muted text-[15px] leading-relaxed max-w-xs mx-auto mb-8">
         Você vai receber uma confirmação no WhatsApp em instantes. Até lá! ✂️
       </p>
@@ -30,7 +30,7 @@ export function SuccessScreen({ onReset }: SuccessScreenProps) {
         ].map(({ key, value, gold }) => (
           <div key={key} className="flex justify-between items-start py-2.5 text-sm gap-3 border-b border-dark-border last:border-0">
             <span className="text-muted whitespace-nowrap">{key}</span>
-            <span className={`font-medium text-right ${gold ? 'text-gold font-serif text-base' : ''}`}>{value}</span>
+            <span className={`font-medium text-right ${gold ? 'text-gold text-base' : ''}`}>{value}</span>
           </div>
         ))}
       </div>
