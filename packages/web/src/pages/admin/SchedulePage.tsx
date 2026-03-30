@@ -209,16 +209,21 @@ export default function SchedulePage() {
                   {a.reason && <p className="text-xs text-muted">{a.reason}</p>}
                 </div>
                 <button
-                  onClick={() => deleteAbsence.mutate(a.id)}
-                  className="text-muted hover:text-red-400 transition-colors cursor-pointer bg-transparent border-none text-lg leading-none"
+                  type="button"
+                  onClick={() => deleteAbsence.mutateAsync(a.id).catch(() => null)}
+                  disabled={deleteAbsence.isPending}
+                  className="text-muted hover:text-red-400 transition-colors cursor-pointer bg-transparent border-none text-lg leading-none disabled:opacity-40"
                 >
-                  ×
+                  {deleteAbsence.isPending ? <Spinner /> : '×'}
                 </button>
               </div>
             ))}
           </div>
         ) : (
           <p className="text-muted text-sm mb-5">Nenhuma ausência cadastrada.</p>
+        )}
+        {deleteAbsence.isError && (
+          <p className="text-red-400 text-sm mb-3">{(deleteAbsence.error as Error).message}</p>
         )}
 
         {/* Add absence form */}

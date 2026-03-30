@@ -37,6 +37,9 @@ function AppointmentCard({
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xl">{appointment.service.icon}</span>
             <span className="font-bold text-base">{appointment.service.name}</span>
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${STATUS_COLOR[appointment.status]}`}>
+              {STATUS_LABEL[appointment.status] ?? appointment.status}
+            </span>
           </div>
           <p className="text-muted text-sm">{appointment.customer.name}</p>
           <p className="text-muted text-xs">+55 {appointment.customer.phone}</p>
@@ -48,43 +51,31 @@ function AppointmentCard({
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-3">
-        <span className={`text-xs font-medium px-2.5 py-1 rounded-full border ${STATUS_COLOR[appointment.status]}`}>
-          {STATUS_LABEL[appointment.status] ?? appointment.status}
-        </span>
-
-        {isActive && (
-          <div className="flex gap-1.5">
-            <button
-              onClick={() => updateStatus.mutate({ id: appointment.id, status: 'completed' })}
-              disabled={updateStatus.isPending}
-              title="Concluído"
-              className="text-xs px-2 py-1.5 sm:px-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 transition-colors cursor-pointer disabled:opacity-50"
-            >
-              <span className="sm:hidden">✓</span>
-              <span className="hidden sm:inline">✓ Concluído</span>
-            </button>
-            <button
-              onClick={() => updateStatus.mutate({ id: appointment.id, status: 'no_show' })}
-              disabled={updateStatus.isPending}
-              title="Não veio"
-              className="text-xs px-2 py-1.5 sm:px-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
-            >
-              <span className="sm:hidden">✗</span>
-              <span className="hidden sm:inline">✗ Não veio</span>
-            </button>
-            <button
-              onClick={() => onCancelClick(appointment.id)}
-              disabled={updateStatus.isPending}
-              title="Cancelar"
-              className="text-xs px-2 py-1.5 sm:px-3 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500/20 transition-colors cursor-pointer disabled:opacity-50"
-            >
-              <span className="sm:hidden">✕</span>
-              <span className="hidden sm:inline">Cancelar</span>
-            </button>
-          </div>
-        )}
-      </div>
+      {isActive && (
+        <div className="flex gap-1.5">
+          <button
+            onClick={() => updateStatus.mutate({ id: appointment.id, status: 'completed' })}
+            disabled={updateStatus.isPending}
+            className="flex-1 py-2 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 transition-colors cursor-pointer disabled:opacity-50 text-xs font-medium"
+          >
+            ✓ Concluído
+          </button>
+          <button
+            onClick={() => updateStatus.mutate({ id: appointment.id, status: 'no_show' })}
+            disabled={updateStatus.isPending}
+            className="flex-1 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50 text-xs font-medium"
+          >
+            ✗ Não veio
+          </button>
+          <button
+            onClick={() => onCancelClick(appointment.id)}
+            disabled={updateStatus.isPending}
+            className="flex-1 py-2 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500/20 transition-colors cursor-pointer disabled:opacity-50 text-xs font-medium"
+          >
+            ✕ Cancelar
+          </button>
+        </div>
+      )}
     </div>
   );
 }

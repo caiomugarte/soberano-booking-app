@@ -20,7 +20,7 @@ export async function authRequest<T>(path: string, options?: RequestInit): Promi
       credentials: 'include',
       ...options,
       headers: {
-        'Content-Type': 'application/json',
+        ...(options?.body ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options?.headers,
       },

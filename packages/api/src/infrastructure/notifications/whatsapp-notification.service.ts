@@ -56,7 +56,7 @@ export class WhatsAppNotificationService {
     const message = [
       `✅ *Agendamento confirmado!*`,
       ``,
-      `📋 *Soberano Barbearia*`,
+      `📍 *Soberano Barbearia*`,
       ``,
       `✂️ Serviço: ${appointment.service.name}`,
       `💈 Barbeiro: ${appointment.barber.firstName} ${appointment.barber.lastName}`,
@@ -79,7 +79,7 @@ export class WhatsAppNotificationService {
     const message = [
       `❌ *Seu agendamento foi cancelado*`,
       ``,
-      `📋 *Soberano Barbearia*`,
+      `📍 *Soberano Barbearia*`,
       ``,
       `✂️ Serviço: ${appointment.service.name}`,
       `💈 Barbeiro: ${appointment.barber.firstName} ${appointment.barber.lastName}`,
@@ -103,7 +103,7 @@ export class WhatsAppNotificationService {
     const message = [
       `❌ *Agendamento cancelado*`,
       ``,
-      `📋 *Soberano Barbearia*`,
+      `📍 *Soberano Barbearia*`,
       ``,
       `✂️ Serviço: ${appointment.service.name}`,
       `📅 Data: ${formatDate(appointment.date)}`,
@@ -126,7 +126,7 @@ export class WhatsAppNotificationService {
     const message = [
       `🔄 *Agendamento alterado!*`,
       ``,
-      `📋 *Soberano Barbearia*`,
+      `📍 *Soberano Barbearia*`,
       ``,
       `✂️ Serviço: ${appointment.service.name}`,
       `💈 Barbeiro: ${appointment.barber.firstName} ${appointment.barber.lastName}`,
@@ -150,7 +150,7 @@ export class WhatsAppNotificationService {
     const message = [
       `⏰ *Lembrete: seu horário é em breve!*`,
       ``,
-      `📋 *Soberano Barbearia*`,
+      `📍 *Soberano Barbearia*`,
       ``,
       `✂️ Serviço: ${appointment.service.name}`,
       `💈 Barbeiro: ${appointment.barber.firstName} ${appointment.barber.lastName}`,
@@ -174,7 +174,7 @@ export class WhatsAppNotificationService {
     }
 
     const eventLabels = {
-      booked: '🆕 *Novo agendamento!*',
+      booked: '✅ *Novo agendamento!*',
       cancelled: '❌ *Agendamento cancelado pelo cliente*',
       changed: '🔄 *Agendamento alterado pelo cliente*',
     };

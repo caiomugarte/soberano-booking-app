@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useSlots } from '../../api/use-slots.ts';
+import { useSlots, type Slot } from '../../api/use-slots.ts';
 import { useBookingStore } from '../../stores/booking.store.ts';
 import { Panel } from '../ui/Panel.tsx';
 import { StickyBar } from '../ui/StickyBar.tsx';
 import { Spinner } from '../ui/Spinner.tsx';
 import { getWeekDates, getWeekLabel, dateToString, DAY_NAMES, formatDateLong } from '../../lib/format.ts';
-import { BUSINESS_HOURS, MAX_WEEKS_AHEAD } from '@soberano/shared';
+import { MAX_WEEKS_AHEAD } from '@soberano/shared';
 
 export function TimeStep() {
   const [weekOffset, setWeekOffset] = useState(0);
@@ -19,9 +19,6 @@ export function TimeStep() {
   useEffect(() => {
     if (!date) {
       const d = new Date(today);
-      while (!BUSINESS_HOURS.workDays.includes(d.getDay())) {
-        d.setDate(d.getDate() + 1);
-      }
       setDate(dateToString(d));
     }
   }, []);
@@ -51,7 +48,7 @@ export function TimeStep() {
       {/* Days row */}
       <div className="grid grid-cols-7 gap-1.5 mb-6">
         {weekDates.map((d) => {
-          const disabled = d < today || !BUSINESS_HOURS.workDays.includes(d.getDay());
+          const disabled = d < today;
           const ds = dateToString(d);
           const isSelected = date === ds;
           return (
@@ -84,15 +81,20 @@ export function TimeStep() {
         <p className="text-center py-5 text-muted text-sm">Sem horários disponíveis neste dia</p>
       ) : (
         <div className="grid grid-cols-5 gap-2 max-[500px]:grid-cols-4">
-          {slots.map((t) => (
+          {slots.map((s: Slot) => (
             <button
-              key={t}
-              onClick={() => setSlot(t)}
-              className={`py-2.5 px-1.5 rounded-lg border text-base font-medium text-center cursor-pointer transition-all duration-200
-                ${slot === t ? 'border-gold bg-gold/[0.08] text-gold' : 'border-dark-border bg-dark-surface2 hover:border-gold/40'}
+              key={s.time}
+              onClick={() => s.available && setSlot(s.time)}
+              disabled={!s.available}
+              className={`py-2.5 px-1.5 rounded-lg border text-base font-medium text-center transition-all duration-200
+                ${!s.available
+                  ? 'border-dark-border bg-dark-surface2 text-muted/40 cursor-not-allowed line-through'
+                  : slot === s.time
+                    ? 'border-gold bg-gold/[0.08] text-gold cursor-pointer'
+                    : 'border-dark-border bg-dark-surface2 hover:border-gold/40 cursor-pointer'}
               `}
             >
-              {t}
+              {s.time}
             </button>
           ))}
         </div>

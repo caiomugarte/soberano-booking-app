@@ -1,12 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import { cancelAppointmentSchema, changeAppointmentSchema } from '@soberano/shared';
 import { PrismaAppointmentRepository } from '../../infrastructure/database/repositories/prisma-appointment.repository.js';
+import { PrismaBarberShiftRepository } from '../../infrastructure/database/repositories/prisma-barber-shift.repository.js';
 import { WhatsAppNotificationService } from '../../infrastructure/notifications/whatsapp-notification.service.js';
 import { CancelAppointment } from '../../application/use-cases/booking/cancel-appointment.js';
 import { ChangeAppointment } from '../../application/use-cases/booking/change-appointment.js';
 import { NotFoundError } from '../../shared/errors.js';
 
 const appointmentRepo = new PrismaAppointmentRepository();
+const shiftRepo = new PrismaBarberShiftRepository();
 const notificationService = new WhatsAppNotificationService();
 
 export async function appointmentRoutes(app: FastifyInstance): Promise<void> {
@@ -57,7 +59,7 @@ export async function appointmentRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { token: string } }>('/appointment/:token/change', async (request) => {
     const { token } = request.params;
     const input = changeAppointmentSchema.parse(request.body);
-    const useCase = new ChangeAppointment(appointmentRepo, notificationService);
+    const useCase = new ChangeAppointment(appointmentRepo, notificationService, shiftRepo);
     const updated = await useCase.execute(token, input.phoneLastFour, input.date, input.startTime);
     return { appointment: updated };
   });

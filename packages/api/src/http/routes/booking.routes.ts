@@ -41,6 +41,7 @@ export async function bookingRoutes(app: FastifyInstance): Promise<void> {
       barberRepo,
       customerRepo,
       notificationService,
+      shiftRepo,
     );
     const result = await useCase.execute(input);
     return reply.status(201).send(result);

@@ -22,13 +22,18 @@ function generateSlotsForShift(startTime: string, endTime: string, durationMinut
   return slots;
 }
 
+export interface SlotResult {
+  time: string;
+  available: boolean;
+}
+
 export class GetAvailableSlots {
   constructor(
     private appointmentRepo: AppointmentRepository,
     private shiftRepo: BarberShiftRepository,
   ) {}
 
-  async execute(barberId: string, dateStr: string): Promise<string[]> {
+  async execute(barberId: string, dateStr: string): Promise<SlotResult[]> {
     const date = new Date(dateStr + 'T00:00:00');
     const dayOfWeek = date.getDay();
 
@@ -51,28 +56,32 @@ export class GetAvailableSlots {
     // Get absences for this date
     const absences = await this.shiftRepo.findAbsencesByBarberAndDate(barberId, date);
 
-    // Full day absence → no slots
+    // Full day absence → all slots unavailable
     const fullDayAbsence = absences.some((a) => !a.startTime && !a.endTime);
-    if (fullDayAbsence) return [];
 
     // Build set of absent time slots
     const absentSlots = new Set<string>();
-    for (const absence of absences) {
-      if (absence.startTime && absence.endTime) {
-        const absentInWindow = generateSlotsForShift(absence.startTime, absence.endTime);
-        absentInWindow.forEach((s) => absentSlots.add(s));
+    if (!fullDayAbsence) {
+      for (const absence of absences) {
+        if (absence.startTime && absence.endTime) {
+          generateSlotsForShift(absence.startTime, absence.endTime).forEach((s) =>
+            absentSlots.add(s),
+          );
+        }
       }
     }
 
-    let available = allSlots.filter((slot) => !bookedSet.has(slot) && !absentSlots.has(slot));
-
-    // If today, filter out past slots
+    // Filter out past slots for today (don't show them at all)
+    let visibleSlots = allSlots;
     const now = new Date();
     if (date.toDateString() === now.toDateString()) {
       const currentMinutes = now.getHours() * 60 + now.getMinutes();
-      available = available.filter((slot) => timeToMinutes(slot) > currentMinutes);
+      visibleSlots = allSlots.filter((slot) => timeToMinutes(slot) > currentMinutes);
     }
 
-    return available;
+    return visibleSlots.map((time) => ({
+      time,
+      available: !fullDayAbsence && !bookedSet.has(time) && !absentSlots.has(time),
+    }));
   }
 }
