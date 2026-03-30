@@ -38,7 +38,7 @@ export function TimeStep() {
         >
           ‹
         </button>
-        <span className="font-serif text-base font-bold">{getWeekLabel(weekDates)}</span>
+        <span className="text-base font-semibold">{getWeekLabel(weekDates)}</span>
         <button
           onClick={() => setWeekOffset((w) => Math.min(MAX_WEEKS_AHEAD - 1, w + 1))}
           disabled={weekOffset >= MAX_WEEKS_AHEAD - 1}
@@ -65,7 +65,7 @@ export function TimeStep() {
               `}
             >
               <span className="text-[9px] tracking-[0.1em] uppercase text-muted">{DAY_NAMES[d.getDay()]}</span>
-              <span className="font-serif text-lg font-bold">{d.getDate()}</span>
+              <span className="text-lg font-semibold">{d.getDate()}</span>
               {!disabled ? <span className="w-1 h-1 rounded-full bg-gold" /> : <span className="w-1 h-1" />}
             </button>
           );
@@ -83,12 +83,12 @@ export function TimeStep() {
       ) : !slots?.length ? (
         <p className="text-center py-5 text-muted text-sm">Sem horários disponíveis neste dia</p>
       ) : (
-        <div className="grid grid-cols-5 gap-2 max-[400px]:grid-cols-4">
+        <div className="grid grid-cols-5 gap-2 max-[500px]:grid-cols-4">
           {slots.map((t) => (
             <button
               key={t}
               onClick={() => setSlot(t)}
-              className={`py-2.5 px-1.5 rounded-lg border text-[13px] font-medium text-center cursor-pointer transition-all duration-200
+              className={`py-2.5 px-1.5 rounded-lg border text-base font-medium text-center cursor-pointer transition-all duration-200
                 ${slot === t ? 'border-gold bg-gold/[0.08] text-gold' : 'border-dark-border bg-dark-surface2 hover:border-gold/40'}
               `}
             >

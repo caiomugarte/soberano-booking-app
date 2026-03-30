@@ -116,12 +116,12 @@ export default function SchedulePage() {
         >
           ←
         </button>
-        <h1 className="font-serif text-2xl font-bold">Minha <em className="not-italic text-gold">Agenda</em></h1>
+        <h1 className="text-2xl font-bold">Minha <em className="not-italic text-gold">Agenda</em></h1>
       </div>
 
       {/* Shifts section */}
       <section className="bg-dark-surface border border-dark-border rounded-2xl p-6 mb-5">
-        <h2 className="font-serif text-lg font-bold mb-4">Horários de trabalho</h2>
+        <h2 className="text-lg font-bold mb-4">Horários de trabalho</h2>
 
         {loadingShifts ? (
           <div className="flex items-center gap-2 text-muted py-4"><Spinner /> Carregando...</div>
@@ -193,7 +193,7 @@ export default function SchedulePage() {
 
       {/* Absences section */}
       <section className="bg-dark-surface border border-dark-border rounded-2xl p-6">
-        <h2 className="font-serif text-lg font-bold mb-4">Ausências</h2>
+        <h2 className="text-lg font-bold mb-4">Ausências</h2>
 
         {loadingAbsences ? (
           <div className="flex items-center gap-2 text-muted py-4"><Spinner /> Carregando...</div>

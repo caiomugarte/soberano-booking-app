@@ -36,13 +36,13 @@ function AppointmentCard({
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xl">{appointment.service.icon}</span>
-            <span className="font-serif font-bold text-base">{appointment.service.name}</span>
+            <span className="font-bold text-base">{appointment.service.name}</span>
           </div>
           <p className="text-muted text-sm">{appointment.customer.name}</p>
           <p className="text-muted text-xs">+55 {appointment.customer.phone}</p>
         </div>
         <div className="text-right shrink-0">
-          <p className="font-serif text-gold text-lg font-bold">{appointment.startTime}</p>
+          <p className="text-gold text-lg font-bold">{appointment.startTime}</p>
           <p className="text-muted text-xs">até {appointment.endTime}</p>
           <p className="text-sm font-medium mt-1">{formatCurrency(appointment.priceCents)}</p>
         </div>
@@ -54,27 +54,33 @@ function AppointmentCard({
         </span>
 
         {isActive && (
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             <button
               onClick={() => updateStatus.mutate({ id: appointment.id, status: 'completed' })}
               disabled={updateStatus.isPending}
-              className="text-xs px-3 py-1.5 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 transition-colors cursor-pointer disabled:opacity-50"
+              title="Concluído"
+              className="text-xs px-2 py-1.5 sm:px-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 transition-colors cursor-pointer disabled:opacity-50"
             >
-              ✓ Concluído
+              <span className="sm:hidden">✓</span>
+              <span className="hidden sm:inline">✓ Concluído</span>
             </button>
             <button
               onClick={() => updateStatus.mutate({ id: appointment.id, status: 'no_show' })}
               disabled={updateStatus.isPending}
-              className="text-xs px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
+              title="Não veio"
+              className="text-xs px-2 py-1.5 sm:px-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-50"
             >
-              ✗ Não veio
+              <span className="sm:hidden">✗</span>
+              <span className="hidden sm:inline">✗ Não veio</span>
             </button>
             <button
               onClick={() => onCancelClick(appointment.id)}
               disabled={updateStatus.isPending}
-              className="text-xs px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500/20 transition-colors cursor-pointer disabled:opacity-50"
+              title="Cancelar"
+              className="text-xs px-2 py-1.5 sm:px-3 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500/20 transition-colors cursor-pointer disabled:opacity-50"
             >
-              Cancelar
+              <span className="sm:hidden">✕</span>
+              <span className="hidden sm:inline">Cancelar</span>
             </button>
           </div>
         )}
@@ -96,7 +102,7 @@ function CancelModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="bg-dark-surface border border-dark-border rounded-2xl p-6 w-full max-w-sm">
-        <h3 className="font-serif text-lg font-bold mb-1">Cancelar agendamento</h3>
+        <h3 className="text-lg font-bold mb-1">Cancelar agendamento</h3>
         <p className="text-muted text-sm mb-4">O cliente receberá uma mensagem no WhatsApp com o motivo.</p>
         <textarea
           value={reason}
@@ -167,6 +173,9 @@ export default function DashboardPage() {
           <span className="font-serif text-sm tracking-widest uppercase text-gold">Soberano</span>
         </div>
         <div className="flex items-center gap-4">
+          <a href="/" className="text-xs text-muted hover:text-[#F0EDE8] transition-colors">
+            Site
+          </a>
           <button
             onClick={() => navigate('/admin/schedule')}
             className="text-xs text-muted hover:text-[#F0EDE8] transition-colors cursor-pointer bg-transparent border-none"
@@ -230,7 +239,7 @@ export default function DashboardPage() {
               },
             ].map(({ label, value, color }) => (
               <div key={label} className="bg-dark-surface border border-dark-border rounded-xl p-4 text-center">
-                <p className={`font-serif text-xl font-bold ${color}`}>{value}</p>
+                <p className={`text-base font-bold ${color}`}>{value}</p>
                 <p className="text-muted text-xs mt-1">{label}</p>
               </div>
             ))}

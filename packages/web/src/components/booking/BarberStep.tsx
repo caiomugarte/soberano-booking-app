@@ -34,7 +34,7 @@ export function BarberStep() {
                 <div className={`w-14 h-14 rounded-full bg-dark-border flex items-center justify-center text-2xl mx-auto mb-3 border-2 transition-colors ${barber?.id === b.id ? 'border-gold' : 'border-dark-border'}`}>
                   💈
                 </div>
-                <div className="font-serif text-[13px] font-bold leading-snug">
+                <div className="text-base font-semibold leading-snug">
                   {b.firstName} {b.lastName}
                 </div>
               </button>

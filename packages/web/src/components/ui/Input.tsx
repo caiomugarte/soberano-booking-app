@@ -13,7 +13,7 @@ export function Input({ label, prefix, className = '', ...props }: InputProps) {
       </label>
       <div className="flex gap-2.5">
         {prefix && (
-          <span className="bg-dark-surface2 border border-dark-border rounded-[10px] px-4 py-3.5 text-base text-muted whitespace-nowrap min-w-[72px] text-center">
+          <span className="bg-dark-surface2 border border-dark-border rounded-[10px] px-5 py-3.5 text-base text-muted whitespace-nowrap text-center">
             {prefix}
           </span>
         )}
