@@ -56,15 +56,18 @@ export function AppointmentView({ token }: { token: string }) {
       return (
         <div className="text-center py-20 animate-[fadeUp_0.5s_ease]">
           <div className="w-18 h-18 rounded-full bg-gold/10 border-2 border-gold flex items-center justify-center text-[28px] mx-auto mb-6">✓</div>
-          <h2 className="font-serif text-3xl font-black mb-3">Agendamento cancelado</h2>
-          <p className="text-muted text-sm">Para agendar novamente, acesse a página inicial.</p>
+          <h2 className="text-3xl font-black mb-3">Agendamento cancelado</h2>
+          <p className="text-muted text-sm mb-6">Esperamos te ver em breve!</p>
+          <a href="/" className="inline-block bg-gold text-dark font-bold text-[14px] px-8 py-3 rounded-lg hover:opacity-90 transition-opacity">
+            Fazer novo agendamento
+          </a>
         </div>
       );
     }
 
     return (
       <div className="bg-dark-surface border border-dark-border rounded-2xl p-7 mb-5">
-        <h2 className="font-serif text-[22px] font-bold mb-1.5">Cancelar agendamento</h2>
+        <h2 className="text-[22px] font-bold mb-1.5">Cancelar agendamento</h2>
         <p className="text-[13px] text-muted mb-5">Confirme os 4 últimos dígitos do seu telefone para cancelar.</p>
         <Input
           label="Últimos 4 dígitos do WhatsApp"
@@ -99,7 +102,7 @@ export function AppointmentView({ token }: { token: string }) {
       return (
         <div className="text-center py-20 animate-[fadeUp_0.5s_ease]">
           <div className="w-18 h-18 rounded-full bg-gold/10 border-2 border-gold flex items-center justify-center text-[28px] mx-auto mb-6">✓</div>
-          <h2 className="font-serif text-3xl font-black mb-3">Horário alterado!</h2>
+          <h2 className="text-3xl font-black mb-3">Horário alterado!</h2>
           <p className="text-muted text-sm">Você receberá uma confirmação no WhatsApp.</p>
         </div>
       );
@@ -107,7 +110,7 @@ export function AppointmentView({ token }: { token: string }) {
 
     return (
       <div className="bg-dark-surface border border-dark-border rounded-2xl p-7 mb-5">
-        <h2 className="font-serif text-[22px] font-bold mb-1.5">Alterar horário</h2>
+        <h2 className="text-[22px] font-bold mb-1.5">Alterar horário</h2>
         <p className="text-[13px] text-muted mb-5">Escolha uma nova data e horário.</p>
 
         {!phoneValid ? (
@@ -123,7 +126,7 @@ export function AppointmentView({ token }: { token: string }) {
           <>
             <div className="flex items-center justify-between mb-4">
               <button onClick={() => setWeekOffset((w) => Math.max(0, w - 1))} disabled={weekOffset === 0} className="w-[34px] h-[34px] bg-dark-surface2 border border-dark-border rounded-lg flex items-center justify-center hover:border-gold hover:text-gold transition-all disabled:opacity-30">‹</button>
-              <span className="font-serif text-base font-bold">{getWeekLabel(weekDates)}</span>
+              <span className="text-base font-bold">{getWeekLabel(weekDates)}</span>
               <button onClick={() => setWeekOffset((w) => Math.min(MAX_WEEKS_AHEAD - 1, w + 1))} disabled={weekOffset >= MAX_WEEKS_AHEAD - 1} className="w-[34px] h-[34px] bg-dark-surface2 border border-dark-border rounded-lg flex items-center justify-center hover:border-gold hover:text-gold transition-all disabled:opacity-30">›</button>
             </div>
             <div className="grid grid-cols-7 gap-1.5 mb-6">
@@ -134,7 +137,7 @@ export function AppointmentView({ token }: { token: string }) {
                   <button key={ds} disabled={disabled} onClick={() => { setNewDate(ds); setNewSlot(null); }}
                     className={`flex flex-col items-center gap-1 py-2.5 px-1 rounded-[10px] border transition-all duration-200 ${disabled ? 'opacity-30 cursor-not-allowed border-dark-border bg-dark-surface2' : 'cursor-pointer'} ${newDate === ds ? 'border-gold bg-gold/[0.08]' : !disabled ? 'border-dark-border bg-dark-surface2 hover:border-gold/40' : ''}`}>
                     <span className="text-[9px] tracking-[0.1em] uppercase text-muted">{DAY_NAMES[d.getDay()]}</span>
-                    <span className="font-serif text-lg font-bold">{d.getDate()}</span>
+                    <span className="text-lg font-bold">{d.getDate()}</span>
                     {!disabled ? <span className="w-1 h-1 rounded-full bg-gold" /> : <span className="w-1 h-1" />}
                   </button>
                 );
@@ -176,7 +179,7 @@ export function AppointmentView({ token }: { token: string }) {
       <div className="flex items-center gap-3 mb-5">
         <div className="text-2xl">{appointment.service.icon}</div>
         <div>
-          <h2 className="font-serif text-xl font-bold">{appointment.service.name}</h2>
+          <h2 className="text-xl font-bold">{appointment.service.name}</h2>
           <p className="text-muted text-sm">{appointment.barber.firstName} {appointment.barber.lastName}</p>
         </div>
       </div>
@@ -189,7 +192,7 @@ export function AppointmentView({ token }: { token: string }) {
       ].map(({ key, value, gold }) => (
         <div key={key} className="flex justify-between items-start py-2.5 text-sm gap-3 border-b border-dark-border last:border-0">
           <span className="text-muted">{key}</span>
-          <span className={`font-medium text-right ${gold ? 'text-gold font-serif text-base' : ''}`}>{value}</span>
+          <span className={`font-medium text-right ${gold ? 'text-gold text-base' : ''}`}>{value}</span>
         </div>
       ))}
 

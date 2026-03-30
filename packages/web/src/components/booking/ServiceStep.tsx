@@ -33,8 +33,10 @@ export function ServiceStep() {
                   <span className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-gold flex items-center justify-center text-[11px] text-dark font-bold">✓</span>
                 )}
                 <div className="text-[22px] mb-2.5">{s.icon}</div>
-                <div className="font-serif text-sm font-bold mb-2.5 leading-snug">{s.name}</div>
-                <div className="text-lg font-medium text-gold">{formatCurrency(s.priceCents)}</div>
+                <div className="flex items-end justify-between gap-2">
+                  <div className="text-base font-semibold leading-snug">{s.name}</div>
+                  <div className="text-base font-semibold text-gold whitespace-nowrap">{formatCurrency(s.priceCents)}</div>
+                </div>
               </button>
             ))}
           </div>

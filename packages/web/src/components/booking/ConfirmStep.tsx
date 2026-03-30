@@ -44,7 +44,7 @@ export function ConfirmStep({ onSuccess }: ConfirmStepProps) {
           {rows.map(({ key, value, gold }) => (
             <div key={key} className="flex justify-between items-start py-2.5 text-sm gap-3 border-b border-dark-border last:border-0">
               <span className="text-muted whitespace-nowrap">{key}</span>
-              <span className={`font-medium text-right ${gold ? 'text-gold font-serif text-base' : ''}`}>{value}</span>
+              <span className={`font-medium text-right ${gold ? 'text-gold text-base' : ''}`}>{value}</span>
             </div>
           ))}
         </div>
