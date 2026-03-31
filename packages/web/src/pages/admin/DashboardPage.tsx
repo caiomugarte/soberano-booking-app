@@ -410,7 +410,9 @@ function MonthView({ onSelectDay, initialOffset = 0 }: { onSelectDay: (date: str
               if (!d) return <div key={i} />;
               const ds = dateToString(d);
               const stat = statsMap.get(ds);
-              const total = (stat?.confirmed ?? 0) + (stat?.completed ?? 0);
+              const confirmed = stat?.confirmed ?? 0;
+              const completed = stat?.completed ?? 0;
+              const total = confirmed + completed;
               const isToday = ds === todayStr;
               return (
                 <button
@@ -421,7 +423,11 @@ function MonthView({ onSelectDay, initialOffset = 0 }: { onSelectDay: (date: str
                 >
                   <span className={`text-sm font-medium ${isToday ? 'text-gold' : ''}`}>{d.getDate()}</span>
                   {total > 0 ? (
-                    <span className="text-[10px] text-green-400 font-medium mt-0.5">{total}</span>
+                    <div className="flex gap-0.5 mt-0.5">
+                      {confirmed > 0 && <span className="text-[10px] text-gold font-medium">{confirmed}</span>}
+                      {confirmed > 0 && completed > 0 && <span className="text-[10px] text-muted">·</span>}
+                      {completed > 0 && <span className="text-[10px] text-green-400 font-medium">{completed}</span>}
+                    </div>
                   ) : (
                     <span className="h-[14px]" />
                   )}
