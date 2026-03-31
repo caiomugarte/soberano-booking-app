@@ -27,6 +27,28 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return { appointments, total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum), summary };
   });
 
+  // Get all appointments for a date range (weekly calendar view)
+  app.get('/admin/appointments/range', async (request: FastifyRequest & { barberId?: string }, reply) => {
+    const { from, to } = request.query as { from?: string; to?: string };
+    if (!from || !to) return reply.status(400).send({ error: 'BAD_REQUEST', message: 'from e to são obrigatórios.' });
+    const appointments = await appointmentRepo.findByBarberAndDateRange(
+      request.barberId!,
+      new Date(from + 'T00:00:00'),
+      new Date(to + 'T00:00:00'),
+    );
+    return { appointments };
+  });
+
+  // Get aggregated stats for a date range (weekly / monthly views)
+  app.get('/admin/stats', async (request: FastifyRequest & { barberId?: string }, reply) => {
+    const { from, to } = request.query as { from?: string; to?: string };
+    if (!from || !to) return reply.status(400).send({ error: 'BAD_REQUEST', message: 'from e to são obrigatórios.' });
+    const fromDate = new Date(from + 'T00:00:00');
+    const toDate = new Date(to + 'T00:00:00');
+    const days = await appointmentRepo.getStatsByDateRange(request.barberId!, fromDate, toDate);
+    return { days };
+  });
+
   // Update appointment status (completed / no_show)
   app.patch<{ Params: { id: string } }>('/admin/appointments/:id', async (request, reply) => {
     const { id } = request.params;

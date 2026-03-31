@@ -49,6 +49,31 @@ export function useAdminAppointments(date: string, page: number = 1) {
   });
 }
 
+export interface DayStat {
+  date: string;
+  confirmed: number;
+  completed: number;
+  revenueCents: number;
+}
+
+export function useAdminAppointmentsRange(from: string, to: string) {
+  return useQuery({
+    queryKey: ['admin-appointments-range', from, to],
+    queryFn: () =>
+      authRequest<{ appointments: AdminAppointment[] }>(`/admin/appointments/range?from=${from}&to=${to}`)
+        .then((r) => r.appointments),
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useAdminStats(from: string, to: string) {
+  return useQuery({
+    queryKey: ['admin-stats', from, to],
+    queryFn: () => authRequest<{ days: DayStat[] }>(`/admin/stats?from=${from}&to=${to}`).then((r) => r.days),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useUpdateAppointmentStatus() {
   const queryClient = useQueryClient();
   return useMutation({

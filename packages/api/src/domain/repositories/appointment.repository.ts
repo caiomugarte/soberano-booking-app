@@ -11,6 +11,13 @@ export interface CreateAppointmentData {
   cancelToken: string;
 }
 
+export interface DayStat {
+  date: string;
+  confirmed: number;
+  completed: number;
+  revenueCents: number;
+}
+
 export interface AppointmentRepository {
   create(data: CreateAppointmentData): Promise<AppointmentWithDetails>;
   findByCancelToken(token: string): Promise<AppointmentWithDetails | null>;
@@ -21,4 +28,6 @@ export interface AppointmentRepository {
   updateStatus(id: string, status: string, cancelledAt?: Date): Promise<void>;
   updateDateTime(id: string, date: Date, startTime: string, endTime: string, cancelToken: string): Promise<AppointmentWithDetails>;
   markReminderSent(id: string): Promise<void>;
+  getStatsByDateRange(barberId: string, from: Date, to: Date): Promise<DayStat[]>;
+  findByBarberAndDateRange(barberId: string, from: Date, to: Date): Promise<AppointmentWithDetails[]>;
 }

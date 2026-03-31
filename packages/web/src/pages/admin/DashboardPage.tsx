@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAdminAppointments, useUpdateAppointmentStatus, useAdminCancelAppointment, type AdminAppointment } from '../../api/use-admin.ts';
+import { useAdminAppointments, useAdminAppointmentsRange, useAdminStats, useUpdateAppointmentStatus, useAdminCancelAppointment, type AdminAppointment, type DayStat } from '../../api/use-admin.ts';
 import { useAuthStore } from '../../stores/auth.store.ts';
 import { Button } from '../../components/ui/Button.tsx';
 import { Spinner } from '../../components/ui/Spinner.tsx';
-import { formatCurrency, dateToString } from '../../lib/format.ts';
+import { formatCurrency, dateToString, DAY_NAMES, getAdminWeekDates, getMonthCalendarDays, getMonthLabel, getWeekLabel } from '../../lib/format.ts';
 
 const STATUS_LABEL: Record<string, string> = {
   confirmed: 'Confirmado',
@@ -130,6 +130,294 @@ function CancelModal({
   );
 }
 
+function StatsSummary({ days }: { days: DayStat[] }) {
+  const total = days.reduce((acc, d) => ({
+    confirmed: acc.confirmed + d.confirmed,
+    completed: acc.completed + d.completed,
+    revenueCents: acc.revenueCents + d.revenueCents,
+  }), { confirmed: 0, completed: 0, revenueCents: 0 });
+
+  return (
+    <div className="grid grid-cols-3 gap-3 mb-6">
+      {[
+        { label: 'Agendados', value: total.confirmed, color: 'text-gold' },
+        { label: 'Concluídos', value: total.completed, color: 'text-green-400' },
+        { label: 'Faturamento', value: formatCurrency(total.revenueCents), color: 'text-gold' },
+      ].map(({ label, value, color }) => (
+        <div key={label} className="bg-dark-surface border border-dark-border rounded-xl p-4 text-center">
+          <p className={`text-base font-bold ${color}`}>{value}</p>
+          <p className="text-muted text-xs mt-1">{label}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const HOUR_HEIGHT = 72; // px per hour
+const START_HOUR = 7;
+const END_HOUR = 21;
+const HOURS = Array.from({ length: END_HOUR - START_HOUR }, (_, i) => START_HOUR + i);
+
+const APPT_COLORS: Record<string, string> = {
+  confirmed: 'bg-gold/20 border-gold/50 text-gold',
+  completed: 'bg-green-500/20 border-green-500/50 text-green-400',
+  no_show: 'bg-red-500/15 border-red-500/40 text-red-400 opacity-60',
+  cancelled: 'bg-dark-surface2 border-dark-border text-muted opacity-40',
+};
+
+function timeToMinutes(t: string) {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function WeekView({ onSelectDay }: { onSelectDay: (date: string) => void }) {
+  const [weekOffset, setWeekOffset] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const dates = getAdminWeekDates(weekOffset);
+  const from = dateToString(dates[0]);
+  const to = dateToString(dates[6]);
+  const { data: appointments, isLoading } = useAdminAppointmentsRange(from, to);
+  const today = dateToString(new Date());
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  // Group appointments by date
+  const byDay = new Map<string, AdminAppointment[]>();
+  (appointments ?? []).forEach((a) => {
+    const ds = a.date.slice(0, 10);
+    if (!byDay.has(ds)) byDay.set(ds, []);
+    byDay.get(ds)!.push(a);
+  });
+
+  // Derive week summary from fetched appointments
+  const weekStats = (appointments ?? []).reduce(
+    (acc, a) => ({
+      confirmed: acc.confirmed + (a.status === 'confirmed' ? 1 : 0),
+      completed: acc.completed + (a.status === 'completed' ? 1 : 0),
+      revenueCents: acc.revenueCents + (a.status === 'completed' ? a.priceCents : 0),
+    }),
+    { confirmed: 0, completed: 0, revenueCents: 0 },
+  );
+
+  // Scroll to current time (or 8am) on mount / week change
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    const scrollTo = weekOffset === 0
+      ? Math.max(0, (currentMinutes - START_HOUR * 60 - 60) / 60 * HOUR_HEIGHT)
+      : (8 - START_HOUR) * HOUR_HEIGHT;
+    scrollRef.current.scrollTop = scrollTo;
+  }, [weekOffset]);
+
+  const totalHeight = (END_HOUR - START_HOUR) * HOUR_HEIGHT;
+
+  return (
+    <div>
+      {/* Navigation */}
+      <div className="flex items-center justify-between mb-4">
+        <button onClick={() => setWeekOffset((w) => w - 1)}
+          className="w-8 h-8 flex items-center justify-center rounded-lg border border-dark-border text-muted hover:border-gold/40 hover:text-gold transition-all cursor-pointer bg-transparent"
+        >‹</button>
+        <span className="text-sm font-semibold">{getWeekLabel(dates)}</span>
+        <button onClick={() => setWeekOffset((w) => w + 1)}
+          className="w-8 h-8 flex items-center justify-center rounded-lg border border-dark-border text-muted hover:border-gold/40 hover:text-gold transition-all cursor-pointer bg-transparent"
+        >›</button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-10 gap-2 text-muted"><Spinner /> Carregando...</div>
+      ) : (
+        <>
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          {[
+            { label: 'Agendados', value: weekStats.confirmed, color: 'text-gold' },
+            { label: 'Concluídos', value: weekStats.completed, color: 'text-green-400' },
+            { label: 'Faturamento', value: formatCurrency(weekStats.revenueCents), color: 'text-gold' },
+          ].map(({ label, value, color }) => (
+            <div key={label} className="bg-dark-surface border border-dark-border rounded-xl p-4 text-center">
+              <p className={`text-base font-bold ${color}`}>{value}</p>
+              <p className="text-muted text-xs mt-1">{label}</p>
+            </div>
+          ))}
+        </div>
+        <div className="border border-dark-border rounded-xl overflow-hidden">
+          {/* Horizontally scrollable on mobile */}
+          <div className="overflow-x-auto">
+          <div style={{ minWidth: 480 }}>
+          {/* Day headers */}
+          <div className="grid border-b border-dark-border bg-dark-surface" style={{ gridTemplateColumns: '36px repeat(7, 1fr)' }}>
+            <div className="border-r border-dark-border" />
+            {dates.map((d) => {
+              const ds = dateToString(d);
+              const isToday = ds === today;
+              return (
+                <button
+                  key={ds}
+                  onClick={() => onSelectDay(ds)}
+                  className={`py-2 text-center border-r border-dark-border last:border-r-0 cursor-pointer hover:bg-dark-surface2 transition-colors
+                    ${isToday ? 'bg-gold/5' : ''}`}
+                >
+                  <div className={`text-[10px] tracking-widest uppercase ${isToday ? 'text-gold' : 'text-muted'}`}>
+                    {DAY_NAMES[d.getDay()]}
+                  </div>
+                  <div className={`text-sm font-bold ${isToday ? 'text-gold' : ''}`}>{d.getDate()}</div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Scrollable grid */}
+          <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: '480px' }}>
+            <div className="relative" style={{ gridTemplateColumns: '36px repeat(7, 1fr)', display: 'grid', height: totalHeight }}>
+              {/* Hour lines + time labels */}
+              {HOURS.map((h) => (
+                <div
+                  key={h}
+                  className="contents"
+                >
+                  <div
+                    className="text-[10px] text-muted text-right pr-1.5 border-r border-dark-border select-none"
+                    style={{ position: 'absolute', top: (h - START_HOUR) * HOUR_HEIGHT - 6, left: 0, width: 36 }}
+                  >
+                    {h}h
+                  </div>
+                  <div
+                    className="absolute left-9 right-0 border-t border-dark-border/40"
+                    style={{ top: (h - START_HOUR) * HOUR_HEIGHT }}
+                  />
+                </div>
+              ))}
+
+              {/* Day columns */}
+              {dates.map((d, colIdx) => {
+                const ds = dateToString(d);
+                const dayAppts = byDay.get(ds) ?? [];
+                const isToday = ds === today;
+                const colLeft = `calc(36px + ${colIdx} * ((100% - 36px) / 7))`;
+                const colWidth = `calc((100% - 36px) / 7)`;
+
+                return (
+                  <div
+                    key={ds}
+                    className={`absolute top-0 bottom-0 border-r border-dark-border/40 last:border-r-0 ${isToday ? 'bg-gold/[0.02]' : ''}`}
+                    style={{ left: colLeft, width: colWidth }}
+                  >
+                    {/* Current time indicator */}
+                    {isToday && currentMinutes >= START_HOUR * 60 && currentMinutes < END_HOUR * 60 && (
+                      <div
+                        className="absolute left-0 right-0 z-10 flex items-center"
+                        style={{ top: (currentMinutes - START_HOUR * 60) / 60 * HOUR_HEIGHT }}
+                      >
+                        <div className="w-2 h-2 rounded-full bg-gold flex-shrink-0 -ml-1" />
+                        <div className="flex-1 h-px bg-gold" />
+                      </div>
+                    )}
+
+                    {/* Appointments */}
+                    {dayAppts.map((a) => {
+                      const startMin = timeToMinutes(a.startTime);
+                      const endMin = timeToMinutes(a.endTime);
+                      const top = Math.max(0, (startMin - START_HOUR * 60) / 60 * HOUR_HEIGHT);
+                      const height = Math.max(22, (endMin - startMin) / 60 * HOUR_HEIGHT - 2);
+                      const colorClass = APPT_COLORS[a.status] ?? APPT_COLORS.confirmed;
+                      const isShort = height < 40;
+
+                      return (
+                        <button
+                          key={a.id}
+                          onClick={() => onSelectDay(ds)}
+                          className={`absolute left-0.5 right-0.5 rounded border text-left overflow-hidden cursor-pointer transition-opacity hover:opacity-90 ${colorClass}`}
+                          style={{ top, height }}
+                        >
+                          <div className="px-1.5 py-0.5 leading-tight">
+                            <div className="text-[10px] font-bold truncate">{a.startTime}</div>
+                            <div className="text-[10px] font-medium truncate">{a.customer.name.split(' ')[0]}</div>
+                            {!isShort && <div className="text-[10px] truncate opacity-70">{a.service.name}</div>}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          </div>
+          </div>
+        </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+const CAL_DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+
+function MonthView({ onSelectDay }: { onSelectDay: (date: string) => void }) {
+  const [monthOffset, setMonthOffset] = useState(0);
+  const calDays = getMonthCalendarDays(monthOffset);
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth() + monthOffset;
+  const from = dateToString(new Date(year, month, 1));
+  const to = dateToString(new Date(year, month + 1, 0));
+  const { data: days, isLoading } = useAdminStats(from, to);
+  const statsMap = new Map((days ?? []).map((d) => [d.date, d]));
+  const todayStr = dateToString(today);
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <button
+          onClick={() => setMonthOffset((m) => m - 1)}
+          className="w-8 h-8 flex items-center justify-center rounded-lg border border-dark-border text-muted hover:border-gold/40 hover:text-gold transition-all cursor-pointer bg-transparent"
+        >‹</button>
+        <span className="text-sm font-semibold">{getMonthLabel(monthOffset)}</span>
+        <button
+          onClick={() => setMonthOffset((m) => m + 1)}
+          className="w-8 h-8 flex items-center justify-center rounded-lg border border-dark-border text-muted hover:border-gold/40 hover:text-gold transition-all cursor-pointer bg-transparent"
+        >›</button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-10 gap-2 text-muted"><Spinner /> Carregando...</div>
+      ) : (
+        <>
+          <StatsSummary days={days ?? []} />
+          <div className="grid grid-cols-7 gap-1 mb-2">
+            {CAL_DAYS.map((d) => (
+              <div key={d} className="text-center text-[10px] tracking-widest uppercase text-muted py-1">{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {calDays.map((d, i) => {
+              if (!d) return <div key={i} />;
+              const ds = dateToString(d);
+              const stat = statsMap.get(ds);
+              const total = (stat?.confirmed ?? 0) + (stat?.completed ?? 0);
+              const isToday = ds === todayStr;
+              return (
+                <button
+                  key={ds}
+                  onClick={() => onSelectDay(ds)}
+                  className={`flex flex-col items-center py-2 rounded-lg border transition-all cursor-pointer
+                    ${isToday ? 'border-gold bg-gold/10' : total > 0 ? 'border-dark-border bg-dark-surface hover:border-gold/30' : 'border-transparent bg-transparent hover:border-dark-border'}`}
+                >
+                  <span className={`text-sm font-medium ${isToday ? 'text-gold' : ''}`}>{d.getDate()}</span>
+                  {total > 0 ? (
+                    <span className="text-[10px] text-green-400 font-medium mt-0.5">{total}</span>
+                  ) : (
+                    <span className="h-[14px]" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function NoShowModal({ onConfirm, onClose, isPending }: { onConfirm: () => void; onClose: () => void; isPending: boolean }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -159,6 +447,7 @@ function NoShowModal({ onConfirm, onClose, isPending }: { onConfirm: () => void;
 
 export default function DashboardPage() {
   const today = dateToString(new Date());
+  const [view, setView] = useState<'day' | 'week' | 'month'>('day');
   const [date, setDate] = useState(today);
   const [page, setPage] = useState(1);
   const [cancelId, setCancelId] = useState<string | null>(null);
@@ -173,6 +462,12 @@ export default function DashboardPage() {
   function handleDateChange(newDate: string) {
     setDate(newDate);
     setPage(1);
+  }
+
+  function handleSelectDay(ds: string) {
+    setDate(ds);
+    setPage(1);
+    setView('day');
   }
 
   async function handleLogout() {
@@ -248,29 +543,44 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Date picker */}
-      <div className="flex items-center gap-3 mb-6">
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => handleDateChange(e.target.value)}
-          className="bg-dark-surface2 border border-dark-border rounded-xl px-4 py-2.5 text-sm text-[#F0EDE8] outline-none focus:border-gold transition-colors"
-        />
-        <button
-          onClick={() => handleDateChange(today)}
-          className={`text-xs px-3 py-2.5 rounded-xl border transition-colors cursor-pointer ${date === today ? 'border-gold text-gold bg-gold/10' : 'border-dark-border text-muted hover:border-gold/40'}`}
+      {/* View selector */}
+      <div className="flex items-center gap-2 mb-6">
+        <select
+          value={view}
+          onChange={(e) => setView(e.target.value as 'day' | 'week' | 'month')}
+          className="bg-dark-surface2 border border-dark-border rounded-xl px-3 py-2 text-sm text-[#F0EDE8] outline-none focus:border-gold transition-colors cursor-pointer"
         >
-          Hoje
-        </button>
-        <button
-          onClick={() => refetch()}
-          className="text-xs text-muted hover:text-[#F0EDE8] transition-colors ml-auto cursor-pointer bg-transparent border-none"
-        >
-          ↻ Atualizar
-        </button>
+          <option value="day">Dia</option>
+          <option value="week">Semana</option>
+          <option value="month">Mês</option>
+        </select>
+        {view === 'day' && (
+          <>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => handleDateChange(e.target.value)}
+              className="bg-dark-surface2 border border-dark-border rounded-xl px-3 py-2 text-sm text-[#F0EDE8] outline-none focus:border-gold transition-colors"
+            />
+            <button
+              onClick={() => handleDateChange(today)}
+              className={`text-xs px-3 py-2 rounded-xl border transition-colors cursor-pointer ${date === today ? 'border-gold text-gold bg-gold/10' : 'border-dark-border text-muted hover:border-gold/40 bg-transparent'}`}
+            >
+              Hoje
+            </button>
+            <button
+              onClick={() => refetch()}
+              className="text-xs text-muted hover:text-[#F0EDE8] transition-colors ml-auto cursor-pointer bg-transparent border-none"
+            >
+              ↻
+            </button>
+          </>
+        )}
       </div>
 
-      {isLoading ? (
+      {view === 'week' && <WeekView onSelectDay={handleSelectDay} />}
+      {view === 'month' && <MonthView onSelectDay={handleSelectDay} />}
+      {view === 'day' && (isLoading ? (
         <div className="flex items-center justify-center py-20 gap-3 text-muted">
           <Spinner /> Carregando...
         </div>
@@ -347,7 +657,7 @@ export default function DashboardPage() {
             </div>
           )}
         </>
-      )}
+      ))}
     </div>
   );
 }

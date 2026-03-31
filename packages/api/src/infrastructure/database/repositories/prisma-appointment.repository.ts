@@ -3,6 +3,7 @@ import type { AppointmentWithDetails } from '../../../domain/entities/appointmen
 import type {
   AppointmentRepository,
   CreateAppointmentData,
+  DayStat,
 } from '../../../domain/repositories/appointment.repository.js';
 
 const includeRelations = {
@@ -141,5 +142,42 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
       where: { id },
       data: { reminderSent: true },
     });
+  }
+
+  async findByBarberAndDateRange(barberId: string, from: Date, to: Date): Promise<AppointmentWithDetails[]> {
+    return prisma.appointment.findMany({
+      where: { barberId, date: { gte: from, lte: to } },
+      include: includeRelations,
+      orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
+    }) as unknown as AppointmentWithDetails[];
+  }
+
+  async getStatsByDateRange(barberId: string, from: Date, to: Date): Promise<DayStat[]> {
+    const where = { barberId, date: { gte: from, lte: to } };
+    const [confirmedGroups, completedGroups] = await prisma.$transaction([
+      prisma.appointment.groupBy({
+        by: ['date'],
+        where: { ...where, status: 'confirmed' },
+        _count: { _all: true },
+      }),
+      prisma.appointment.groupBy({
+        by: ['date'],
+        where: { ...where, status: 'completed' },
+        _count: { _all: true },
+        _sum: { priceCents: true },
+      }),
+    ]);
+
+    const statsMap = new Map<string, DayStat>();
+    for (const g of confirmedGroups) {
+      const date = (g.date as Date).toISOString().split('T')[0];
+      statsMap.set(date, { date, confirmed: g._count._all, completed: 0, revenueCents: 0 });
+    }
+    for (const g of completedGroups) {
+      const date = (g.date as Date).toISOString().split('T')[0];
+      const existing = statsMap.get(date) ?? { date, confirmed: 0, completed: 0, revenueCents: 0 };
+      statsMap.set(date, { ...existing, completed: g._count._all, revenueCents: g._sum.priceCents ?? 0 });
+    }
+    return Array.from(statsMap.values()).sort((a, b) => a.date.localeCompare(b.date));
   }
 }
