@@ -17,7 +17,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     reply.setCookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax',
       path: '/api/auth/refresh',
       maxAge: 7 * 24 * 60 * 60, // 7 days
     });
@@ -46,7 +46,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       reply.setCookie('refreshToken', newRefreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
+        sameSite: 'lax',
         path: '/api/auth/refresh',
         maxAge: 7 * 24 * 60 * 60,
       });
