@@ -1,10 +1,26 @@
-import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAdminAppointments, useAdminAppointmentsRange, useAdminStats, useUpdateAppointmentStatus, useAdminCancelAppointment, type AdminAppointment, type DayStat } from '../../api/use-admin.ts';
-import { useAuthStore } from '../../stores/auth.store.ts';
-import { Button } from '../../components/ui/Button.tsx';
-import { Spinner } from '../../components/ui/Spinner.tsx';
-import { formatCurrency, dateToString, DAY_NAMES, getAdminWeekDates, getMonthCalendarDays, getMonthLabel, getWeekLabel } from '../../lib/format.ts';
+import {useEffect, useRef, useState} from 'react';
+import {useNavigate} from 'react-router-dom';
+import {
+  type AdminAppointment,
+  type DayStat,
+  useAdminAppointments,
+  useAdminAppointmentsRange,
+  useAdminCancelAppointment,
+  useAdminStats,
+  useUpdateAppointmentStatus
+} from '../../api/use-admin.ts';
+import {useAuthStore} from '../../stores/auth.store.ts';
+import {Button} from '../../components/ui/Button.tsx';
+import {Spinner} from '../../components/ui/Spinner.tsx';
+import {
+  dateToString,
+  DAY_NAMES,
+  formatCurrency,
+  getAdminWeekDates,
+  getMonthCalendarDays,
+  getMonthLabel,
+  getWeekLabel
+} from '../../lib/format.ts';
 
 const STATUS_LABEL: Record<string, string> = {
   confirmed: 'Confirmado',
@@ -202,10 +218,9 @@ function WeekView({ onSelectDay }: { onSelectDay: (date: string) => void }) {
   // Scroll to current time (or 8am) on mount / week change
   useEffect(() => {
     if (!scrollRef.current) return;
-    const scrollTo = weekOffset === 0
-      ? Math.max(0, (currentMinutes - START_HOUR * 60 - 60) / 60 * HOUR_HEIGHT)
-      : (8 - START_HOUR) * HOUR_HEIGHT;
-    scrollRef.current.scrollTop = scrollTo;
+    scrollRef.current.scrollTop = weekOffset === 0
+        ? Math.max(0, (currentMinutes - START_HOUR * 60 - 60) / 60 * HOUR_HEIGHT)
+        : (8 - START_HOUR) * HOUR_HEIGHT;
   }, [weekOffset]);
 
   const totalHeight = (END_HOUR - START_HOUR) * HOUR_HEIGHT;

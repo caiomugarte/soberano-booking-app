@@ -1,4 +1,4 @@
-import type { AppointmentEntity, AppointmentWithDetails } from '../entities/appointment.js';
+import type { AppointmentWithDetails } from '../entities/appointment.js';
 
 export interface CreateAppointmentData {
   barberId: string;
