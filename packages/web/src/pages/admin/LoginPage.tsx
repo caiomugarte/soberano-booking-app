@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useLogin } from '../../api/use-admin.ts';
+import { useAuthStore } from '../../stores/auth.store.ts';
 import { Button } from '../../components/ui/Button.tsx';
 import { Input } from '../../components/ui/Input.tsx';
 
@@ -9,6 +10,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const navigate = useNavigate();
   const login = useLogin();
+  const accessToken = useAuthStore((s) => s.accessToken);
+
+  if (accessToken) return <Navigate to="/admin" replace />;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
