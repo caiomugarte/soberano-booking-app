@@ -71,17 +71,17 @@ export class GetAvailableSlots {
       }
     }
 
-    // Filter out past slots for today (don't show them at all)
-    let visibleSlots = allSlots;
     const now = new Date();
-    if (date.toDateString() === now.toDateString()) {
-      const currentMinutes = now.getHours() * 60 + now.getMinutes();
-      visibleSlots = allSlots.filter((slot) => timeToMinutes(slot) > currentMinutes);
-    }
+    const isToday = date.toDateString() === now.toDateString();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-    return visibleSlots.map((time) => ({
+    return allSlots.map((time) => ({
       time,
-      available: !fullDayAbsence && !bookedSet.has(time) && !absentSlots.has(time),
+      available:
+        !fullDayAbsence &&
+        !bookedSet.has(time) &&
+        !absentSlots.has(time) &&
+        !(isToday && timeToMinutes(time) <= currentMinutes),
     }));
   }
 }
