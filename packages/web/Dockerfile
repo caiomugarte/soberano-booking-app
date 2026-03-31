@@ -29,6 +29,6 @@ RUN npm -w @soberano/web run build
 FROM nginx:alpine
 
 COPY --from=builder /app/packages/web/dist /usr/share/nginx/html
-COPY packages/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY packages/web/nginx.conf /etc/nginx/templates/default.conf.template
 
 EXPOSE 80
