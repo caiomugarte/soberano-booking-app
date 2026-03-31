@@ -50,7 +50,10 @@ export function getWeekDates(weekOffset: number): Date[] {
 }
 
 export function dateToString(d: Date): string {
-  return d.toISOString().split('T')[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 export function getWeekLabel(dates: Date[]): string {
@@ -95,4 +98,8 @@ export function getMonthLabel(monthOffset: number): string {
   const today = new Date();
   const d = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
   return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+export function getYearLabel(yearOffset: number): number {
+  return new Date().getFullYear() + yearOffset;
 }
