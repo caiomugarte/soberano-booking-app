@@ -7,8 +7,8 @@ COPY package.json package-lock.json tsconfig.base.json ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/web/package.json ./packages/web/
 
-# Install all dependencies
-RUN npm ci
+# Install all dependencies including devDeps (needed for tsc, vitest, vite)
+RUN npm ci --include=dev
 
 # Copy source
 COPY packages/shared ./packages/shared
