@@ -60,3 +60,39 @@ export function getWeekLabel(dates: Date[]): string {
 }
 
 export const DAY_NAMES = WEEKDAYS;
+
+export const MONTH_NAMES = [
+  'Janeiro','Fevereiro','Março','Abril','Maio','Junho',
+  'Julho','Agosto','Setembro','Outubro','Novembro','Dezembro',
+];
+
+export function getAdminWeekDates(weekOffset: number): Date[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7) + weekOffset * 7);
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d;
+  });
+}
+
+export function getMonthCalendarDays(monthOffset: number): (Date | null)[] {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth() + monthOffset;
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startPad = (firstDay.getDay() + 6) % 7; // Mon = 0
+  const days: (Date | null)[] = Array(startPad).fill(null);
+  for (let d = 1; d <= lastDay.getDate(); d++) days.push(new Date(year, month, d));
+  while (days.length % 7 !== 0) days.push(null);
+  return days;
+}
+
+export function getMonthLabel(monthOffset: number): string {
+  const today = new Date();
+  const d = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+  return `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+}

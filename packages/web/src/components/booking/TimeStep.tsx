@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSlots, type Slot } from '../../api/use-slots.ts';
 import { useBookingStore } from '../../stores/booking.store.ts';
 import { Panel } from '../ui/Panel.tsx';
@@ -9,6 +9,7 @@ import { MAX_WEEKS_AHEAD } from '@soberano/shared';
 
 export function TimeStep() {
   const [weekOffset, setWeekOffset] = useState(0);
+  const initializing = useRef(true);
   const { barber, date, slot, setDate, setSlot, nextStep, prevStep } = useBookingStore();
   const { data: slots, isLoading: loadingSlots } = useSlots(barber?.id ?? null, date);
 
@@ -16,12 +17,41 @@ export function TimeStep() {
   today.setHours(0, 0, 0, 0);
   const weekDates = getWeekDates(weekOffset);
 
+  // On mount, start from tomorrow and align the week view
   useEffect(() => {
     if (!date) {
-      const d = new Date(today);
-      setDate(dateToString(d));
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      setDate(dateToString(tomorrow));
+      // Monday of the current week (weekOffset=0) — if tomorrow is in the next week, show week 1
+      const mondayThisWeek = new Date(today);
+      mondayThisWeek.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+      const mondayNextWeek = new Date(mondayThisWeek);
+      mondayNextWeek.setDate(mondayThisWeek.getDate() + 7);
+      if (tomorrow >= mondayNextWeek) setWeekOffset(1);
     }
   }, []);
+
+  // If the selected day has no slots (barber doesn't work), auto-advance to the next day — only during initial mount
+  useEffect(() => {
+    if (!initializing.current || !date || loadingSlots || !slots || slots.length > 0) return;
+    const next = new Date(date + 'T00:00:00');
+    next.setDate(next.getDate() + 1);
+    const maxDate = new Date(today);
+    maxDate.setDate(maxDate.getDate() + MAX_WEEKS_AHEAD * 7);
+    if (next > maxDate) { initializing.current = false; return; }
+    setDate(dateToString(next));
+    // Advance week view if needed: compute offset from today's Monday
+    const mondayThisWeek = new Date(today);
+    mondayThisWeek.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    const diffDays = Math.floor((next.getTime() - mondayThisWeek.getTime()) / 86400000);
+    setWeekOffset(Math.floor(diffDays / 7));
+  }, [slots, loadingSlots]);
+
+  // Once slots load and there are some, initialization is done
+  useEffect(() => {
+    if (slots && slots.length > 0) initializing.current = false;
+  }, [slots]);
 
   return (
     <>
@@ -48,14 +78,16 @@ export function TimeStep() {
       {/* Days row */}
       <div className="grid grid-cols-7 gap-1.5 mb-6">
         {weekDates.map((d) => {
-          const disabled = d < today;
+          const isPast = d < today;
+          const noShift = barber?.workDays ? !barber.workDays.includes(d.getDay()) : false;
+          const disabled = isPast || noShift;
           const ds = dateToString(d);
           const isSelected = date === ds;
           return (
             <button
               key={ds}
               disabled={disabled}
-              onClick={() => setDate(ds)}
+              onClick={() => { initializing.current = false; setDate(ds); }}
               className={`flex flex-col items-center gap-1 py-2.5 px-1 rounded-[10px] border transition-all duration-200
                 ${disabled ? 'opacity-30 cursor-not-allowed border-dark-border bg-dark-surface2' : 'cursor-pointer'}
                 ${isSelected ? 'border-gold bg-gold/[0.08]' : !disabled ? 'border-dark-border bg-dark-surface2 hover:border-gold/40' : ''}

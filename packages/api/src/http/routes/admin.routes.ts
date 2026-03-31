@@ -12,16 +12,41 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   // All admin routes require authentication
   app.addHook('onRequest', authGuard);
 
-  // Get barber's appointments for a date
+  // Get barber's appointments for a date (paginated)
   app.get('/admin/appointments', async (request: FastifyRequest & { barberId?: string }) => {
-    const { date } = request.query as { date?: string };
+    const { date, page = '1', limit = '15' } = request.query as { date?: string; page?: string; limit?: string };
     const barberId = request.barberId!;
 
     const targetDate = date ? new Date(date + 'T00:00:00') : new Date();
     targetDate.setHours(0, 0, 0, 0);
 
-    const appointments = await appointmentRepo.findByBarberAndDate(barberId, targetDate);
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
+
+    const { appointments, total, summary } = await appointmentRepo.findByBarberAndDate(barberId, targetDate, pageNum, limitNum);
+    return { appointments, total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum), summary };
+  });
+
+  // Get all appointments for a date range (weekly calendar view)
+  app.get('/admin/appointments/range', async (request: FastifyRequest & { barberId?: string }, reply) => {
+    const { from, to } = request.query as { from?: string; to?: string };
+    if (!from || !to) return reply.status(400).send({ error: 'BAD_REQUEST', message: 'from e to são obrigatórios.' });
+    const appointments = await appointmentRepo.findByBarberAndDateRange(
+      request.barberId!,
+      new Date(from + 'T00:00:00'),
+      new Date(to + 'T00:00:00'),
+    );
     return { appointments };
+  });
+
+  // Get aggregated stats for a date range (weekly / monthly views)
+  app.get('/admin/stats', async (request: FastifyRequest & { barberId?: string }, reply) => {
+    const { from, to } = request.query as { from?: string; to?: string };
+    if (!from || !to) return reply.status(400).send({ error: 'BAD_REQUEST', message: 'from e to são obrigatórios.' });
+    const fromDate = new Date(from + 'T00:00:00');
+    const toDate = new Date(to + 'T00:00:00');
+    const days = await appointmentRepo.getStatsByDateRange(request.barberId!, fromDate, toDate);
+    return { days };
   });
 
   // Update appointment status (completed / no_show)
