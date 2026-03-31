@@ -17,18 +17,10 @@ export function TimeStep() {
   today.setHours(0, 0, 0, 0);
   const weekDates = getWeekDates(weekOffset);
 
-  // On mount, start from tomorrow and align the week view
+  // On mount, start from today and align the week view
   useEffect(() => {
     if (!date) {
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      setDate(dateToString(tomorrow));
-      // Monday of the current week (weekOffset=0) — if tomorrow is in the next week, show week 1
-      const mondayThisWeek = new Date(today);
-      mondayThisWeek.setDate(today.getDate() - ((today.getDay() + 6) % 7));
-      const mondayNextWeek = new Date(mondayThisWeek);
-      mondayNextWeek.setDate(mondayThisWeek.getDate() + 7);
-      if (tomorrow >= mondayNextWeek) setWeekOffset(1);
+      setDate(dateToString(today));
     }
   }, []);
 
@@ -110,7 +102,7 @@ export function TimeStep() {
           <Spinner /> Buscando horários...
         </div>
       ) : !slots?.length ? (
-        <p className="text-center py-5 text-muted text-sm">Sem horários disponíveis neste dia</p>
+        <p className="text-center py-5 text-muted text-sm">Não há mais horários disponíveis neste dia</p>
       ) : (
         <div className="grid grid-cols-5 gap-2 max-[500px]:grid-cols-4">
           {slots.map((s: Slot) => (
