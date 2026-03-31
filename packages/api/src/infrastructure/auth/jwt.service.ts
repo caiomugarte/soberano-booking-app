@@ -7,7 +7,7 @@ interface TokenPayload {
 
 export function generateAccessToken(barberId: string): string {
   return jwt.sign({ barberId } satisfies TokenPayload, env.JWT_SECRET, {
-    expiresIn: '1h',
+    expiresIn: '18h',
   });
 }
 
