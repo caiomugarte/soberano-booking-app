@@ -19,7 +19,9 @@ import {
   getAdminWeekDates,
   getMonthCalendarDays,
   getMonthLabel,
-  getWeekLabel
+  getWeekLabel,
+  getYearLabel,
+  MONTH_NAMES,
 } from '../../lib/format.ts';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -178,7 +180,6 @@ const APPT_COLORS: Record<string, string> = {
   confirmed: 'bg-gold/20 border-gold/50 text-gold',
   completed: 'bg-green-500/20 border-green-500/50 text-green-400',
   no_show: 'bg-red-500/15 border-red-500/40 text-red-400 opacity-60',
-  cancelled: 'bg-dark-surface2 border-dark-border text-muted opacity-40',
 };
 
 function timeToMinutes(t: string) {
@@ -197,9 +198,9 @@ function WeekView({ onSelectDay }: { onSelectDay: (date: string) => void }) {
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-  // Group appointments by date
+  // Group appointments by date — exclude cancelled
   const byDay = new Map<string, AdminAppointment[]>();
-  (appointments ?? []).forEach((a) => {
+  (appointments ?? []).filter((a) => a.status !== 'cancelled').forEach((a) => {
     const ds = a.date.slice(0, 10);
     if (!byDay.has(ds)) byDay.set(ds, []);
     byDay.get(ds)!.push(a);
@@ -259,7 +260,7 @@ function WeekView({ onSelectDay }: { onSelectDay: (date: string) => void }) {
           <div className="overflow-x-auto">
           <div style={{ minWidth: 480 }}>
           {/* Day headers */}
-          <div className="grid border-b border-dark-border bg-dark-surface" style={{ gridTemplateColumns: '36px repeat(7, 1fr)' }}>
+          <div className="grid border-b border-dark-border bg-dark-surface overflow-y-scroll" style={{ gridTemplateColumns: '36px repeat(7, 1fr)', scrollbarGutter: 'stable' }}>
             <div className="border-r border-dark-border" />
             {dates.map((d) => {
               const ds = dateToString(d);
@@ -281,41 +282,42 @@ function WeekView({ onSelectDay }: { onSelectDay: (date: string) => void }) {
           </div>
 
           {/* Scrollable grid */}
-          <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: '480px' }}>
-            <div className="relative" style={{ gridTemplateColumns: '36px repeat(7, 1fr)', display: 'grid', height: totalHeight }}>
-              {/* Hour lines + time labels */}
-              {HOURS.map((h) => (
-                <div
-                  key={h}
-                  className="contents"
-                >
+          <div ref={scrollRef} className="overflow-y-scroll" style={{ maxHeight: '480px', scrollbarGutter: 'stable' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '36px repeat(7, 1fr)', height: totalHeight }}>
+
+              {/* Time gutter */}
+              <div className="relative border-r border-dark-border">
+                {HOURS.map((h) => (
                   <div
-                    className="text-[10px] text-muted text-right pr-1.5 border-r border-dark-border select-none"
-                    style={{ position: 'absolute', top: (h - START_HOUR) * HOUR_HEIGHT - 6, left: 0, width: 36 }}
+                    key={h}
+                    className="absolute text-[10px] text-muted text-right pr-1.5 select-none w-full"
+                    style={{ top: (h - START_HOUR) * HOUR_HEIGHT - 6 }}
                   >
                     {h}h
                   </div>
-                  <div
-                    className="absolute left-9 right-0 border-t border-dark-border/40"
-                    style={{ top: (h - START_HOUR) * HOUR_HEIGHT }}
-                  />
-                </div>
-              ))}
+                ))}
+              </div>
 
-              {/* Day columns */}
-              {dates.map((d, colIdx) => {
+              {/* Day columns — each is a real grid cell */}
+              {dates.map((d) => {
                 const ds = dateToString(d);
                 const dayAppts = byDay.get(ds) ?? [];
                 const isToday = ds === today;
-                const colLeft = `calc(36px + ${colIdx} * ((100% - 36px) / 7))`;
-                const colWidth = `calc((100% - 36px) / 7)`;
 
                 return (
                   <div
                     key={ds}
-                    className={`absolute top-0 bottom-0 border-r border-dark-border/40 last:border-r-0 ${isToday ? 'bg-gold/[0.02]' : ''}`}
-                    style={{ left: colLeft, width: colWidth }}
+                    className={`relative border-r border-dark-border/40 last:border-r-0 ${isToday ? 'bg-gold/[0.02]' : ''}`}
                   >
+                    {/* Hour lines */}
+                    {HOURS.map((h) => (
+                      <div
+                        key={h}
+                        className="absolute left-0 right-0 border-t border-dark-border/40"
+                        style={{ top: (h - START_HOUR) * HOUR_HEIGHT }}
+                      />
+                    ))}
+
                     {/* Current time indicator */}
                     {isToday && currentMinutes >= START_HOUR * 60 && currentMinutes < END_HOUR * 60 && (
                       <div
@@ -367,8 +369,8 @@ function WeekView({ onSelectDay }: { onSelectDay: (date: string) => void }) {
 
 const CAL_DAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
-function MonthView({ onSelectDay }: { onSelectDay: (date: string) => void }) {
-  const [monthOffset, setMonthOffset] = useState(0);
+function MonthView({ onSelectDay, initialOffset = 0 }: { onSelectDay: (date: string) => void; initialOffset?: number }) {
+  const [monthOffset, setMonthOffset] = useState(initialOffset);
   const calDays = getMonthCalendarDays(monthOffset);
   const today = new Date();
   const year = today.getFullYear();
@@ -433,6 +435,86 @@ function MonthView({ onSelectDay }: { onSelectDay: (date: string) => void }) {
   );
 }
 
+function YearView({ onSelectMonth }: { onSelectMonth: (offset: number) => void }) {
+  const [yearOffset, setYearOffset] = useState(0);
+  const year = getYearLabel(yearOffset);
+  const from = `${year}-01-01`;
+  const to = `${year}-12-31`;
+  const { data: days, isLoading } = useAdminStats(from, to);
+
+  const byMonth = Array.from({ length: 12 }, (_, i) => ({
+    month: i,
+    confirmed: 0,
+    completed: 0,
+    revenueCents: 0,
+  }));
+  (days ?? []).forEach((d) => {
+    const m = parseInt(d.date.slice(5, 7)) - 1;
+    byMonth[m].confirmed += d.confirmed;
+    byMonth[m].completed += d.completed;
+    byMonth[m].revenueCents += d.revenueCents;
+  });
+
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth();
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <button
+          onClick={() => setYearOffset((y) => y - 1)}
+          className="w-8 h-8 flex items-center justify-center rounded-lg border border-dark-border text-muted hover:border-gold/40 hover:text-gold transition-all cursor-pointer bg-transparent"
+        >‹</button>
+        <span className="text-sm font-semibold">{year}</span>
+        <button
+          onClick={() => setYearOffset((y) => y + 1)}
+          className="w-8 h-8 flex items-center justify-center rounded-lg border border-dark-border text-muted hover:border-gold/40 hover:text-gold transition-all cursor-pointer bg-transparent"
+        >›</button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-10 gap-2 text-muted"><Spinner /> Carregando...</div>
+      ) : (
+        <>
+          <StatsSummary days={days ?? []} />
+          <div className="grid grid-cols-3 gap-3">
+            {byMonth.map(({ month, confirmed, completed, revenueCents }) => {
+              const total = confirmed + completed;
+              const isCurrentMonth = year === currentYear && month === currentMonth;
+              const monthOffset = (year - currentYear) * 12 + (month - currentMonth);
+
+              return (
+                <button
+                  key={month}
+                  onClick={() => onSelectMonth(monthOffset)}
+                  className={`flex flex-col gap-1.5 p-4 rounded-xl border text-left transition-all cursor-pointer
+                    ${isCurrentMonth ? 'border-gold bg-gold/5' : total > 0 ? 'border-dark-border bg-dark-surface hover:border-gold/30' : 'border-dark-border bg-dark-surface opacity-40 hover:opacity-60'}`}
+                >
+                  <span className={`text-xs font-semibold tracking-wide ${isCurrentMonth ? 'text-gold' : ''}`}>
+                    {MONTH_NAMES[month].slice(0, 3).toUpperCase()}
+                  </span>
+                  {total > 0 ? (
+                    <>
+                      <span className="text-xl font-bold">{total}</span>
+                      <span className="text-xs text-muted">{confirmed > 0 ? `${confirmed} agend.` : ''}{confirmed > 0 && completed > 0 ? ' · ' : ''}{completed > 0 ? `${completed} concl.` : ''}</span>
+                      {revenueCents > 0 && (
+                        <span className="text-xs text-green-400 font-medium">{formatCurrency(revenueCents)}</span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-xl font-bold text-muted">—</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function NoShowModal({ onConfirm, onClose, isPending }: { onConfirm: () => void; onClose: () => void; isPending: boolean }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -462,9 +544,10 @@ function NoShowModal({ onConfirm, onClose, isPending }: { onConfirm: () => void;
 
 export default function DashboardPage() {
   const today = dateToString(new Date());
-  const [view, setView] = useState<'day' | 'week' | 'month'>('day');
+  const [view, setView] = useState<'day' | 'week' | 'month' | 'year'>('day');
   const [date, setDate] = useState(today);
   const [page, setPage] = useState(1);
+  const [targetMonthOffset, setTargetMonthOffset] = useState(0);
   const [cancelId, setCancelId] = useState<string | null>(null);
   const [noShowId, setNoShowId] = useState<string | null>(null);
   const logout = useAuthStore((s) => s.logout);
@@ -483,6 +566,11 @@ export default function DashboardPage() {
     setDate(ds);
     setPage(1);
     setView('day');
+  }
+
+  function handleSelectMonth(offset: number) {
+    setTargetMonthOffset(offset);
+    setView('month');
   }
 
   async function handleLogout() {
@@ -562,12 +650,13 @@ export default function DashboardPage() {
       <div className="flex items-center gap-2 mb-6">
         <select
           value={view}
-          onChange={(e) => setView(e.target.value as 'day' | 'week' | 'month')}
+          onChange={(e) => setView(e.target.value as 'day' | 'week' | 'month' | 'year')}
           className="bg-dark-surface2 border border-dark-border rounded-xl px-3 py-2 text-sm text-[#F0EDE8] outline-none focus:border-gold transition-colors cursor-pointer"
         >
           <option value="day">Dia</option>
           <option value="week">Semana</option>
           <option value="month">Mês</option>
+          <option value="year">Ano</option>
         </select>
         {view === 'day' && (
           <>
@@ -594,7 +683,8 @@ export default function DashboardPage() {
       </div>
 
       {view === 'week' && <WeekView onSelectDay={handleSelectDay} />}
-      {view === 'month' && <MonthView onSelectDay={handleSelectDay} />}
+      {view === 'month' && <MonthView key={targetMonthOffset} initialOffset={targetMonthOffset} onSelectDay={handleSelectDay} />}
+      {view === 'year' && <YearView onSelectMonth={handleSelectMonth} />}
       {view === 'day' && (isLoading ? (
         <div className="flex items-center justify-center py-20 gap-3 text-muted">
           <Spinner /> Carregando...
