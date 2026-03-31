@@ -14,6 +14,9 @@ services:
       CHATWOOT_API_TOKEN: ${CHATWOOT_API_TOKEN:-}
       CHATWOOT_ACCOUNT_ID: ${CHATWOOT_ACCOUNT_ID:-}
       CHATWOOT_INBOX_ID: ${CHATWOOT_INBOX_ID:-}
+    networks:
+      - default
+      - coolify
     restart: unless-stopped
 
   web:
@@ -23,3 +26,7 @@ services:
     depends_on:
       - api
     restart: unless-stopped
+
+networks:
+  coolify:
+    external: true
