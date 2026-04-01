@@ -31,9 +31,19 @@ export function BarberStep() {
                 {barber?.id === b.id && (
                   <span className="absolute top-2.5 right-2.5 w-5 h-5 rounded-full bg-gold flex items-center justify-center text-[11px] text-dark font-bold">✓</span>
                 )}
-                <div className={`w-14 h-14 rounded-full bg-dark-border flex items-center justify-center text-2xl mx-auto mb-3 border-2 transition-colors ${barber?.id === b.id ? 'border-gold' : 'border-dark-border'}`}>
-                  💈
-                </div>
+                {b.avatarUrl ? (
+                  <img
+                    src={b.avatarUrl}
+                    alt={`${b.firstName} ${b.lastName}`}
+                    onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                    className={`w-14 h-14 rounded-full object-cover mx-auto mb-3 border-2 transition-colors ${barber?.id === b.id ? 'border-gold' : 'border-dark-border'}`}
+                style={{objectPosition: 'center 30%' }}
+                  />
+                ) : (
+                  <div className={`w-14 h-14 rounded-full bg-dark-border flex items-center justify-center text-2xl mx-auto mb-3 border-2 transition-colors ${barber?.id === b.id ? 'border-gold' : 'border-dark-border'}`}>
+                    💈
+                  </div>
+                )}
                 <div className="text-base font-semibold leading-snug">
                   {b.firstName} {b.lastName}
                 </div>

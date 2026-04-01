@@ -8,6 +8,10 @@ export function Footer() {
       <Link to="/privacidade" className="hover:text-gold transition-colors underline underline-offset-2">
         Política de Privacidade
       </Link>
+      <span>·</span>
+      <a href="https://altion.com.br" target="_blank" rel="noopener noreferrer" className="hover:text-gold transition-colors">
+        Desenvolvido por Altion
+      </a>
     </footer>
   );
 }

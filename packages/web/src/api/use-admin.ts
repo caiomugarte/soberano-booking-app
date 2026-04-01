@@ -11,6 +11,21 @@ export interface AdminAppointment {
   priceCents: number;
   service: { name: string; icon: string };
   customer: { name: string; phone: string };
+  barber: { firstName: string; lastName: string; avatarUrl: string | null };
+}
+
+export interface AdminMe {
+  firstName: string;
+  lastName: string;
+  avatarUrl: string | null;
+}
+
+export function useAdminMe() {
+  return useQuery({
+    queryKey: ['admin-me'],
+    queryFn: () => authRequest<AdminMe>('/admin/me'),
+    staleTime: Infinity,
+  });
 }
 
 export function useLogin() {

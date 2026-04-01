@@ -2,15 +2,24 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { authGuard } from '../middleware/auth.middleware.js';
 import { PrismaAppointmentRepository } from '../../infrastructure/database/repositories/prisma-appointment.repository.js';
+import { PrismaBarberRepository } from '../../infrastructure/database/repositories/prisma-barber.repository.js';
 import { WhatsAppNotificationService } from '../../infrastructure/notifications/whatsapp-notification.service.js';
 import { APPOINTMENT_STATUS } from '@soberano/shared';
 
 const appointmentRepo = new PrismaAppointmentRepository();
+const barberRepo = new PrismaBarberRepository();
 const notificationService = new WhatsAppNotificationService();
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
   // All admin routes require authentication
   app.addHook('onRequest', authGuard);
+
+  // Get the logged-in barber's profile
+  app.get('/admin/me', async (request: FastifyRequest & { barberId?: string }, reply) => {
+    const barber = await barberRepo.findById(request.barberId!);
+    if (!barber) return reply.status(404).send({ error: 'NOT_FOUND' });
+    return { firstName: barber.firstName, lastName: barber.lastName, avatarUrl: barber.avatarUrl };
+  });
 
   // Get barber's appointments for a date (paginated)
   app.get('/admin/appointments', async (request: FastifyRequest & { barberId?: string }) => {
