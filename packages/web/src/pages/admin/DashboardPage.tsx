@@ -11,6 +11,7 @@ import {
   useUpdateAppointmentStatus
 } from '../../api/use-admin.ts';
 import {useAuthStore} from '../../stores/auth.store.ts';
+import {queryClient} from '../../config/query-client.ts';
 import {Button} from '../../components/ui/Button.tsx';
 import {Spinner} from '../../components/ui/Spinner.tsx';
 import {
@@ -118,6 +119,8 @@ function AppointmentCard({
 }) {
   const updateStatus = useUpdateAppointmentStatus();
   const isConfirmed = appointment.status === 'confirmed';
+  const isCompleted = appointment.status === 'completed';
+  const isNoShow = appointment.status === 'no_show';
 
   return (
     <div className={`bg-dark-surface border rounded-xl p-5 transition-opacity ${appointment.status === 'cancelled' ? 'opacity-50' : ''} border-dark-border`}>
@@ -163,6 +166,30 @@ function AppointmentCard({
               className="flex-1 py-2 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500/20 transition-colors cursor-pointer disabled:opacity-50 text-xs font-medium"
             >
               ✕ Cancelar
+            </button>
+          )}
+        </div>
+      )}
+
+      {(isCompleted || isNoShow) && (
+        <div className="flex gap-1.5">
+          <span className="text-xs text-muted self-center mr-1">Corrigir:</span>
+          {isCompleted && (
+            <button
+              onClick={() => updateStatus.mutate({ id: appointment.id, status: 'no_show' })}
+              disabled={updateStatus.isPending}
+              className="py-1.5 px-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed text-xs font-medium"
+            >
+              ✗ Não veio
+            </button>
+          )}
+          {isNoShow && (
+            <button
+              onClick={() => updateStatus.mutate({ id: appointment.id, status: 'completed' })}
+              disabled={updateStatus.isPending}
+              className="py-1.5 px-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed text-xs font-medium"
+            >
+              ✓ Concluído
             </button>
           )}
         </div>
@@ -649,6 +676,7 @@ export default function DashboardPage() {
 
   async function handleLogout() {
     await logout();
+    queryClient.clear();
     navigate('/admin/login');
   }
 
