@@ -6,10 +6,12 @@ import {
   useAdminAppointments,
   useAdminAppointmentsRange,
   useAdminCancelAppointment,
+  useAdminMe,
   useAdminStats,
   useUpdateAppointmentStatus
 } from '../../api/use-admin.ts';
 import {useAuthStore} from '../../stores/auth.store.ts';
+import {queryClient} from '../../config/query-client.ts';
 import {Button} from '../../components/ui/Button.tsx';
 import {Spinner} from '../../components/ui/Spinner.tsx';
 import {
@@ -38,6 +40,72 @@ const STATUS_COLOR: Record<string, string> = {
   cancelled: 'text-muted border-dark-border bg-dark-surface2',
 };
 
+function BarberProfile({
+  barber,
+  onLogout,
+  onAgenda,
+}: {
+  barber: { firstName: string; lastName: string; avatarUrl: string | null };
+  onLogout: () => void;
+  onAgenda: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [imgError, setImgError] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  const initials = barber.firstName[0] + barber.lastName[0];
+  const showPhoto = barber.avatarUrl && !imgError;
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 cursor-pointer bg-transparent border-none"
+      >
+        <span className="text-xs text-muted">{barber.firstName} {barber.lastName}</span>
+        {showPhoto ? (
+          <img
+            src={barber.avatarUrl!}
+            alt={`${barber.firstName} ${barber.lastName}`}
+            onError={() => setImgError(true)}
+            className="w-7 h-7 rounded-full object-cover border border-dark-border"
+            style={{objectPosition: 'center 30%' }}
+          />
+        ) : (
+          <div className="w-7 h-7 rounded-full bg-dark-border flex items-center justify-center text-xs font-bold">
+            {initials}
+          </div>
+        )}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-2 w-36 bg-dark-surface border border-dark-border rounded-xl py-1 shadow-lg z-50">
+          <button
+            onClick={() => { setOpen(false); onAgenda(); }}
+            className="w-full text-left px-4 py-2 text-xs text-muted hover:text-[#F0EDE8] hover:bg-dark-surface2 transition-colors cursor-pointer bg-transparent border-none"
+          >
+            Agenda
+          </button>
+          <div className="mx-3 border-t border-dark-border" />
+          <button
+            onClick={() => { setOpen(false); onLogout(); }}
+            className="w-full text-left px-4 py-2 text-xs text-muted hover:text-[#F0EDE8] hover:bg-dark-surface2 transition-colors cursor-pointer bg-transparent border-none"
+          >
+            Sair
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AppointmentCard({
   appointment,
   timePassed,
@@ -51,6 +119,8 @@ function AppointmentCard({
 }) {
   const updateStatus = useUpdateAppointmentStatus();
   const isConfirmed = appointment.status === 'confirmed';
+  const isCompleted = appointment.status === 'completed';
+  const isNoShow = appointment.status === 'no_show';
 
   return (
     <div className={`bg-dark-surface border rounded-xl p-5 transition-opacity ${appointment.status === 'cancelled' ? 'opacity-50' : ''} border-dark-border`}>
@@ -96,6 +166,30 @@ function AppointmentCard({
               className="flex-1 py-2 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500/20 transition-colors cursor-pointer disabled:opacity-50 text-xs font-medium"
             >
               ✕ Cancelar
+            </button>
+          )}
+        </div>
+      )}
+
+      {(isCompleted || isNoShow) && (
+        <div className="flex gap-1.5">
+          <span className="text-xs text-muted self-center mr-1">Corrigir:</span>
+          {isCompleted && (
+            <button
+              onClick={() => updateStatus.mutate({ id: appointment.id, status: 'no_show' })}
+              disabled={updateStatus.isPending}
+              className="py-1.5 px-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed text-xs font-medium"
+            >
+              ✗ Não veio
+            </button>
+          )}
+          {isNoShow && (
+            <button
+              onClick={() => updateStatus.mutate({ id: appointment.id, status: 'completed' })}
+              disabled={updateStatus.isPending}
+              className="py-1.5 px-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed text-xs font-medium"
+            >
+              ✓ Concluído
             </button>
           )}
         </div>
@@ -558,6 +652,7 @@ export default function DashboardPage() {
   const [noShowId, setNoShowId] = useState<string | null>(null);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
+  const { data: me } = useAdminMe();
   const { data, isLoading, refetch } = useAdminAppointments(date, page);
   const appointments = data?.appointments;
   const cancelAppointment = useAdminCancelAppointment();
@@ -581,6 +676,7 @@ export default function DashboardPage() {
 
   async function handleLogout() {
     await logout();
+    queryClient.clear();
     navigate('/admin/login');
   }
 
@@ -629,26 +725,12 @@ export default function DashboardPage() {
       )}
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-2.5">
-          <img src="/logo.png" alt="Soberano Barbearia" className="w-8 h-8 object-contain" />
+        <a href="/" className="flex items-center gap-2.5 no-underline">
+          <img src="/logo.png" alt="Soberano Barbearia" className="w-8 h-8 object-contain"/>
           <span className="font-serif text-sm tracking-widest uppercase text-gold">Soberano</span>
-        </div>
+        </a>
         <div className="flex items-center gap-4">
-          <a href="/" className="text-xs text-muted hover:text-[#F0EDE8] transition-colors">
-            Site
-          </a>
-          <button
-            onClick={() => navigate('/admin/schedule')}
-            className="text-xs text-muted hover:text-[#F0EDE8] transition-colors cursor-pointer bg-transparent border-none"
-          >
-            Agenda
-          </button>
-          <button
-            onClick={handleLogout}
-            className="text-xs text-muted hover:text-[#F0EDE8] transition-colors cursor-pointer bg-transparent border-none"
-          >
-            Sair
-          </button>
+          {me && <BarberProfile barber={me} onLogout={handleLogout} onAgenda={() => navigate('/admin/schedule')} />}
         </div>
       </div>
 
@@ -680,7 +762,7 @@ export default function DashboardPage() {
             </button>
             <button
               onClick={() => refetch()}
-              className="text-xs text-muted hover:text-[#F0EDE8] transition-colors ml-auto cursor-pointer bg-transparent border-none"
+              className="text-xl text-muted hover:text-[#F0EDE8] transition-colors ml-auto cursor-pointer bg-transparent border-none"
             >
               ↻
             </button>
