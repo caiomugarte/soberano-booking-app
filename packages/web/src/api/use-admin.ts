@@ -116,3 +116,34 @@ export function useAdminCancelAppointment() {
     },
   });
 }
+
+export interface AdminBookingInput {
+  serviceId: string;
+  date: string;
+  startTime: string;
+  customerName: string;
+  customerPhone?: string;
+}
+
+export function useAdminCreateBooking() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AdminBookingInput) =>
+      authRequest('/admin/appointments', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-appointments'] });
+    },
+  });
+}
+
+export function useAdminCustomerLookup(phone: string) {
+  return useQuery({
+    queryKey: ['admin-customer-lookup', phone],
+    queryFn: () => authRequest<{ name: string | null }>('/admin/customers/lookup?phone=' + phone),
+    enabled: phone.length >= 10,
+    staleTime: 30_000,
+  });
+}

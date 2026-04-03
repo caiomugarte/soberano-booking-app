@@ -144,6 +144,36 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
     });
   }
 
+  async findUpcomingWithoutBarberReminder(minutesAhead: number): Promise<AppointmentWithDetails[]> {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const futureMinutes = now.getMinutes() + minutesAhead;
+    const futureHours = now.getHours() + Math.floor(futureMinutes / 60);
+    const maxTime = `${String(futureHours).padStart(2, '0')}:${String(futureMinutes % 60).padStart(2, '0')}`;
+
+    return prisma.appointment.findMany({
+      where: {
+        status: 'confirmed',
+        barberReminderSent: false,
+        date: today,
+        startTime: {
+          gte: currentTime,
+          lte: maxTime,
+        },
+      },
+      include: includeRelations,
+    }) as unknown as AppointmentWithDetails[];
+  }
+
+  async markBarberReminderSent(id: string): Promise<void> {
+    await prisma.appointment.update({
+      where: { id },
+      data: { barberReminderSent: true },
+    });
+  }
+
   async findByBarberAndDateRange(barberId: string, from: Date, to: Date): Promise<AppointmentWithDetails[]> {
     return prisma.appointment.findMany({
       where: { barberId, date: { gte: from, lte: to } },

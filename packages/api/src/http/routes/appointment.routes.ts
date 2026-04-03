@@ -40,7 +40,7 @@ export async function appointmentRoutes(app: FastifyInstance): Promise<void> {
         },
         customer: {
           name: appointment.customer.name,
-          phoneLast4: appointment.customer.phone.slice(-4),
+          phoneLast4: appointment.customer.phone?.slice(-4) ?? null,
         },
       },
     };
