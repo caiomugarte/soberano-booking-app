@@ -3,11 +3,17 @@ import { z } from 'zod';
 import { authGuard } from '../middleware/auth.middleware.js';
 import { PrismaAppointmentRepository } from '../../infrastructure/database/repositories/prisma-appointment.repository.js';
 import { PrismaBarberRepository } from '../../infrastructure/database/repositories/prisma-barber.repository.js';
+import { PrismaServiceRepository } from '../../infrastructure/database/repositories/prisma-service.repository.js';
+import { PrismaCustomerRepository } from '../../infrastructure/database/repositories/prisma-customer.repository.js';
 import { WhatsAppNotificationService } from '../../infrastructure/notifications/whatsapp-notification.service.js';
-import { APPOINTMENT_STATUS } from '@soberano/shared';
+import { AdminCreateAppointment } from '../../application/use-cases/booking/admin-create-appointment.js';
+import { APPOINTMENT_STATUS, bookingSchema } from '@soberano/shared';
+import { NotFoundError, SlotTakenError, ValidationError } from '../../shared/errors.js';
 
 const appointmentRepo = new PrismaAppointmentRepository();
 const barberRepo = new PrismaBarberRepository();
+const serviceRepo = new PrismaServiceRepository();
+const customerRepo = new PrismaCustomerRepository();
 const notificationService = new WhatsAppNotificationService();
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
@@ -72,6 +78,51 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
     await appointmentRepo.updateStatus(id, status);
     return { message: 'Status atualizado.' };
+  });
+
+  // Admin manually creates an appointment for a customer
+  app.post('/admin/appointments', async (request: FastifyRequest & { barberId?: string }, reply) => {
+    const adminBookingSchema = bookingSchema.omit({ barberId: true }).extend({
+      customerPhone: z.string().regex(/^\d{10,11}$/, 'Telefone deve ter 10 ou 11 dígitos').optional(),
+    });
+    const parsed = adminBookingSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    }
+
+    const useCase = new AdminCreateAppointment(
+      appointmentRepo,
+      serviceRepo,
+      barberRepo,
+      customerRepo,
+      notificationService,
+    );
+
+    try {
+      const result = await useCase.execute({ ...parsed.data, barberId: request.barberId! });
+      return reply.status(201).send(result);
+    } catch (err) {
+      if (err instanceof SlotTakenError) {
+        return reply.status(409).send({ error: 'SLOT_TAKEN', message: 'Horário já ocupado.' });
+      }
+      if (err instanceof ValidationError) {
+        return reply.status(400).send({ error: 'VALIDATION_ERROR', message: (err as Error).message });
+      }
+      if (err instanceof NotFoundError) {
+        return reply.status(404).send({ error: 'NOT_FOUND', message: (err as Error).message });
+      }
+      throw err;
+    }
+  });
+
+  // Look up a customer by phone number
+  app.get('/admin/customers/lookup', async (request: FastifyRequest & { barberId?: string }, reply) => {
+    const { phone } = request.query as { phone?: string };
+    if (!phone) {
+      return reply.status(400).send({ error: 'BAD_REQUEST', message: 'phone é obrigatório.' });
+    }
+    const customer = await customerRepo.findByPhone(phone);
+    return { name: customer ? customer.name : null };
   });
 
   // Barber cancels an appointment and notifies the customer

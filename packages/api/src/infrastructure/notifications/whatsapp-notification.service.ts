@@ -52,6 +52,7 @@ export class WhatsAppNotificationService {
   }
 
   async sendBookingConfirmation(appointment: AppointmentWithDetails): Promise<void> {
+    if (!appointment.customer.phone) return;
     const cancelUrl = `${env.BASE_URL}/agendamento/${appointment.cancelToken}`;
     const message = [
       `✅ *Agendamento confirmado!*`,
@@ -76,6 +77,7 @@ export class WhatsAppNotificationService {
   }
 
   async sendBarberCancellationToCustomer(appointment: AppointmentWithDetails, reason: string): Promise<void> {
+    if (!appointment.customer.phone) return;
     const message = [
       `❌ *Seu agendamento foi cancelado*`,
       ``,
@@ -100,6 +102,7 @@ export class WhatsAppNotificationService {
   }
 
   async sendCancellationNotice(appointment: AppointmentWithDetails): Promise<void> {
+    if (!appointment.customer.phone) return;
     const message = [
       `❌ *Agendamento cancelado*`,
       ``,
@@ -122,6 +125,7 @@ export class WhatsAppNotificationService {
   }
 
   async sendChangeNotice(appointment: AppointmentWithDetails): Promise<void> {
+    if (!appointment.customer.phone) return;
     const cancelUrl = `${env.BASE_URL}/agendamento/${appointment.cancelToken}`;
     const message = [
       `🔄 *Agendamento alterado!*`,
@@ -146,6 +150,7 @@ export class WhatsAppNotificationService {
   }
 
   async sendReminder(appointment: AppointmentWithDetails): Promise<void> {
+    if (!appointment.customer.phone) return;
     const cancelUrl = `${env.BASE_URL}/agendamento/${appointment.cancelToken}`;
     const message = [
       `⏰ *Lembrete: seu horário é em breve!*`,
@@ -167,6 +172,24 @@ export class WhatsAppNotificationService {
     );
   }
 
+  async sendBarberReminder(appointment: AppointmentWithDetails): Promise<void> {
+    if (!appointment.barber.phone) {
+      console.log(`[WhatsApp] Barber ${appointment.barber.firstName} has no phone configured, skipping reminder`);
+      return;
+    }
+
+    const message = [
+      `⏰ *Lembrete: você tem um cliente em breve!*`,
+      ``,
+      `👤 Cliente: ${appointment.customer.name}`,
+      `✂️ Serviço: ${appointment.service.name}`,
+      `🕐 Horário: ${appointment.startTime}`,
+    ].join('\n');
+
+    const barberFullName = `${appointment.barber.firstName} ${appointment.barber.lastName}`;
+    await this.sendWithRetry(appointment.barber.phone, barberFullName, message);
+  }
+
   async notifyBarber(appointment: AppointmentWithDetails, event: 'booked' | 'cancelled' | 'changed'): Promise<void> {
     if (!appointment.barber.phone) {
       console.log(`[WhatsApp] Barber ${appointment.barber.firstName} has no phone configured, skipping notification`);
@@ -183,7 +206,7 @@ export class WhatsAppNotificationService {
       eventLabels[event],
       ``,
       `👤 Cliente: ${appointment.customer.name}`,
-      `📱 WhatsApp: +55 ${appointment.customer.phone}`,
+      ...(appointment.customer.phone ? [`📱 WhatsApp: +55 ${appointment.customer.phone}`] : []),
       `✂️ Serviço: ${appointment.service.name}`,
       `📅 Data: ${formatDate(appointment.date)}`,
       `🕐 Horário: ${appointment.startTime}`,

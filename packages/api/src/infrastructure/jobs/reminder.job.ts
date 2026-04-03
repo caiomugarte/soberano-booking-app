@@ -23,6 +23,22 @@ export function startReminderJob(): void {
     } catch (err) {
       console.error('[Reminder] Job failed:', err);
     }
+
+    try {
+      const upcomingForBarbers = await appointmentRepo.findUpcomingWithoutBarberReminder(60);
+
+      for (const appointment of upcomingForBarbers) {
+        try {
+          await notificationService.sendBarberReminder(appointment);
+          await appointmentRepo.markBarberReminderSent(appointment.id);
+          console.log(`[Reminder] Sent barber reminder for appointment ${appointment.id}`);
+        } catch (err) {
+          console.error(`[Reminder] Failed barber reminder for appointment ${appointment.id}:`, err);
+        }
+      }
+    } catch (err) {
+      console.error('[Reminder] Barber reminder job failed:', err);
+    }
   });
 
   console.log('[Reminder] Reminder job started (every 15 minutes)');
