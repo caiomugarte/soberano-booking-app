@@ -15,6 +15,7 @@ export interface AppointmentEntity {
   status: AppointmentStatus;
   cancelToken: string;
   reminderSent: boolean;
+  barberReminderSent: boolean;
   cancelledAt: Date | null;
   createdAt: Date;
 }

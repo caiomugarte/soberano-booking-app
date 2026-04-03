@@ -73,7 +73,7 @@ model Service {
 model Customer {
   id        String   @id @default(uuid()) @db.Uuid
   name      String   @db.VarChar(200)
-  phone     String   @unique @db.VarChar(20)
+  phone     String?  @unique @db.VarChar(20)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -93,7 +93,8 @@ model Appointment {
   priceCents   Int      @map("price_cents")
   status       String   @default("confirmed") @db.VarChar(20)
   cancelToken  String   @unique @map("cancel_token") @db.VarChar(64)
-  reminderSent Boolean  @default(false) @map("reminder_sent")
+  reminderSent        Boolean  @default(false) @map("reminder_sent")
+  barberReminderSent  Boolean  @default(false) @map("barber_reminder_sent")
   cancelledAt  DateTime? @map("cancelled_at") @db.Timestamptz
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz

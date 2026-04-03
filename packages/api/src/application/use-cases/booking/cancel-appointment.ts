@@ -16,6 +16,9 @@ export class CancelAppointment {
     }
 
     // Verify phone
+    if (!appointment.customer.phone) {
+      throw new ValidationError('Este agendamento não pode ser cancelado online.');
+    }
     if (!appointment.customer.phone.endsWith(phoneLastFour)) {
       throw new ValidationError('Telefone não confere.');
     }

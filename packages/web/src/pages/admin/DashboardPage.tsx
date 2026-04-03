@@ -13,6 +13,7 @@ import {
 import {useAuthStore} from '../../stores/auth.store.ts';
 import {queryClient} from '../../config/query-client.ts';
 import {Button} from '../../components/ui/Button.tsx';
+import {AdminBookingModal} from '../../components/admin/AdminBookingModal.tsx';
 import {Spinner} from '../../components/ui/Spinner.tsx';
 import {
   dateToString,
@@ -134,7 +135,7 @@ function AppointmentCard({
             </span>
           </div>
           <p className="text-muted text-sm">{appointment.customer.name}</p>
-          <p className="text-muted text-xs">+55 {appointment.customer.phone}</p>
+          {appointment.customer.phone && <p className="text-muted text-xs">+55 {appointment.customer.phone}</p>}
         </div>
         <div className="text-right shrink-0">
           <p className="text-gold text-lg font-bold">{appointment.startTime}</p>
@@ -441,7 +442,7 @@ function WeekView({ onSelectDay }: { onSelectDay: (date: string) => void }) {
                         >
                           <div className="px-1.5 py-0.5 leading-tight">
                             <div className="text-[10px] font-bold truncate">{a.startTime}</div>
-                            <div className="text-[10px] font-medium truncate">{a.customer.name.split(' ')[0]}</div>
+                            <div className="text-[10px] font-medium truncate">{(() => { const parts = a.customer.name.trim().split(/\s+/); return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0]; })()}</div>
                             {!isShort && <div className="text-[10px] truncate opacity-70">{a.service.name}</div>}
                           </div>
                         </button>
@@ -650,6 +651,7 @@ export default function DashboardPage() {
   const [targetMonthOffset, setTargetMonthOffset] = useState(0);
   const [cancelId, setCancelId] = useState<string | null>(null);
   const [noShowId, setNoShowId] = useState<string | null>(null);
+  const [showBookingModal, setShowBookingModal] = useState(false);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
   const { data: me } = useAdminMe();
@@ -723,6 +725,7 @@ export default function DashboardPage() {
           isPending={updateStatus.isPending}
         />
       )}
+      {showBookingModal && <AdminBookingModal onClose={() => setShowBookingModal(false)} />}
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <a href="/" className="flex items-center gap-2.5 no-underline">
@@ -730,6 +733,12 @@ export default function DashboardPage() {
           <span className="font-serif text-sm tracking-widest uppercase text-gold">Soberano</span>
         </a>
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => setShowBookingModal(true)}
+            className="text-xs px-3 py-1.5 rounded-lg border border-gold text-gold hover:bg-gold/10 transition-colors cursor-pointer bg-transparent"
+          >
+            + Agendamento
+          </button>
           {me && <BarberProfile barber={me} onLogout={handleLogout} onAgenda={() => navigate('/admin/schedule')} />}
         </div>
       </div>

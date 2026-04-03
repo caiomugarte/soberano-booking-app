@@ -14,4 +14,8 @@ export class PrismaCustomerRepository implements CustomerRepository {
       create: { phone, name },
     });
   }
+
+  async createWalkin(name: string): Promise<CustomerEntity> {
+    return prisma.customer.create({ data: { name } });
+  }
 }

@@ -24,6 +24,9 @@ export class ChangeAppointment {
       throw new NotFoundError('Agendamento');
     }
 
+    if (!appointment.customer.phone) {
+      throw new ValidationError('Este agendamento não pode ser alterado online.');
+    }
     if (!appointment.customer.phone.endsWith(phoneLastFour)) {
       throw new ValidationError('Telefone não confere.');
     }

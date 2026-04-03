@@ -2,6 +2,8 @@
 
 Guidance for AI agents working on this codebase. Read this before making any changes.
 
+> Product requirements, feature status, and business rules: [`prd.md`](./prd.md)  
+> Active feature work, decisions, and blockers: [`.specs/project/STATE.md`](./.specs/project/STATE.md)  
 > For library-specific best practices and general engineering guidelines (SOLID, Clean Architecture, Clean Code, unit testing) see [`docs/best-practices.md`](./docs/best-practices.md).
 
 ## Project

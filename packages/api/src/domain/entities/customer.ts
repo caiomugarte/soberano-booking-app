@@ -1,5 +1,5 @@
 export interface CustomerEntity {
   id: string;
   name: string;
-  phone: string;
+  phone: string | null;
 }
