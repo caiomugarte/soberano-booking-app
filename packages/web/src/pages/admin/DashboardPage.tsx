@@ -8,6 +8,7 @@ import {
   useAdminCancelAppointment,
   useAdminMe,
   useAdminStats,
+  useDeleteAppointment,
   useUpdateAppointmentStatus
 } from '../../api/use-admin.ts';
 import {useAuthStore} from '../../stores/auth.store.ts';
@@ -112,11 +113,13 @@ function AppointmentCard({
   timePassed,
   onCancelClick,
   onNoShowClick,
+  onDeleteClick,
 }: {
   appointment: AdminAppointment;
   timePassed: boolean;
   onCancelClick: (id: string) => void;
   onNoShowClick: (id: string) => void;
+  onDeleteClick: (id: string) => void;
 }) {
   const updateStatus = useUpdateAppointmentStatus();
   const isConfirmed = appointment.status === 'confirmed';
@@ -169,6 +172,14 @@ function AppointmentCard({
               ✕ Cancelar
             </button>
           )}
+          {timePassed && (
+            <button
+              onClick={() => onDeleteClick(appointment.id)}
+              className="py-2 px-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer text-xs font-medium"
+            >
+              ✕ Apagar
+            </button>
+          )}
         </div>
       )}
 
@@ -193,6 +204,12 @@ function AppointmentCard({
               ✓ Concluído
             </button>
           )}
+          <button
+            onClick={() => onDeleteClick(appointment.id)}
+            className="py-1.5 px-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer text-xs font-medium"
+          >
+            ✕ Apagar
+          </button>
         </div>
       )}
     </div>
@@ -616,6 +633,33 @@ function YearView({ onSelectMonth }: { onSelectMonth: (offset: number) => void }
   );
 }
 
+function DeleteModal({ onConfirm, onClose, isPending }: { onConfirm: () => void; onClose: () => void; isPending: boolean }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <div className="bg-dark-surface border border-dark-border rounded-2xl p-6 w-full max-w-sm">
+        <h3 className="text-lg font-bold mb-1">Apagar agendamento</h3>
+        <p className="text-muted text-sm mb-6">Tem certeza que deseja apagar este agendamento? Esta ação não pode ser desfeita.</p>
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            disabled={isPending}
+            className="flex-1 py-2.5 rounded-xl border border-dark-border text-muted hover:text-[#F0EDE8] transition-colors text-sm cursor-pointer bg-transparent disabled:opacity-50"
+          >
+            Voltar
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isPending}
+            className="flex-1 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors text-sm font-medium cursor-pointer disabled:opacity-50"
+          >
+            {isPending ? <Spinner /> : '✕ Apagar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NoShowModal({ onConfirm, onClose, isPending }: { onConfirm: () => void; onClose: () => void; isPending: boolean }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -647,28 +691,34 @@ export default function DashboardPage() {
   const today = dateToString(new Date());
   const [view, setView] = useState<'day' | 'week' | 'month' | 'year'>('day');
   const [date, setDate] = useState(today);
-  const [page, setPage] = useState(1);
   const [targetMonthOffset, setTargetMonthOffset] = useState(0);
   const [cancelId, setCancelId] = useState<string | null>(null);
   const [noShowId, setNoShowId] = useState<string | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
   const { data: me } = useAdminMe();
-  const { data, isLoading, refetch } = useAdminAppointments(date, page);
+  const { data, isLoading, refetch } = useAdminAppointments(date);
   const appointments = data?.appointments;
   const cancelAppointment = useAdminCancelAppointment();
   const updateStatus = useUpdateAppointmentStatus();
+  const deleteMutation = useDeleteAppointment();
 
   function handleDateChange(newDate: string) {
     setDate(newDate);
-    setPage(1);
   }
 
   function handleSelectDay(ds: string) {
     setDate(ds);
-    setPage(1);
     setView('day');
+  }
+
+  function handleDeleteConfirm() {
+    if (!deleteId) return;
+    deleteMutation.mutate(deleteId, {
+      onSuccess: () => setDeleteId(null),
+    });
   }
 
   function handleSelectMonth(offset: number) {
@@ -723,6 +773,13 @@ export default function DashboardPage() {
           onConfirm={handleNoShowConfirm}
           onClose={() => setNoShowId(null)}
           isPending={updateStatus.isPending}
+        />
+      )}
+      {deleteId && (
+        <DeleteModal
+          onConfirm={handleDeleteConfirm}
+          onClose={() => setDeleteId(null)}
+          isPending={deleteMutation.isPending}
         />
       )}
       {showBookingModal && <AdminBookingModal onClose={() => setShowBookingModal(false)} />}
@@ -811,7 +868,7 @@ export default function DashboardPage() {
             <section className="mb-6">
               <h2 className="text-xs tracking-widest uppercase text-orange-400 mb-3">Aguardando confirmação</h2>
               <div className="flex flex-col gap-3">
-                {overdue.map((a) => <AppointmentCard key={a.id} appointment={a} timePassed={true} onCancelClick={setCancelId} onNoShowClick={setNoShowId} />)}
+                {overdue.map((a) => <AppointmentCard key={a.id} appointment={a} timePassed={true} onCancelClick={setCancelId} onNoShowClick={setNoShowId} onDeleteClick={setDeleteId} />)}
               </div>
             </section>
           )}
@@ -821,7 +878,7 @@ export default function DashboardPage() {
             <section className="mb-6">
               <h2 className="text-xs tracking-widest uppercase text-muted mb-3">Próximos</h2>
               <div className="flex flex-col gap-3">
-                {upcoming.map((a) => <AppointmentCard key={a.id} appointment={a} timePassed={false} onCancelClick={setCancelId} onNoShowClick={setNoShowId} />)}
+                {upcoming.map((a) => <AppointmentCard key={a.id} appointment={a} timePassed={false} onCancelClick={setCancelId} onNoShowClick={setNoShowId} onDeleteClick={setDeleteId} />)}
               </div>
             </section>
           )}
@@ -831,33 +888,11 @@ export default function DashboardPage() {
             <section>
               <h2 className="text-xs tracking-widest uppercase text-muted mb-3">Concluídos / Outros</h2>
               <div className="flex flex-col gap-3">
-                {done.map((a) => <AppointmentCard key={a.id} appointment={a} timePassed={true} onCancelClick={setCancelId} onNoShowClick={setNoShowId} />)}
+                {done.map((a) => <AppointmentCard key={a.id} appointment={a} timePassed={true} onCancelClick={setCancelId} onNoShowClick={setNoShowId} onDeleteClick={setDeleteId} />)}
               </div>
             </section>
           )}
 
-          {/* Pagination */}
-          {data && data.totalPages > 1 && (
-            <div className="flex items-center justify-between mt-6 pt-4 border-t border-dark-border">
-              <button
-                onClick={() => setPage((p) => p - 1)}
-                disabled={page <= 1}
-                className="px-4 py-2 rounded-lg border border-dark-border text-sm text-muted hover:text-[#F0EDE8] hover:border-gold/40 transition-colors disabled:opacity-30 cursor-pointer bg-transparent"
-              >
-                ← Anterior
-              </button>
-              <span className="text-xs text-muted">
-                Página {page} de {data.totalPages} · {data.total} agendamentos
-              </span>
-              <button
-                onClick={() => setPage((p) => p + 1)}
-                disabled={page >= data.totalPages}
-                className="px-4 py-2 rounded-lg border border-dark-border text-sm text-muted hover:text-[#F0EDE8] hover:border-gold/40 transition-colors disabled:opacity-30 cursor-pointer bg-transparent"
-              >
-                Próxima →
-              </button>
-            </div>
-          )}
         </>
       ))}
     </div>
