@@ -6,6 +6,8 @@
 
 | Feature | Status | Spec |
 |---|---|---|
+| whatsapp-ai-booking | Tasks ready — ready to execute | `.specs/features/whatsapp-ai-booking/spec.md` |
+| barber-admin-improvements | Tasks ready — ready to execute | `.specs/features/barber-admin-improvements/spec.md` |
 | admin-manual-booking | Specify — awaiting gray area clarification | `.specs/features/admin-manual-booking/spec.md` |
 | admin-barber-identity | Unknown | `.specs/features/admin-barber-identity/spec.md` |
 | barber-photos | Unknown | `.specs/features/barber-photos/spec.md` |

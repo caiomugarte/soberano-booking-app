@@ -50,17 +50,25 @@ export function useLogin() {
 export interface AppointmentPage {
   appointments: AdminAppointment[];
   total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
   summary: { confirmed: number; completed: number; revenueCents: number };
 }
 
-export function useAdminAppointments(date: string, page: number = 1) {
+export function useAdminAppointments(date: string) {
   return useQuery({
-    queryKey: ['admin-appointments', date, page],
-    queryFn: () => authRequest<AppointmentPage>(`/admin/appointments?date=${date}&page=${page}`),
+    queryKey: ['admin-appointments', date],
+    queryFn: () => authRequest<AppointmentPage>(`/admin/appointments?date=${date}`),
     refetchInterval: 1000 * 60,
+  });
+}
+
+export function useDeleteAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authRequest(`/admin/appointments/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-appointments'] });
+    },
   });
 }
 

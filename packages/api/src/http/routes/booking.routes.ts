@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { bookingSchema, slotsQuerySchema } from '@soberano/shared';
 import { PrismaAppointmentRepository } from '../../infrastructure/database/repositories/prisma-appointment.repository.js';
 import { PrismaServiceRepository } from '../../infrastructure/database/repositories/prisma-service.repository.js';
@@ -16,6 +17,10 @@ const customerRepo = new PrismaCustomerRepository();
 const shiftRepo = new PrismaBarberShiftRepository();
 const notificationService = new WhatsAppNotificationService();
 
+const customerNameQuerySchema = z.object({
+  phone: z.string().regex(/^\d{10,11}$/),
+});
+
 export async function bookingRoutes(app: FastifyInstance): Promise<void> {
   // Get available slots
   app.get('/slots', async (request) => {
@@ -23,6 +28,16 @@ export async function bookingRoutes(app: FastifyInstance): Promise<void> {
     const useCase = new GetAvailableSlots(appointmentRepo, shiftRepo);
     const slots = await useCase.execute(query.barberId, query.date);
     return { slots };
+  });
+
+  // Get customer name by phone (public, used by AI to greet returning customers)
+  app.get('/customer/name', async (request, reply) => {
+    const result = customerNameQuerySchema.safeParse(request.query);
+    if (!result.success) {
+      return reply.status(400).send({ error: 'phone must be 10-11 digits' });
+    }
+    const customer = await customerRepo.findByPhone(result.data.phone);
+    return { name: customer?.name ?? null };
   });
 
   // Create booking
