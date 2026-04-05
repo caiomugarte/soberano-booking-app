@@ -19,6 +19,22 @@ services:
       - coolify
     restart: unless-stopped
 
+  mcp:
+    build:
+      context: .
+      dockerfile: packages/mcp/Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3002
+      API_BASE_URL: http://api:3000
+      MCP_SECRET: ${MCP_SECRET}
+    networks:
+      - default
+      - coolify
+    depends_on:
+      - api
+    restart: unless-stopped
+
   web:
     build:
       context: .
