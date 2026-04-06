@@ -321,15 +321,34 @@ Architecture: Clean arch (domain → application → infrastructure → HTTP).
 
 ## 12. Deployment
 
-| Env var | Purpose |
-|---------|---------|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `JWT_SECRET` | Access token signing (min 32 chars) |
-| `JWT_REFRESH_SECRET` | Refresh token signing (min 32 chars) |
-| `BASE_URL` | Used in WhatsApp links (e.g., `https://soberano.com`) |
-| `CHATWOOT_BASE_URL` | Chatwoot instance URL (optional) |
-| `CHATWOOT_API_TOKEN` | Chatwoot API token (optional) |
-| `CHATWOOT_ACCOUNT_ID` | Chatwoot account (optional) |
-| `CHATWOOT_INBOX_ID` | Chatwoot inbox (optional) |
+### Infrastructure
+
+Hosted on a VPS (Hostinger), managed via **Coolify** (Docker-based). All services run as Docker containers on the same internal network.
+
+### Nginx Proxy (web container)
+
+The web container runs nginx and acts as the unified entry point for a client domain. All traffic hits a single domain; nginx routes internally:
+
+| Path | Proxied to | Notes |
+|------|-----------|-------|
+| `/` | Vite SPA (static files) | SPA routing via `try_files` |
+| `/api/*` | API container (`${API_INTERNAL_URL}`) | `Host` header forwarded as-is |
+| `/mcp` | MCP container (`http://mcp:3002/mcp`) | Used by n8n AI agent |
+
+nginx forwards the original `Host` header to the API via `proxy_set_header Host $host`. This means the API receives the full client domain (e.g., `soberano.altion.com.br`) on every request — used for tenant resolution in the multi-tenant architecture.
+
+### Environment Variables
+
+| Env var | Service | Purpose |
+|---------|---------|---------|
+| `DATABASE_URL` | API | PostgreSQL connection string |
+| `JWT_SECRET` | API | Access token signing (min 32 chars) |
+| `JWT_REFRESH_SECRET` | API | Refresh token signing (min 32 chars) |
+| `BASE_URL` | API | Used in WhatsApp links (e.g., `https://soberano.altion.com.br`) |
+| `CHATWOOT_BASE_URL` | API | Chatwoot instance URL (optional) |
+| `CHATWOOT_API_TOKEN` | API | Chatwoot API token (optional) |
+| `CHATWOOT_ACCOUNT_ID` | API | Chatwoot account (optional) |
+| `CHATWOOT_INBOX_ID` | API | Chatwoot inbox (optional) |
+| `API_INTERNAL_URL` | Web (nginx) | Internal Docker network URL for API proxy |
 
 Notifications degrade gracefully if Chatwoot vars are absent.
