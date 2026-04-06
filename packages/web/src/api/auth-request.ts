@@ -45,5 +45,6 @@ export async function authRequest<T>(path: string, options?: RequestInit): Promi
     throw new Error(body.message ?? 'Erro inesperado.');
   }
 
+  if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
 }

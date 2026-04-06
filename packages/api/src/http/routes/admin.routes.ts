@@ -27,19 +27,25 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return { firstName: barber.firstName, lastName: barber.lastName, avatarUrl: barber.avatarUrl };
   });
 
-  // Get barber's appointments for a date (paginated)
+  // Get barber's appointments for a date
   app.get('/admin/appointments', async (request: FastifyRequest & { barberId?: string }) => {
-    const { date, page = '1', limit = '15' } = request.query as { date?: string; page?: string; limit?: string };
+    const { date } = request.query as { date?: string };
     const barberId = request.barberId!;
 
     const targetDate = date ? new Date(date + 'T00:00:00') : new Date();
     targetDate.setHours(0, 0, 0, 0);
 
-    const pageNum = Math.max(1, parseInt(page, 10) || 1);
-    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 10));
+    const { appointments, total, summary } = await appointmentRepo.findByBarberAndDate(barberId, targetDate);
+    return { appointments, total, summary };
+  });
 
-    const { appointments, total, summary } = await appointmentRepo.findByBarberAndDate(barberId, targetDate, pageNum, limitNum);
-    return { appointments, total, page: pageNum, limit: limitNum, totalPages: Math.ceil(total / limitNum), summary };
+  // Delete an appointment
+  app.delete<{ Params: { id: string } }>('/admin/appointments/:id', async (request, reply) => {
+    const { id } = request.params;
+    const appointment = await appointmentRepo.findById(id);
+    if (!appointment) return reply.status(404).send({ error: 'NOT_FOUND' });
+    await appointmentRepo.deleteById(id);
+    return reply.status(204).send();
   });
 
   // Get all appointments for a date range (weekly calendar view)

@@ -59,19 +59,14 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
   async findByBarberAndDate(
     barberId: string,
     date: Date,
-    page: number,
-    limit: number,
   ): Promise<{ appointments: AppointmentWithDetails[]; total: number; summary: { confirmed: number; completed: number; revenueCents: number } }> {
     const where = { barberId, date };
-    const [appointments, total, confirmedCount, completedAgg] = await prisma.$transaction([
+    const [appointments, confirmedCount, completedAgg] = await prisma.$transaction([
       prisma.appointment.findMany({
         where,
         include: includeRelations,
         orderBy: { startTime: 'asc' },
-        skip: (page - 1) * limit,
-        take: limit,
       }),
-      prisma.appointment.count({ where }),
       prisma.appointment.count({ where: { barberId, date, status: 'confirmed' } }),
       prisma.appointment.aggregate({
         where: { barberId, date, status: 'completed' },
@@ -81,13 +76,17 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
     ]);
     return {
       appointments: appointments as unknown as AppointmentWithDetails[],
-      total,
+      total: appointments.length,
       summary: {
         confirmed: confirmedCount,
         completed: completedAgg._count,
         revenueCents: completedAgg._sum.priceCents ?? 0,
       },
     };
+  }
+
+  async deleteById(id: string): Promise<void> {
+    await prisma.appointment.delete({ where: { id } });
   }
 
   async findUpcomingWithoutReminder(minutesAhead: number): Promise<AppointmentWithDetails[]> {
