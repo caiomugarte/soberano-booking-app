@@ -13,9 +13,9 @@ import {
 } from '../../api/use-admin.ts';
 import {useAuthStore} from '../../stores/auth.store.ts';
 import {queryClient} from '../../config/query-client.ts';
-import {Button} from '../../components/ui/Button.tsx';
+import {Button} from '@soberano/ui';
 import {AdminBookingModal} from '../../components/admin/AdminBookingModal.tsx';
-import {Spinner} from '../../components/ui/Spinner.tsx';
+import {Spinner} from '@soberano/ui';
 import {
   dateToString,
   DAY_NAMES,

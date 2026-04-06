@@ -4,7 +4,7 @@ import type { AppointmentRepository } from '../../../domain/repositories/appoint
 import type { BarberShiftRepository } from '../../../domain/repositories/barber-shift.repository.js';
 import type { AppointmentWithDetails } from '../../../domain/entities/appointment.js';
 import { NotFoundError, SlotTakenError, ValidationError } from '../../../shared/errors.js';
-import { WhatsAppNotificationService } from '../../../infrastructure/notifications/whatsapp-notification.service.js';
+import type { WhatsAppNotificationService } from '../../../infrastructure/notifications/whatsapp-notification.service.js';
 
 export class ChangeAppointment {
   constructor(
@@ -18,8 +18,9 @@ export class ChangeAppointment {
     phoneLastFour: string,
     newDate: string,
     newStartTime: string,
+    clientId: string,
   ): Promise<AppointmentWithDetails> {
-    const appointment = await this.appointmentRepo.findByCancelToken(cancelToken);
+    const appointment = await this.appointmentRepo.findByCancelToken(cancelToken, clientId);
     if (!appointment) {
       throw new NotFoundError('Agendamento');
     }

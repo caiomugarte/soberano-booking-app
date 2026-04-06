@@ -1,7 +1,7 @@
 import { useBookingStore } from '../../stores/booking.store.ts';
 import { useCreateBooking } from '../../api/use-create-booking.ts';
-import { Panel } from '../ui/Panel.tsx';
-import { StickyBar } from '../ui/StickyBar.tsx';
+import { Panel } from '@soberano/ui';
+import { StickyBar } from '@soberano/ui';
 import { formatCurrency, formatDateLong } from '../../lib/format.ts';
 
 interface ConfirmStepProps {

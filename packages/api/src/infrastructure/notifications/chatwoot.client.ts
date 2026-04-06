@@ -1,5 +1,3 @@
-import { env } from '../../config/env.js';
-
 interface ChatwootContact {
   id: number;
   name: string;
@@ -9,6 +7,13 @@ interface ChatwootContact {
 interface ChatwootConversation {
   id: number;
   inbox_id: number;
+}
+
+export interface ChatwootConfig {
+  baseUrl: string;
+  apiToken: string;
+  accountId: number;
+  inboxId: number;
 }
 
 /**
@@ -52,18 +57,10 @@ function normalizeBrazilianPhone(phone: string): { primary: string; alternate: s
 }
 
 export class ChatwootClient {
-  private baseUrl: string;
-  private token: string;
-  private accountId: number;
-  private inboxId: number;
   private enabled: boolean;
 
-  constructor() {
-    this.baseUrl = env.CHATWOOT_BASE_URL ?? '';
-    this.token = env.CHATWOOT_API_TOKEN ?? '';
-    this.accountId = env.CHATWOOT_ACCOUNT_ID ?? 0;
-    this.inboxId = env.CHATWOOT_INBOX_ID ?? 0;
-    this.enabled = !!(this.baseUrl && this.token && this.accountId && this.inboxId);
+  constructor(private config: ChatwootConfig | null) {
+    this.enabled = config !== null;
   }
 
   isEnabled(): boolean {
@@ -71,14 +68,15 @@ export class ChatwootClient {
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const url = `${this.baseUrl}/api/v1/accounts/${this.accountId}${path}`;
+    if (!this.config) throw new Error('ChatwootClient is not configured');
+    const url = `${this.config.baseUrl}/api/v1/accounts/${this.config.accountId}${path}`;
     console.log(`[Chatwoot] ${options.method ?? 'GET'} ${url}`);
 
     const res = await fetch(url, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        'api_access_token': this.token,
+        'api_access_token': this.config.apiToken,
         ...options.headers,
       },
     });
@@ -140,6 +138,8 @@ export class ChatwootClient {
   }
 
   async findOrCreateConversation(contactId: number): Promise<ChatwootConversation> {
+    if (!this.config) throw new Error('ChatwootClient is not configured');
+
     // Get existing conversations for this contact
     const result = await this.request<{ payload: ChatwootConversation[] }>(
       `/contacts/${contactId}/conversations`
@@ -148,9 +148,9 @@ export class ChatwootClient {
     const conversations = result.payload ?? [];
     console.log(`[Chatwoot] Contact ${contactId} has ${conversations.length} conversations`);
 
-    const match = conversations.find((c) => c.inbox_id === this.inboxId);
+    const match = conversations.find((c) => c.inbox_id === this.config!.inboxId);
     if (match) {
-      console.log(`[Chatwoot] Found conversation id=${match.id} for inbox ${this.inboxId}`);
+      console.log(`[Chatwoot] Found conversation id=${match.id} for inbox ${this.config.inboxId}`);
       return match;
     }
 
@@ -159,7 +159,7 @@ export class ChatwootClient {
       method: 'POST',
       body: JSON.stringify({
         contact_id: contactId,
-        inbox_id: this.inboxId,
+        inbox_id: this.config.inboxId,
       }),
     });
 

@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSlots, type Slot } from '../../api/use-slots.ts';
 import { useBookingStore } from '../../stores/booking.store.ts';
-import { Panel } from '../ui/Panel.tsx';
-import { StickyBar } from '../ui/StickyBar.tsx';
-import { Spinner } from '../ui/Spinner.tsx';
+import { Panel } from '@soberano/ui';
+import { StickyBar } from '@soberano/ui';
+import { Spinner } from '@soberano/ui';
 import { getWeekDates, getWeekLabel, dateToString, DAY_NAMES, formatDateLong } from '../../lib/format.ts';
 import { MAX_WEEKS_AHEAD } from '@soberano/shared';
 

@@ -6,8 +6,8 @@ import { UnauthorizedError } from '../../../shared/errors.js';
 export class AuthenticateBarber {
   constructor(private barberRepo: BarberRepository) {}
 
-  async execute(email: string, password: string): Promise<{ accessToken: string; refreshToken: string }> {
-    const barber = await this.barberRepo.findByEmail(email);
+  async execute(email: string, password: string, clientId: string): Promise<{ accessToken: string; refreshToken: string }> {
+    const barber = await this.barberRepo.findByEmail(email, clientId);
     if (!barber) {
       throw new UnauthorizedError('Email ou senha incorretos.');
     }

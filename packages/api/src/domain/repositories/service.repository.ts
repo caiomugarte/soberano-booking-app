@@ -1,6 +1,6 @@
 import type { ServiceEntity } from '../entities/service.js';
 
 export interface ServiceRepository {
-  findAllActive(): Promise<ServiceEntity[]>;
-  findById(id: string): Promise<ServiceEntity | null>;
+  findAllActive(clientId: string): Promise<ServiceEntity[]>;
+  findById(id: string, clientId: string): Promise<ServiceEntity | null>;
 }

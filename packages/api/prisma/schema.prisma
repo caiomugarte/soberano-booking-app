@@ -7,23 +7,61 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model SuperAdmin {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique @db.VarChar(255)
+  password  String   @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("super_admins")
+}
+
+model Client {
+  id                String   @id @default(uuid()) @db.Uuid
+  slug              String   @unique @db.VarChar(50)
+  name              String   @db.VarChar(200)
+  customDomain      String?  @unique @map("custom_domain") @db.VarChar(255)
+  enabledFeatures   String[] @map("enabled_features")
+  theme             Json     @default("{}")
+  baseUrl           String   @map("base_url") @db.VarChar(500)
+  timezone          String   @db.VarChar(50)
+  isActive          Boolean  @default(true) @map("is_active")
+  chatwootBaseUrl   String?  @map("chatwoot_base_url") @db.VarChar(500)
+  chatwootToken     String?  @map("chatwoot_token") @db.VarChar(255)
+  chatwootAccountId Int?     @map("chatwoot_account_id")
+  chatwootInboxId   Int?     @map("chatwoot_inbox_id")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  barbers      Barber[]
+  services     Service[]
+  customers    Customer[]
+  appointments Appointment[]
+
+  @@map("clients")
+}
+
 model Barber {
   id        String   @id @default(uuid()) @db.Uuid
-  slug      String   @unique @db.VarChar(50)
+  slug      String   @db.VarChar(50)
   firstName String   @map("first_name") @db.VarChar(100)
   lastName  String   @map("last_name") @db.VarChar(100)
-  email     String   @unique @db.VarChar(255)
+  email     String   @db.VarChar(255)
   password  String   @db.VarChar(255)
   phone     String?  @db.VarChar(20)
   avatarUrl String?  @map("avatar_url") @db.VarChar(500)
   isActive  Boolean  @default(true) @map("is_active")
+  clientId  String?  @map("client_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
+  client       Client?         @relation(fields: [clientId], references: [id])
   appointments Appointment[]
   shifts       BarberShift[]
   absences     BarberAbsence[]
 
+  @@unique([clientId, slug])
+  @@unique([clientId, email])
   @@map("barbers")
 }
 
@@ -55,57 +93,66 @@ model BarberAbsence {
 }
 
 model Service {
-  id        String   @id @default(uuid()) @db.Uuid
-  slug      String   @unique @db.VarChar(50)
-  name      String   @db.VarChar(200)
-  icon      String   @db.VarChar(10)
-  priceCents Int     @map("price_cents")
-  duration  Int      @default(30)
-  isActive  Boolean  @default(true) @map("is_active")
-  sortOrder Int      @default(0) @map("sort_order")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id         String   @id @default(uuid()) @db.Uuid
+  slug       String   @db.VarChar(50)
+  name       String   @db.VarChar(200)
+  icon       String   @db.VarChar(10)
+  priceCents Int      @map("price_cents")
+  duration   Int      @default(30)
+  isActive   Boolean  @default(true) @map("is_active")
+  sortOrder  Int      @default(0) @map("sort_order")
+  clientId   String?  @map("client_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
 
+  client       Client?       @relation(fields: [clientId], references: [id])
   appointments Appointment[]
 
+  @@unique([clientId, slug])
   @@map("services")
 }
 
 model Customer {
   id        String   @id @default(uuid()) @db.Uuid
   name      String   @db.VarChar(200)
-  phone     String?  @unique @db.VarChar(20)
+  phone     String?  @db.VarChar(20)
+  clientId  String?  @map("client_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
+  client       Client?       @relation(fields: [clientId], references: [id])
   appointments Appointment[]
 
+  @@unique([clientId, phone])
   @@map("customers")
 }
 
 model Appointment {
-  id           String   @id @default(uuid()) @db.Uuid
-  barberId     String   @map("barber_id") @db.Uuid
-  serviceId    String   @map("service_id") @db.Uuid
-  customerId   String   @map("customer_id") @db.Uuid
-  date         DateTime @db.Date
-  startTime    String   @map("start_time") @db.VarChar(5)
-  endTime      String   @map("end_time") @db.VarChar(5)
-  priceCents   Int      @map("price_cents")
-  status       String   @default("confirmed") @db.VarChar(20)
-  cancelToken  String   @unique @map("cancel_token") @db.VarChar(64)
-  reminderSent        Boolean  @default(false) @map("reminder_sent")
-  barberReminderSent  Boolean  @default(false) @map("barber_reminder_sent")
-  cancelledAt  DateTime? @map("cancelled_at") @db.Timestamptz
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id                 String    @id @default(uuid()) @db.Uuid
+  barberId           String    @map("barber_id") @db.Uuid
+  serviceId          String    @map("service_id") @db.Uuid
+  customerId         String    @map("customer_id") @db.Uuid
+  date               DateTime  @db.Date
+  startTime          String    @map("start_time") @db.VarChar(5)
+  endTime            String    @map("end_time") @db.VarChar(5)
+  priceCents         Int       @map("price_cents")
+  status             String    @default("confirmed") @db.VarChar(20)
+  cancelToken        String    @unique @map("cancel_token") @db.VarChar(64)
+  reminderSent       Boolean   @default(false) @map("reminder_sent")
+  barberReminderSent Boolean   @default(false) @map("barber_reminder_sent")
+  cancelledAt        DateTime? @map("cancelled_at") @db.Timestamptz
+  clientId           String?   @map("client_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   barber   Barber   @relation(fields: [barberId], references: [id])
   service  Service  @relation(fields: [serviceId], references: [id])
   customer Customer @relation(fields: [customerId], references: [id])
+  client   Client?  @relation(fields: [clientId], references: [id])
 
   @@index([barberId, date, startTime])
   @@index([date, barberId])
   @@index([customerId])
   @@index([cancelToken])
+  @@index([clientId, date])
   @@map("appointments")
 }

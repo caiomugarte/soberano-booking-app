@@ -5,10 +5,10 @@ import type { BarberRepository } from '../../../domain/repositories/barber.repos
 import type { CustomerRepository } from '../../../domain/repositories/customer.repository.js';
 import type { AppointmentWithDetails } from '../../../domain/entities/appointment.js';
 import { NotFoundError, SlotTakenError } from '../../../shared/errors.js';
-import { WhatsAppNotificationService } from '../../../infrastructure/notifications/whatsapp-notification.service.js';
-import { env } from '../../../config/env.js';
+import type { WhatsAppNotificationService } from '../../../infrastructure/notifications/whatsapp-notification.service.js';
 
 interface AdminCreateAppointmentInput {
+  clientId: string;
   serviceId: string;
   barberId: string;
   date: string;
@@ -26,11 +26,13 @@ export class AdminCreateAppointment {
     private notificationService: WhatsAppNotificationService,
   ) {}
 
-  async execute(input: AdminCreateAppointmentInput): Promise<{ appointment: AppointmentWithDetails; cancelUrl: string }> {
-    const service = await this.serviceRepo.findById(input.serviceId);
+  async execute(input: AdminCreateAppointmentInput): Promise<{ appointment: AppointmentWithDetails }> {
+    const { clientId } = input;
+
+    const service = await this.serviceRepo.findById(input.serviceId, clientId);
     if (!service || !service.isActive) throw new NotFoundError('Serviço');
 
-    const barber = await this.barberRepo.findById(input.barberId);
+    const barber = await this.barberRepo.findById(input.barberId, clientId);
     if (!barber || !barber.isActive) throw new NotFoundError('Barbeiro');
 
     const date = new Date(input.date + 'T00:00:00');
@@ -40,8 +42,8 @@ export class AdminCreateAppointment {
     const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
 
     const customer = input.customerPhone
-      ? await this.customerRepo.upsertByPhone(input.customerPhone, input.customerName)
-      : await this.customerRepo.createWalkin(input.customerName);
+      ? await this.customerRepo.upsertByPhone(input.customerPhone, input.customerName, clientId)
+      : await this.customerRepo.createWalkin(input.customerName, clientId);
     const cancelToken = crypto.randomBytes(32).toString('hex');
 
     let appointment: AppointmentWithDetails;
@@ -50,6 +52,7 @@ export class AdminCreateAppointment {
         barberId: input.barberId,
         serviceId: input.serviceId,
         customerId: customer.id,
+        clientId,
         date,
         startTime: input.startTime,
         endTime,
@@ -73,7 +76,6 @@ export class AdminCreateAppointment {
       });
     }
 
-    const cancelUrl = `${env.BASE_URL}/agendamento/${cancelToken}`;
-    return { appointment, cancelUrl };
+    return { appointment };
   }
 }

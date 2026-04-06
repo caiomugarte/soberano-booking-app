@@ -1,7 +1,7 @@
 import { useBarbers } from '../../api/use-barbers.ts';
 import { useBookingStore } from '../../stores/booking.store.ts';
-import { Panel } from '../ui/Panel.tsx';
-import { StickyBar } from '../ui/StickyBar.tsx';
+import { Panel } from '@soberano/ui';
+import { StickyBar } from '@soberano/ui';
 
 export function BarberStep() {
   const { data: barbers, isLoading } = useBarbers();

@@ -13,6 +13,9 @@ import { barberRoutes } from './http/routes/barber.routes.js';
 import { authRoutes } from './http/routes/auth.routes.js';
 import { adminRoutes } from './http/routes/admin.routes.js';
 import { scheduleRoutes } from './http/routes/schedule.routes.js';
+import { clientRoutes } from './http/routes/client.routes.js';
+import { superAdminRoutes } from './http/routes/super-admin.routes.js';
+import { tenantMiddleware } from './http/plugins/tenant.plugin.js';
 import { startReminderJob } from './infrastructure/jobs/reminder.job.js';
 
 const app = Fastify({
@@ -22,7 +25,13 @@ const app = Fastify({
 });
 
 await app.register(cors, {
-  origin: env.NODE_ENV === 'development' ? true : env.BASE_URL,
+  origin: (origin, cb) => {
+    if (!origin || /\.altion\.com\.br$/.test(origin) || /^http:\/\/localhost/.test(origin)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Not allowed'), false);
+    }
+  },
   credentials: true,
 });
 
@@ -32,6 +41,9 @@ await app.register(rateLimit, {
   max: 100,
   timeWindow: '1 minute',
 });
+
+// Tenant resolution — runs on every request except health check and super-admin routes
+app.addHook('onRequest', tenantMiddleware);
 
 // Error handler
 app.setErrorHandler((error: FastifyError, _request, reply) => {
@@ -67,6 +79,7 @@ app.setErrorHandler((error: FastifyError, _request, reply) => {
 app.get('/api/health', async () => ({ status: 'ok' }));
 
 // Routes
+await app.register(clientRoutes, { prefix: '/api' });
 await app.register(serviceRoutes, { prefix: '/api' });
 await app.register(barberRoutes, { prefix: '/api' });
 await app.register(bookingRoutes, { prefix: '/api' });
@@ -74,6 +87,7 @@ await app.register(appointmentRoutes, { prefix: '/api' });
 await app.register(authRoutes, { prefix: '/api' });
 await app.register(adminRoutes, { prefix: '/api' });
 await app.register(scheduleRoutes, { prefix: '/api' });
+await app.register(superAdminRoutes, { prefix: '/api' });
 
 // Start
 try {

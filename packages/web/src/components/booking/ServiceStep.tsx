@@ -1,7 +1,7 @@
 import { useServices } from '../../api/use-services.ts';
 import { useBookingStore } from '../../stores/booking.store.ts';
-import { Panel } from '../ui/Panel.tsx';
-import { StickyBar } from '../ui/StickyBar.tsx';
+import { Panel } from '@soberano/ui';
+import { StickyBar } from '@soberano/ui';
 import { formatCurrency } from '../../lib/format.ts';
 
 export function ServiceStep() {

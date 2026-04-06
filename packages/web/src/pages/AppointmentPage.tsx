@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom';
 import { AppointmentView } from '../components/appointment/AppointmentView.tsx';
-import { Footer } from '../components/ui/Footer.tsx';
+import { Footer } from '@soberano/ui';
 
 export default function AppointmentPage() {
   const { token } = useParams<{ token: string }>();

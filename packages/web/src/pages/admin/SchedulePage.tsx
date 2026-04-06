@@ -4,8 +4,8 @@ import {
   useShifts, useUpdateShifts, useAbsences, useAddAbsence, useDeleteAbsence,
   type Shift,
 } from '../../api/use-schedule.ts';
-import { Button } from '../../components/ui/Button.tsx';
-import { Spinner } from '../../components/ui/Spinner.tsx';
+import { Button } from '@soberano/ui';
+import { Spinner } from '@soberano/ui';
 
 const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const WORK_DAYS = [1, 2, 3, 4, 5, 6];

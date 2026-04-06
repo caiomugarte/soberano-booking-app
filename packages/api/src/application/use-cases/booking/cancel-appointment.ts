@@ -1,7 +1,7 @@
 import { APPOINTMENT_STATUS } from '@soberano/shared';
 import type { AppointmentRepository } from '../../../domain/repositories/appointment.repository.js';
 import { NotFoundError, ValidationError } from '../../../shared/errors.js';
-import { WhatsAppNotificationService } from '../../../infrastructure/notifications/whatsapp-notification.service.js';
+import type { WhatsAppNotificationService } from '../../../infrastructure/notifications/whatsapp-notification.service.js';
 
 export class CancelAppointment {
   constructor(
@@ -9,8 +9,8 @@ export class CancelAppointment {
     private notificationService: WhatsAppNotificationService,
   ) {}
 
-  async execute(cancelToken: string, phoneLastFour: string): Promise<void> {
-    const appointment = await this.appointmentRepo.findByCancelToken(cancelToken);
+  async execute(cancelToken: string, phoneLastFour: string, clientId: string): Promise<void> {
+    const appointment = await this.appointmentRepo.findByCancelToken(cancelToken, clientId);
     if (!appointment) {
       throw new NotFoundError('Agendamento');
     }

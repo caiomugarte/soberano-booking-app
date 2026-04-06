@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useBookingStore } from '../../stores/booking.store.ts';
-import { Panel } from '../ui/Panel.tsx';
-import { StickyBar } from '../ui/StickyBar.tsx';
-import { Input } from '../ui/Input.tsx';
+import { Panel } from '@soberano/ui';
+import { StickyBar } from '@soberano/ui';
+import { Input } from '@soberano/ui';
 import { formatPhone, stripPhone } from '../../lib/format.ts';
 
 export function CustomerStep() {

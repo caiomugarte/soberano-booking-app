@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppointment, useCancelAppointment, useChangeAppointment } from '../../api/use-appointment.ts';
 import { useSlots, type Slot } from '../../api/use-slots.ts';
-import { Button } from '../ui/Button.tsx';
-import { Input } from '../ui/Input.tsx';
-import { Spinner } from '../ui/Spinner.tsx';
+import { Button } from '@soberano/ui';
+import { Input } from '@soberano/ui';
+import { Spinner } from '@soberano/ui';
 import { formatCurrency, formatDateLong, getWeekDates, getWeekLabel, dateToString, DAY_NAMES } from '../../lib/format.ts';
 import { MAX_WEEKS_AHEAD } from '@soberano/shared';
 

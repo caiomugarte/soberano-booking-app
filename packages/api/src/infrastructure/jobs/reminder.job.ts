@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { PrismaAppointmentRepository } from '../database/repositories/prisma-appointment.repository.js';
-import { WhatsAppNotificationService } from '../notifications/whatsapp-notification.service.js';
+import { createNotificationService } from '../notifications/whatsapp-notification.service.js';
 
 function gaussianDelay(meanMs: number, stdMs: number, minMs: number, maxMs: number): Promise<void> {
   const u1 = Math.random();
@@ -11,7 +11,6 @@ function gaussianDelay(meanMs: number, stdMs: number, minMs: number, maxMs: numb
 }
 
 const appointmentRepo = new PrismaAppointmentRepository();
-const notificationService = new WhatsAppNotificationService();
 
 export function startReminderJob(): void {
   // Run every 15 minutes
@@ -22,7 +21,8 @@ export function startReminderJob(): void {
       for (let i = 0; i < upcoming.length; i++) {
         const appointment = upcoming[i];
         try {
-          await notificationService.sendReminder(appointment);
+          const notificationSvc = createNotificationService((appointment as any).client);
+          await notificationSvc.sendReminder(appointment);
           await appointmentRepo.markReminderSent(appointment.id);
           console.log(`[Reminder] Sent reminder for appointment ${appointment.id}`);
         } catch (err) {
@@ -42,7 +42,8 @@ export function startReminderJob(): void {
       for (let i = 0; i < upcomingForBarbers.length; i++) {
         const appointment = upcomingForBarbers[i];
         try {
-          await notificationService.sendBarberReminder(appointment);
+          const notificationSvc = createNotificationService((appointment as any).client);
+          await notificationSvc.sendBarberReminder(appointment);
           await appointmentRepo.markBarberReminderSent(appointment.id);
           console.log(`[Reminder] Sent barber reminder for appointment ${appointment.id}`);
         } catch (err) {

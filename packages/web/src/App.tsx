@@ -9,7 +9,7 @@ import DashboardPage from './pages/admin/DashboardPage.tsx';
 import SchedulePage from './pages/admin/SchedulePage.tsx';
 import { ProtectedRoute } from './components/admin/ProtectedRoute.tsx';
 import { useAuthStore } from './stores/auth.store.ts';
-import { Spinner } from './components/ui/Spinner.tsx';
+import { ClientConfigProvider, Spinner } from '@soberano/ui';
 
 function AppRoutes() {
   return (
@@ -34,7 +34,7 @@ function AppRoutes() {
   );
 }
 
-export default function App() {
+function AppContent() {
   const initialize = useAuthStore((s) => s.initialize);
   const isInitialized = useAuthStore((s) => s.isInitialized);
 
@@ -54,5 +54,13 @@ export default function App() {
     <BrowserRouter>
       <AppRoutes />
     </BrowserRouter>
+  );
+}
+
+export default function App() {
+  return (
+    <ClientConfigProvider>
+      <AppContent />
+    </ClientConfigProvider>
   );
 }

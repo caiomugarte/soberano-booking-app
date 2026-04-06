@@ -6,10 +6,10 @@ import type { CustomerRepository } from '../../../domain/repositories/customer.r
 import type { BarberShiftRepository } from '../../../domain/repositories/barber-shift.repository.js';
 import type { AppointmentWithDetails } from '../../../domain/entities/appointment.js';
 import { NotFoundError, SlotTakenError, ValidationError } from '../../../shared/errors.js';
-import { WhatsAppNotificationService } from '../../../infrastructure/notifications/whatsapp-notification.service.js';
-import { env } from '../../../config/env.js';
+import type { WhatsAppNotificationService } from '../../../infrastructure/notifications/whatsapp-notification.service.js';
 
 interface CreateAppointmentInput {
+  clientId: string;
   serviceId: string;
   barberId: string;
   date: string;
@@ -28,15 +28,17 @@ export class CreateAppointment {
     private shiftRepo: BarberShiftRepository,
   ) {}
 
-  async execute(input: CreateAppointmentInput): Promise<{ appointment: AppointmentWithDetails; cancelUrl: string }> {
+  async execute(input: CreateAppointmentInput): Promise<{ appointment: AppointmentWithDetails }> {
+    const { clientId } = input;
+
     // Validate service
-    const service = await this.serviceRepo.findById(input.serviceId);
+    const service = await this.serviceRepo.findById(input.serviceId, clientId);
     if (!service || !service.isActive) {
       throw new NotFoundError('Serviço');
     }
 
     // Validate barber
-    const barber = await this.barberRepo.findById(input.barberId);
+    const barber = await this.barberRepo.findById(input.barberId, clientId);
     if (!barber || !barber.isActive) {
       throw new NotFoundError('Barbeiro');
     }
@@ -68,7 +70,7 @@ export class CreateAppointment {
     const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
 
     // Upsert customer
-    const customer = await this.customerRepo.upsertByPhone(input.customerPhone, input.customerName);
+    const customer = await this.customerRepo.upsertByPhone(input.customerPhone, input.customerName, clientId);
 
     // Generate cancel token
     const cancelToken = crypto.randomBytes(32).toString('hex');
@@ -80,6 +82,7 @@ export class CreateAppointment {
         barberId: input.barberId,
         serviceId: input.serviceId,
         customerId: customer.id,
+        clientId,
         date,
         startTime: input.startTime,
         endTime,
@@ -103,7 +106,6 @@ export class CreateAppointment {
       console.error('[Notification] Failed to notify barber:', err);
     });
 
-    const cancelUrl = `${env.BASE_URL}/agendamento/${cancelToken}`;
-    return { appointment, cancelUrl };
+    return { appointment };
   }
 }

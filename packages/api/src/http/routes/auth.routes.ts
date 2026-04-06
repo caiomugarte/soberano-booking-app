@@ -20,7 +20,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   }, async (request, reply) => {
     const input = barberLoginSchema.parse(request.body);
     const useCase = new AuthenticateBarber(barberRepo);
-    const { accessToken, refreshToken } = await useCase.execute(input.email, input.password);
+    const { accessToken, refreshToken } = await useCase.execute(input.email, input.password, request.client.id);
 
     reply.setCookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
     return { accessToken };

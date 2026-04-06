@@ -6,8 +6,8 @@ const barberRepo = new PrismaBarberRepository();
 const shiftRepo = new PrismaBarberShiftRepository();
 
 export async function barberRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/barbers', async () => {
-    const barbers = await barberRepo.findAllActive();
+  app.get('/barbers', async (request) => {
+    const barbers = await barberRepo.findAllActive(request.client.id);
     const allShifts = await Promise.all(barbers.map((b) => shiftRepo.findAllByBarber(b.id)));
     // Don't expose password or email to public
     return {

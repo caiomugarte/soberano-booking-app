@@ -5,7 +5,7 @@ import { PrismaAppointmentRepository } from '../../infrastructure/database/repos
 import { PrismaBarberRepository } from '../../infrastructure/database/repositories/prisma-barber.repository.js';
 import { PrismaServiceRepository } from '../../infrastructure/database/repositories/prisma-service.repository.js';
 import { PrismaCustomerRepository } from '../../infrastructure/database/repositories/prisma-customer.repository.js';
-import { WhatsAppNotificationService } from '../../infrastructure/notifications/whatsapp-notification.service.js';
+import { createNotificationService } from '../../infrastructure/notifications/whatsapp-notification.service.js';
 import { AdminCreateAppointment } from '../../application/use-cases/booking/admin-create-appointment.js';
 import { APPOINTMENT_STATUS, bookingSchema } from '@soberano/shared';
 import { NotFoundError, SlotTakenError, ValidationError } from '../../shared/errors.js';
@@ -14,7 +14,6 @@ const appointmentRepo = new PrismaAppointmentRepository();
 const barberRepo = new PrismaBarberRepository();
 const serviceRepo = new PrismaServiceRepository();
 const customerRepo = new PrismaCustomerRepository();
-const notificationService = new WhatsAppNotificationService();
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
   // All admin routes require authentication
@@ -22,7 +21,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   // Get the logged-in barber's profile
   app.get('/admin/me', async (request: FastifyRequest & { barberId?: string }, reply) => {
-    const barber = await barberRepo.findById(request.barberId!);
+    const barber = await barberRepo.findById(request.barberId!, request.client.id);
     if (!barber) return reply.status(404).send({ error: 'NOT_FOUND' });
     return { firstName: barber.firstName, lastName: barber.lastName, avatarUrl: barber.avatarUrl };
   });
@@ -31,18 +30,19 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   app.get('/admin/appointments', async (request: FastifyRequest & { barberId?: string }) => {
     const { date } = request.query as { date?: string };
     const barberId = request.barberId!;
+    const clientId = request.client.id;
 
     const targetDate = date ? new Date(date + 'T00:00:00') : new Date();
     targetDate.setHours(0, 0, 0, 0);
 
-    const { appointments, total, summary } = await appointmentRepo.findByBarberAndDate(barberId, targetDate);
+    const { appointments, total, summary } = await appointmentRepo.findByBarberAndDate(barberId, targetDate, clientId);
     return { appointments, total, summary };
   });
 
   // Delete an appointment
   app.delete<{ Params: { id: string } }>('/admin/appointments/:id', async (request, reply) => {
     const { id } = request.params;
-    const appointment = await appointmentRepo.findById(id);
+    const appointment = await appointmentRepo.findById(id, request.client.id);
     if (!appointment) return reply.status(404).send({ error: 'NOT_FOUND' });
     await appointmentRepo.deleteById(id);
     return reply.status(204).send();
@@ -56,6 +56,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       request.barberId!,
       new Date(from + 'T00:00:00'),
       new Date(to + 'T00:00:00'),
+      request.client.id,
     );
     return { appointments };
   });
@@ -66,7 +67,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     if (!from || !to) return reply.status(400).send({ error: 'BAD_REQUEST', message: 'from e to são obrigatórios.' });
     const fromDate = new Date(from + 'T00:00:00');
     const toDate = new Date(to + 'T00:00:00');
-    const days = await appointmentRepo.getStatsByDateRange(request.barberId!, fromDate, toDate);
+    const days = await appointmentRepo.getStatsByDateRange(request.barberId!, fromDate, toDate, request.client.id);
     return { days };
   });
 
@@ -96,6 +97,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
     }
 
+    const notificationService = createNotificationService(request.client);
     const useCase = new AdminCreateAppointment(
       appointmentRepo,
       serviceRepo,
@@ -105,8 +107,13 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     );
 
     try {
-      const result = await useCase.execute({ ...parsed.data, barberId: request.barberId! });
-      return reply.status(201).send(result);
+      const result = await useCase.execute({
+        ...parsed.data,
+        barberId: request.barberId!,
+        clientId: request.client.id,
+      });
+      const cancelUrl = `${request.client.baseUrl}/agendamento/${result.appointment.cancelToken}`;
+      return reply.status(201).send({ ...result, cancelUrl });
     } catch (err) {
       if (err instanceof SlotTakenError) {
         return reply.status(409).send({ error: 'SLOT_TAKEN', message: 'Horário já ocupado.' });
@@ -127,7 +134,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     if (!phone) {
       return reply.status(400).send({ error: 'BAD_REQUEST', message: 'phone é obrigatório.' });
     }
-    const customer = await customerRepo.findByPhone(phone);
+    const customer = await customerRepo.findByPhone(phone, request.client.id);
     return { name: customer ? customer.name : null };
   });
 
@@ -136,7 +143,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const { id } = request.params;
     const { reason } = z.object({ reason: z.string().min(1).max(300) }).parse(request.body);
 
-    const appointment = await appointmentRepo.findById(id);
+    const appointment = await appointmentRepo.findById(id, request.client.id);
     if (!appointment) {
       return reply.status(404).send({ error: 'NOT_FOUND', message: 'Agendamento não encontrado.' });
     }
@@ -146,7 +153,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
     await appointmentRepo.updateStatus(id, APPOINTMENT_STATUS.CANCELLED, new Date());
 
-    // Fire-and-forget notification to customer
+    const notificationService = createNotificationService(request.client);
     notificationService.sendBarberCancellationToCustomer(appointment, reason).catch((err) => {
       console.error('[WhatsApp] Failed to send barber cancellation notice:', err);
     });

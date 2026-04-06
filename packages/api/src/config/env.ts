@@ -6,13 +6,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url(),
   JWT_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
-
-  CHATWOOT_BASE_URL: z.string().url().optional(),
-  CHATWOOT_API_TOKEN: z.string().optional(),
-  CHATWOOT_ACCOUNT_ID: z.coerce.number().optional(),
-  CHATWOOT_INBOX_ID: z.coerce.number().optional(),
-
-  BASE_URL: z.string().url().default('http://localhost:5173'),
+  SUPER_ADMIN_JWT_SECRET: z.string().min(32).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

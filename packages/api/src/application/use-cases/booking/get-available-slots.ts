@@ -33,7 +33,7 @@ export class GetAvailableSlots {
     private shiftRepo: BarberShiftRepository,
   ) {}
 
-  async execute(barberId: string, dateStr: string): Promise<SlotResult[]> {
+  async execute(barberId: string, dateStr: string, clientId?: string): Promise<SlotResult[]> {
     const date = new Date(dateStr + 'T00:00:00');
     const dayOfWeek = date.getDay();
 
@@ -50,7 +50,7 @@ export class GetAvailableSlots {
     const allSlots = shifts.flatMap((s) => generateSlotsForShift(s.startTime, s.endTime));
 
     // Get booked slots
-    const bookedSlots = await this.appointmentRepo.findBookedSlots(barberId, date);
+    const bookedSlots = await this.appointmentRepo.findBookedSlots(barberId, date, clientId ?? '');
     const bookedSet = new Set(bookedSlots);
 
     // Get absences for this date

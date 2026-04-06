@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useBookingStore } from '../../stores/booking.store.ts';
-import { StepIndicator } from '../ui/StepIndicator.tsx';
+import { StepIndicator } from '@soberano/ui';
 import { ServiceStep } from './ServiceStep.tsx';
 import { BarberStep } from './BarberStep.tsx';
 import { TimeStep } from './TimeStep.tsx';

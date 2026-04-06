@@ -5,6 +5,7 @@ import type {
   CreateAppointmentData,
   DayStat,
 } from '../../../domain/repositories/appointment.repository.js';
+import { NotFoundError } from '../../../shared/errors.js';
 
 const includeRelations = {
   barber: {
@@ -22,6 +23,11 @@ const includeRelations = {
   customer: true,
 } as const;
 
+const includeRelationsWithClient = {
+  ...includeRelations,
+  client: true,
+} as const;
+
 export class PrismaAppointmentRepository implements AppointmentRepository {
   async create(data: CreateAppointmentData): Promise<AppointmentWithDetails> {
     return prisma.appointment.create({
@@ -30,25 +36,29 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
     }) as unknown as AppointmentWithDetails;
   }
 
-  async findByCancelToken(token: string): Promise<AppointmentWithDetails | null> {
-    return prisma.appointment.findUnique({
+  async findByCancelToken(token: string, clientId: string): Promise<AppointmentWithDetails | null> {
+    const appointment = await prisma.appointment.findUnique({
       where: { cancelToken: token },
       include: includeRelations,
-    }) as unknown as AppointmentWithDetails | null;
+    });
+    if (!appointment) return null;
+    if (appointment.clientId !== clientId) throw new NotFoundError('Agendamento');
+    return appointment as unknown as AppointmentWithDetails;
   }
 
-  async findById(id: string): Promise<AppointmentWithDetails | null> {
-    return prisma.appointment.findUnique({
-      where: { id },
+  async findById(id: string, clientId: string): Promise<AppointmentWithDetails | null> {
+    return prisma.appointment.findFirst({
+      where: { id, clientId },
       include: includeRelations,
     }) as unknown as AppointmentWithDetails | null;
   }
 
-  async findBookedSlots(barberId: string, date: Date): Promise<string[]> {
+  async findBookedSlots(barberId: string, date: Date, clientId: string): Promise<string[]> {
     const appointments = await prisma.appointment.findMany({
       where: {
         barberId,
         date,
+        clientId,
         status: 'confirmed',
       },
       select: { startTime: true },
@@ -59,17 +69,18 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
   async findByBarberAndDate(
     barberId: string,
     date: Date,
+    clientId: string,
   ): Promise<{ appointments: AppointmentWithDetails[]; total: number; summary: { confirmed: number; completed: number; revenueCents: number } }> {
-    const where = { barberId, date };
+    const where = { barberId, date, clientId };
     const [appointments, confirmedCount, completedAgg] = await prisma.$transaction([
       prisma.appointment.findMany({
         where,
         include: includeRelations,
         orderBy: { startTime: 'asc' },
       }),
-      prisma.appointment.count({ where: { barberId, date, status: 'confirmed' } }),
+      prisma.appointment.count({ where: { barberId, date, clientId, status: 'confirmed' } }),
       prisma.appointment.aggregate({
-        where: { barberId, date, status: 'completed' },
+        where: { barberId, date, clientId, status: 'completed' },
         _sum: { priceCents: true },
         _count: true,
       }),
@@ -108,7 +119,7 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
           lte: maxTime,
         },
       },
-      include: includeRelations,
+      include: includeRelationsWithClient,
     }) as unknown as AppointmentWithDetails[];
   }
 
@@ -162,7 +173,7 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
           lte: maxTime,
         },
       },
-      include: includeRelations,
+      include: includeRelationsWithClient,
     }) as unknown as AppointmentWithDetails[];
   }
 
@@ -173,16 +184,16 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
     });
   }
 
-  async findByBarberAndDateRange(barberId: string, from: Date, to: Date): Promise<AppointmentWithDetails[]> {
+  async findByBarberAndDateRange(barberId: string, from: Date, to: Date, clientId: string): Promise<AppointmentWithDetails[]> {
     return prisma.appointment.findMany({
-      where: { barberId, date: { gte: from, lte: to } },
+      where: { barberId, clientId, date: { gte: from, lte: to } },
       include: includeRelations,
       orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
     }) as unknown as AppointmentWithDetails[];
   }
 
-  async getStatsByDateRange(barberId: string, from: Date, to: Date): Promise<DayStat[]> {
-    const where = { barberId, date: { gte: from, lte: to } };
+  async getStatsByDateRange(barberId: string, from: Date, to: Date, clientId: string): Promise<DayStat[]> {
+    const where = { barberId, clientId, date: { gte: from, lte: to } };
     const [confirmedGroups, completedGroups] = await Promise.all([
       prisma.appointment.groupBy({
         by: ['date'],

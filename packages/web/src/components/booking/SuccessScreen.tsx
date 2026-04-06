@@ -1,5 +1,5 @@
 import { useBookingStore } from '../../stores/booking.store.ts';
-import { Button } from '../ui/Button.tsx';
+import { Button } from '@soberano/ui';
 import { formatCurrency, formatDateLong } from '../../lib/format.ts';
 
 interface SuccessScreenProps {

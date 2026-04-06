@@ -1,5 +1,5 @@
 import { BookingWizard } from '../components/booking/BookingWizard.tsx';
-import { Footer } from '../components/ui/Footer.tsx';
+import { Footer } from '@soberano/ui';
 
 export default function BookingPage() {
   return (

@@ -6,7 +6,7 @@ import { PrismaServiceRepository } from '../../infrastructure/database/repositor
 import { PrismaBarberRepository } from '../../infrastructure/database/repositories/prisma-barber.repository.js';
 import { PrismaCustomerRepository } from '../../infrastructure/database/repositories/prisma-customer.repository.js';
 import { PrismaBarberShiftRepository } from '../../infrastructure/database/repositories/prisma-barber-shift.repository.js';
-import { WhatsAppNotificationService } from '../../infrastructure/notifications/whatsapp-notification.service.js';
+import { createNotificationService } from '../../infrastructure/notifications/whatsapp-notification.service.js';
 import { CreateAppointment } from '../../application/use-cases/booking/create-appointment.js';
 import { GetAvailableSlots } from '../../application/use-cases/booking/get-available-slots.js';
 
@@ -15,7 +15,6 @@ const serviceRepo = new PrismaServiceRepository();
 const barberRepo = new PrismaBarberRepository();
 const customerRepo = new PrismaCustomerRepository();
 const shiftRepo = new PrismaBarberShiftRepository();
-const notificationService = new WhatsAppNotificationService();
 
 const customerNameQuerySchema = z.object({
   phone: z.string().regex(/^\d{10,11}$/),
@@ -26,7 +25,7 @@ export async function bookingRoutes(app: FastifyInstance): Promise<void> {
   app.get('/slots', async (request) => {
     const query = slotsQuerySchema.parse(request.query);
     const useCase = new GetAvailableSlots(appointmentRepo, shiftRepo);
-    const slots = await useCase.execute(query.barberId, query.date);
+    const slots = await useCase.execute(query.barberId, query.date, request.client.id);
     return { slots };
   });
 
@@ -36,7 +35,7 @@ export async function bookingRoutes(app: FastifyInstance): Promise<void> {
     if (!result.success) {
       return reply.status(400).send({ error: 'phone must be 10-11 digits' });
     }
-    const customer = await customerRepo.findByPhone(result.data.phone);
+    const customer = await customerRepo.findByPhone(result.data.phone, request.client.id);
     return { name: customer?.name ?? null };
   });
 
@@ -50,6 +49,7 @@ export async function bookingRoutes(app: FastifyInstance): Promise<void> {
     },
   }, async (request, reply) => {
     const input = bookingSchema.parse(request.body);
+    const notificationService = createNotificationService(request.client);
     const useCase = new CreateAppointment(
       appointmentRepo,
       serviceRepo,
@@ -58,7 +58,8 @@ export async function bookingRoutes(app: FastifyInstance): Promise<void> {
       notificationService,
       shiftRepo,
     );
-    const result = await useCase.execute(input);
-    return reply.status(201).send(result);
+    const result = await useCase.execute({ ...input, clientId: request.client.id });
+    const cancelUrl = `${request.client.baseUrl}/agendamento/${result.appointment.cancelToken}`;
+    return reply.status(201).send({ ...result, cancelUrl });
   });
 }

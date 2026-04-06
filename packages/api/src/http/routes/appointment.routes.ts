@@ -2,20 +2,19 @@ import type { FastifyInstance } from 'fastify';
 import { cancelAppointmentSchema, changeAppointmentSchema } from '@soberano/shared';
 import { PrismaAppointmentRepository } from '../../infrastructure/database/repositories/prisma-appointment.repository.js';
 import { PrismaBarberShiftRepository } from '../../infrastructure/database/repositories/prisma-barber-shift.repository.js';
-import { WhatsAppNotificationService } from '../../infrastructure/notifications/whatsapp-notification.service.js';
+import { createNotificationService } from '../../infrastructure/notifications/whatsapp-notification.service.js';
 import { CancelAppointment } from '../../application/use-cases/booking/cancel-appointment.js';
 import { ChangeAppointment } from '../../application/use-cases/booking/change-appointment.js';
 import { NotFoundError } from '../../shared/errors.js';
 
 const appointmentRepo = new PrismaAppointmentRepository();
 const shiftRepo = new PrismaBarberShiftRepository();
-const notificationService = new WhatsAppNotificationService();
 
 export async function appointmentRoutes(app: FastifyInstance): Promise<void> {
   // View appointment by cancel token
   app.get<{ Params: { token: string } }>('/appointment/:token', async (request) => {
     const { token } = request.params;
-    const appointment = await appointmentRepo.findByCancelToken(token);
+    const appointment = await appointmentRepo.findByCancelToken(token, request.client.id);
     if (!appointment) {
       throw new NotFoundError('Agendamento');
     }
@@ -50,8 +49,9 @@ export async function appointmentRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { token: string } }>('/appointment/:token/cancel', async (request, reply) => {
     const { token } = request.params;
     const input = cancelAppointmentSchema.parse(request.body);
+    const notificationService = createNotificationService(request.client);
     const useCase = new CancelAppointment(appointmentRepo, notificationService);
-    await useCase.execute(token, input.phoneLastFour);
+    await useCase.execute(token, input.phoneLastFour, request.client.id);
     return reply.status(200).send({ message: 'Agendamento cancelado com sucesso.' });
   });
 
@@ -59,8 +59,9 @@ export async function appointmentRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { token: string } }>('/appointment/:token/change', async (request) => {
     const { token } = request.params;
     const input = changeAppointmentSchema.parse(request.body);
+    const notificationService = createNotificationService(request.client);
     const useCase = new ChangeAppointment(appointmentRepo, notificationService, shiftRepo);
-    const updated = await useCase.execute(token, input.phoneLastFour, input.date, input.startTime);
+    const updated = await useCase.execute(token, input.phoneLastFour, input.date, input.startTime, request.client.id);
     return { appointment: updated };
   });
 }

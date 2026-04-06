@@ -1,6 +1,6 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
-import { Button } from '../ui/Button.tsx';
-import { Input } from '../ui/Input.tsx';
+import { Button } from '@soberano/ui';
+import { Input } from '@soberano/ui';
 import { formatPhone, stripPhone } from '../../lib/format.ts';
 import { useAdminCreateBooking, useAdminCustomerLookup } from '../../api/use-admin.ts';
 import { useServices } from '../../api/use-services.ts';

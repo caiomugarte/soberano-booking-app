@@ -4,8 +4,8 @@ import { PrismaServiceRepository } from '../../infrastructure/database/repositor
 const serviceRepo = new PrismaServiceRepository();
 
 export async function serviceRoutes(app: FastifyInstance): Promise<void> {
-  app.get('/services', async () => {
-    const services = await serviceRepo.findAllActive();
+  app.get('/services', async (request) => {
+    const services = await serviceRepo.findAllActive(request.client.id);
     return { services };
   });
 }

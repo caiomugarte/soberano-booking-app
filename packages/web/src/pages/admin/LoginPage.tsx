@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useLogin } from '../../api/use-admin.ts';
 import { useAuthStore } from '../../stores/auth.store.ts';
-import { Button } from '../../components/ui/Button.tsx';
-import { Input } from '../../components/ui/Input.tsx';
+import { Button } from '@soberano/ui';
+import { Input } from '@soberano/ui';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
