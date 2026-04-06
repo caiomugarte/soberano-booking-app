@@ -6,7 +6,7 @@ export function registerListServices(server: McpServer, apiBaseUrl: string): voi
     'Lists all active services at Soberano Barbearia with name, duration, and price.',
     {},
     async () => {
-      const response = await fetch(`${apiBaseUrl}/services`);
+      const response = await fetch(`${apiBaseUrl}/api/services`);
       if (!response.ok) {
         return {
           isError: true,
