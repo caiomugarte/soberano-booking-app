@@ -6,7 +6,7 @@ export function registerListBarbers(server: McpServer, apiBaseUrl: string): void
     'Lists all active barbers with their names and working days of the week (0=Sunday … 6=Saturday).',
     {},
     async () => {
-      const response = await fetch(`${apiBaseUrl}/barbers`);
+      const response = await fetch(`${apiBaseUrl}/api/barbers`);
       if (!response.ok) {
         return {
           isError: true,

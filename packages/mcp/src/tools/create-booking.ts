@@ -29,7 +29,7 @@ export function registerCreateBooking(server: McpServer, apiBaseUrl: string): vo
     async ({ serviceId, barberId, date, startTime, customerName, customerPhone }) => {
       const phone = normalizePhone(customerPhone);
 
-      const response = await fetch(`${apiBaseUrl}/book`, {
+      const response = await fetch(`${apiBaseUrl}/api/book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ serviceId, barberId, date, startTime, customerName, customerPhone: phone }),
