@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import type { ClientConfig } from './types.js';
-import { ThemeProvider } from './ThemeProvider.js';
+import type { ClientConfig } from './types';
+import { ThemeProvider } from './ThemeProvider';
 
 const ClientConfigContext = createContext<ClientConfig | null>(null);
 

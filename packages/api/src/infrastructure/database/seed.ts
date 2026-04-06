@@ -60,9 +60,31 @@ const SERVICES = [
   { slug: 'barba_sob', name: 'Barba e Sobrancelha', icon: '🪄', priceCents: 7000, sortOrder: 9 },
 ];
 
+const SUPER_ADMIN_EMAIL = 'caio@altion.com.br';
+
 async function seed() {
   console.log('Seeding database...');
   console.log('');
+
+  // Super admin
+  const existingAdmin = await prisma.superAdmin.findUnique({ where: { email: SUPER_ADMIN_EMAIL } });
+  if (!existingAdmin) {
+    const plainPassword = generatePassword();
+    const hashedPassword = await hashPassword(plainPassword);
+    await prisma.superAdmin.create({ data: { email: SUPER_ADMIN_EMAIL, password: hashedPassword } });
+    console.log('======= SUPER ADMIN CREDENTIALS =======');
+    console.log(`  ${SUPER_ADMIN_EMAIL} / ${plainPassword}`);
+    console.log('=======================================');
+    console.log('');
+  }
+
+  // Get Soberano client (required for tenant-scoped upserts)
+  const soberano = await prisma.client.findUnique({ where: { slug: 'soberano' } });
+  if (!soberano) {
+    console.error('Client "soberano" not found — run seed-tenant-soberano.ts first');
+    process.exit(1);
+  }
+
   console.log('======= BARBER CREDENTIALS =======');
 
   // Upsert barbers + shifts
@@ -71,9 +93,9 @@ async function seed() {
     const hashedPassword = await hashPassword(plainPassword);
 
     const record = await prisma.barber.upsert({
-      where: { slug: barber.slug },
+      where: { clientId_slug: { clientId: soberano.id, slug: barber.slug } },
       update: { firstName: barber.firstName, lastName: barber.lastName, phone: barber.phone, avatarUrl: barber.avatarUrl },
-      create: { ...barber, password: hashedPassword },
+      create: { ...barber, password: hashedPassword, clientId: soberano.id },
     });
 
     const isNew = record.createdAt.getTime() === record.updatedAt.getTime();
@@ -95,9 +117,9 @@ async function seed() {
   // Upsert services
   for (const service of SERVICES) {
     await prisma.service.upsert({
-      where: { slug: service.slug },
+      where: { clientId_slug: { clientId: soberano.id, slug: service.slug } },
       update: { name: service.name, icon: service.icon, priceCents: service.priceCents, sortOrder: service.sortOrder },
-      create: { ...service, duration: 30 },
+      create: { ...service, duration: 30, clientId: soberano.id },
     });
     console.log(`  Service: ${service.name}`);
   }

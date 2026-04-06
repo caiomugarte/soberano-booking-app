@@ -8,7 +8,7 @@ const cache = new Map<string, ClientEntity>()
 const EXEMPT_PATHS = ['/api/health', '/api/super-admin/login']
 
 export async function tenantMiddleware(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  if (EXEMPT_PATHS.includes(request.url) || request.url.startsWith('/api/super-admin/')) {
+  if (EXEMPT_PATHS.includes(request.url) || request.url.startsWith('/api/super-admin/') || request.url.startsWith('/docs')) {
     return
   }
 

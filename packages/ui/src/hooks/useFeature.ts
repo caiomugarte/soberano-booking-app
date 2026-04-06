@@ -1,4 +1,4 @@
-import { useClientConfig } from '../theme/ClientConfigProvider.js';
+import { useClientConfig } from '../theme/ClientConfigProvider';
 
 export function useFeature(feature: string): boolean {
   const { enabledFeatures } = useClientConfig();

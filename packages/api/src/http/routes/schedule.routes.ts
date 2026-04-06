@@ -22,13 +22,13 @@ export async function scheduleRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('onRequest', authGuard);
 
   // Get my shifts (all days)
-  app.get('/admin/schedule/shifts', async (request: FastifyRequest & { barberId?: string }) => {
+  app.get('/admin/schedule/shifts', { schema: { tags: ['Schedule'], summary: "Get barber's work shifts", security: [{ bearerAuth: [] }] } }, async (request: FastifyRequest & { barberId?: string }) => {
     const shifts = await shiftRepo.findAllByBarber(request.barberId!);
     return { shifts };
   });
 
   // Replace all my shifts (send full schedule at once)
-  app.put('/admin/schedule/shifts', async (request: FastifyRequest & { barberId?: string }) => {
+  app.put('/admin/schedule/shifts', { schema: { tags: ['Schedule'], summary: 'Replace all shifts (full schedule)', body: z.object({ shifts: z.array(shiftSchema) }), security: [{ bearerAuth: [] }] } }, async (request: FastifyRequest & { barberId?: string }) => {
     const { shifts } = request.body as { shifts: unknown[] };
     const parsed = z.array(shiftSchema).parse(shifts);
     await shiftRepo.replaceForBarber(request.barberId!, parsed);
@@ -36,13 +36,13 @@ export async function scheduleRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Get my absences
-  app.get('/admin/schedule/absences', async (request: FastifyRequest & { barberId?: string }) => {
+  app.get('/admin/schedule/absences', { schema: { tags: ['Schedule'], summary: "Get barber's absences", security: [{ bearerAuth: [] }] } }, async (request: FastifyRequest & { barberId?: string }) => {
     const absences = await shiftRepo.findAbsencesByBarber(request.barberId!);
     return { absences };
   });
 
   // Add absence
-  app.post('/admin/schedule/absences', async (request: FastifyRequest & { barberId?: string }, reply) => {
+  app.post('/admin/schedule/absences', { schema: { tags: ['Schedule'], summary: 'Add absence', body: absenceSchema, security: [{ bearerAuth: [] }] } }, async (request: FastifyRequest & { barberId?: string }, reply) => {
     const input = absenceSchema.parse(request.body);
     const absence = await shiftRepo.createAbsence({
       barberId: request.barberId!,
@@ -55,7 +55,7 @@ export async function scheduleRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Delete absence
-  app.delete<{ Params: { id: string } }>('/admin/schedule/absences/:id', async (request, reply) => {
+  app.delete<{ Params: { id: string } }>('/admin/schedule/absences/:id', { schema: { tags: ['Schedule'], summary: 'Remove absence', params: z.object({ id: z.string() }), security: [{ bearerAuth: [] }] } }, async (request, reply) => {
     try {
       await shiftRepo.deleteAbsence(request.params.id);
     } catch (err: unknown) {

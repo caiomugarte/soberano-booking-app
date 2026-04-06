@@ -1,5 +1,5 @@
 import { type ButtonHTMLAttributes } from 'react';
-import { Spinner } from './Spinner.js';
+import { Spinner } from './Spinner';
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   loading?: boolean;

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { cancelAppointmentSchema, changeAppointmentSchema } from '@soberano/shared';
 import { PrismaAppointmentRepository } from '../../infrastructure/database/repositories/prisma-appointment.repository.js';
 import { PrismaBarberShiftRepository } from '../../infrastructure/database/repositories/prisma-barber-shift.repository.js';
@@ -12,7 +13,14 @@ const shiftRepo = new PrismaBarberShiftRepository();
 
 export async function appointmentRoutes(app: FastifyInstance): Promise<void> {
   // View appointment by cancel token
-  app.get<{ Params: { token: string } }>('/appointment/:token', async (request) => {
+  app.get<{ Params: { token: string } }>('/appointment/:token', {
+    schema: {
+      tags: ['Appointments'],
+      summary: 'View appointment by cancel token',
+      params: z.object({ token: z.string() }),
+      response: { 200: z.object({ appointment: z.any() }) },
+    }
+  }, async (request) => {
     const { token } = request.params;
     const appointment = await appointmentRepo.findByCancelToken(token, request.client.id);
     if (!appointment) {
@@ -46,7 +54,15 @@ export async function appointmentRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Cancel appointment
-  app.patch<{ Params: { token: string } }>('/appointment/:token/cancel', async (request, reply) => {
+  app.patch<{ Params: { token: string } }>('/appointment/:token/cancel', {
+    schema: {
+      tags: ['Appointments'],
+      summary: 'Cancel appointment (customer self-service)',
+      params: z.object({ token: z.string() }),
+      body: cancelAppointmentSchema,
+      response: { 200: z.object({ message: z.string() }) },
+    }
+  }, async (request, reply) => {
     const { token } = request.params;
     const input = cancelAppointmentSchema.parse(request.body);
     const notificationService = createNotificationService(request.client);
@@ -56,7 +72,15 @@ export async function appointmentRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Change appointment date/time
-  app.patch<{ Params: { token: string } }>('/appointment/:token/change', async (request) => {
+  app.patch<{ Params: { token: string } }>('/appointment/:token/change', {
+    schema: {
+      tags: ['Appointments'],
+      summary: 'Reschedule appointment (customer self-service)',
+      params: z.object({ token: z.string() }),
+      body: changeAppointmentSchema,
+      response: { 200: z.object({ appointment: z.any() }) },
+    }
+  }, async (request) => {
     const { token } = request.params;
     const input = changeAppointmentSchema.parse(request.body);
     const notificationService = createNotificationService(request.client);

@@ -2,6 +2,9 @@ import Fastify, { type FastifyError } from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
+import swagger from '@fastify/swagger';
+import swaggerUi from '@fastify/swagger-ui';
+import { serializerCompiler, validatorCompiler, jsonSchemaTransform, type ZodTypeProvider } from 'fastify-type-provider-zod';
 import { ZodError } from 'zod';
 import { env } from './config/env.js';
 import { prisma } from './config/database.js';
@@ -22,6 +25,34 @@ const app = Fastify({
   logger: {
     level: env.NODE_ENV === 'development' ? 'info' : 'warn',
   },
+}).withTypeProvider<ZodTypeProvider>();
+
+app.setValidatorCompiler(validatorCompiler);
+app.setSerializerCompiler(serializerCompiler);
+
+await app.register(swagger, {
+  transform: jsonSchemaTransform,
+  openapi: {
+    info: {
+      title: 'Soberano API',
+      version: '1.0.0',
+      description: 'Barbershop booking SaaS API',
+    },
+    components: {
+      securitySchemes: {
+        bearerAuth: {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+        },
+      },
+    },
+  },
+});
+
+await app.register(swaggerUi, {
+  routePrefix: '/docs',
+  uiConfig: { docExpansion: 'list' },
 });
 
 await app.register(cors, {

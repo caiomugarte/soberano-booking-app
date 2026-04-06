@@ -22,7 +22,16 @@ const customerNameQuerySchema = z.object({
 
 export async function bookingRoutes(app: FastifyInstance): Promise<void> {
   // Get available slots
-  app.get('/slots', async (request) => {
+  app.get('/slots', {
+    schema: {
+      tags: ['Booking'],
+      summary: 'Get available time slots',
+      querystring: slotsQuerySchema,
+      response: {
+        200: z.object({ slots: z.array(z.string()) }),
+      },
+    },
+  }, async (request) => {
     const query = slotsQuerySchema.parse(request.query);
     const useCase = new GetAvailableSlots(appointmentRepo, shiftRepo);
     const slots = await useCase.execute(query.barberId, query.date, request.client.id);
@@ -30,7 +39,16 @@ export async function bookingRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Get customer name by phone (public, used by AI to greet returning customers)
-  app.get('/customer/name', async (request, reply) => {
+  app.get('/customer/name', {
+    schema: {
+      tags: ['Booking'],
+      summary: 'Look up customer name by phone',
+      querystring: z.object({ phone: z.string().regex(/^\d{10,11}$/) }),
+      response: {
+        200: z.object({ name: z.string().nullable() }),
+      },
+    },
+  }, async (request, reply) => {
     const result = customerNameQuerySchema.safeParse(request.query);
     if (!result.success) {
       return reply.status(400).send({ error: 'phone must be 10-11 digits' });
@@ -45,6 +63,14 @@ export async function bookingRoutes(app: FastifyInstance): Promise<void> {
       rateLimit: {
         max: 5,
         timeWindow: '1 minute',
+      },
+    },
+    schema: {
+      tags: ['Booking'],
+      summary: 'Create a booking',
+      body: bookingSchema,
+      response: {
+        201: z.object({ cancelUrl: z.string(), appointment: z.any() }),
       },
     },
   }, async (request, reply) => {

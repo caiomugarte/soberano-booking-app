@@ -20,14 +20,14 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('onRequest', authGuard);
 
   // Get the logged-in barber's profile
-  app.get('/admin/me', async (request: FastifyRequest & { barberId?: string }, reply) => {
+  app.get('/admin/me', { schema: { tags: ['Admin'], summary: 'Get logged-in barber profile', security: [{ bearerAuth: [] }] } }, async (request: FastifyRequest & { barberId?: string }, reply) => {
     const barber = await barberRepo.findById(request.barberId!, request.client.id);
     if (!barber) return reply.status(404).send({ error: 'NOT_FOUND' });
     return { firstName: barber.firstName, lastName: barber.lastName, avatarUrl: barber.avatarUrl };
   });
 
   // Get barber's appointments for a date
-  app.get('/admin/appointments', async (request: FastifyRequest & { barberId?: string }) => {
+  app.get('/admin/appointments', { schema: { tags: ['Admin'], summary: "Get barber's appointments for a date", querystring: z.object({ date: z.string().optional() }), security: [{ bearerAuth: [] }] } }, async (request: FastifyRequest & { barberId?: string }) => {
     const { date } = request.query as { date?: string };
     const barberId = request.barberId!;
     const clientId = request.client.id;
@@ -40,7 +40,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Delete an appointment
-  app.delete<{ Params: { id: string } }>('/admin/appointments/:id', async (request, reply) => {
+  app.delete<{ Params: { id: string } }>('/admin/appointments/:id', { schema: { tags: ['Admin'], summary: 'Delete appointment', params: z.object({ id: z.string() }), security: [{ bearerAuth: [] }] } }, async (request, reply) => {
     const { id } = request.params;
     const appointment = await appointmentRepo.findById(id, request.client.id);
     if (!appointment) return reply.status(404).send({ error: 'NOT_FOUND' });
@@ -49,7 +49,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Get all appointments for a date range (weekly calendar view)
-  app.get('/admin/appointments/range', async (request: FastifyRequest & { barberId?: string }, reply) => {
+  app.get('/admin/appointments/range', { schema: { tags: ['Admin'], summary: 'Get appointments for a date range', querystring: z.object({ from: z.string(), to: z.string() }), security: [{ bearerAuth: [] }] } }, async (request: FastifyRequest & { barberId?: string }, reply) => {
     const { from, to } = request.query as { from?: string; to?: string };
     if (!from || !to) return reply.status(400).send({ error: 'BAD_REQUEST', message: 'from e to são obrigatórios.' });
     const appointments = await appointmentRepo.findByBarberAndDateRange(
@@ -62,7 +62,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Get aggregated stats for a date range (weekly / monthly views)
-  app.get('/admin/stats', async (request: FastifyRequest & { barberId?: string }, reply) => {
+  app.get('/admin/stats', { schema: { tags: ['Admin'], summary: 'Get appointment stats for a date range', querystring: z.object({ from: z.string(), to: z.string() }), security: [{ bearerAuth: [] }] } }, async (request: FastifyRequest & { barberId?: string }, reply) => {
     const { from, to } = request.query as { from?: string; to?: string };
     if (!from || !to) return reply.status(400).send({ error: 'BAD_REQUEST', message: 'from e to são obrigatórios.' });
     const fromDate = new Date(from + 'T00:00:00');
@@ -72,7 +72,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Update appointment status (completed / no_show)
-  app.patch<{ Params: { id: string } }>('/admin/appointments/:id', async (request, reply) => {
+  app.patch<{ Params: { id: string } }>('/admin/appointments/:id', { schema: { tags: ['Admin'], summary: 'Update appointment status', params: z.object({ id: z.string() }), body: z.object({ status: z.enum(['completed', 'no_show']) }), security: [{ bearerAuth: [] }] } }, async (request, reply) => {
     const { id } = request.params;
     const { status } = request.body as { status: string };
 
@@ -88,7 +88,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Admin manually creates an appointment for a customer
-  app.post('/admin/appointments', async (request: FastifyRequest & { barberId?: string }, reply) => {
+  app.post('/admin/appointments', { schema: { tags: ['Admin'], summary: 'Admin creates appointment for customer', body: bookingSchema.omit({ barberId: true }).extend({ customerPhone: z.string().optional() }), security: [{ bearerAuth: [] }] } }, async (request: FastifyRequest & { barberId?: string }, reply) => {
     const adminBookingSchema = bookingSchema.omit({ barberId: true }).extend({
       customerPhone: z.string().regex(/^\d{10,11}$/, 'Telefone deve ter 10 ou 11 dígitos').optional(),
     });
@@ -129,7 +129,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Look up a customer by phone number
-  app.get('/admin/customers/lookup', async (request: FastifyRequest & { barberId?: string }, reply) => {
+  app.get('/admin/customers/lookup', { schema: { tags: ['Admin'], summary: 'Look up customer by phone', querystring: z.object({ phone: z.string() }), security: [{ bearerAuth: [] }] } }, async (request: FastifyRequest & { barberId?: string }, reply) => {
     const { phone } = request.query as { phone?: string };
     if (!phone) {
       return reply.status(400).send({ error: 'BAD_REQUEST', message: 'phone é obrigatório.' });
@@ -139,7 +139,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Barber cancels an appointment and notifies the customer
-  app.post<{ Params: { id: string } }>('/admin/appointments/:id/cancel', async (request, reply) => {
+  app.post<{ Params: { id: string } }>('/admin/appointments/:id/cancel', { schema: { tags: ['Admin'], summary: 'Barber cancels appointment and notifies customer', params: z.object({ id: z.string() }), body: z.object({ reason: z.string().min(1).max(300) }), security: [{ bearerAuth: [] }] } }, async (request, reply) => {
     const { id } = request.params;
     const { reason } = z.object({ reason: z.string().min(1).max(300) }).parse(request.body);
 

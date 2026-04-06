@@ -1,5 +1,5 @@
 import { useEffect, type ReactNode } from 'react';
-import type { ClientTheme } from './types.js';
+import type { ClientTheme } from './types';
 
 interface ThemeProviderProps {
   theme: ClientTheme;

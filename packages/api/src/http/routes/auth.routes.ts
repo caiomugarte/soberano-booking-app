@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { z } from 'zod';
 import { barberLoginSchema } from '@soberano/shared';
 import { PrismaBarberRepository } from '../../infrastructure/database/repositories/prisma-barber.repository.js';
 import { AuthenticateBarber } from '../../application/use-cases/barber/authenticate-barber.js';
@@ -17,6 +18,12 @@ const REFRESH_COOKIE_OPTIONS = {
 export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post('/auth/login', {
     config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+    schema: {
+      tags: ['Auth'],
+      summary: 'Barber login — returns access token',
+      body: barberLoginSchema,
+      response: { 200: z.object({ accessToken: z.string() }) },
+    },
   }, async (request, reply) => {
     const input = barberLoginSchema.parse(request.body);
     const useCase = new AuthenticateBarber(barberRepo);
@@ -26,12 +33,27 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     return { accessToken };
   });
 
-  app.post('/auth/logout', async (_request, reply) => {
+  app.post('/auth/logout', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Logout — clears refresh token cookie',
+      response: { 200: z.object({ message: z.string() }) },
+    },
+  }, async (_request, reply) => {
     reply.clearCookie('refreshToken', { path: '/api/auth/refresh' });
     return { message: 'Logout realizado.' };
   });
 
-  app.post('/auth/refresh', async (request, reply) => {
+  app.post('/auth/refresh', {
+    schema: {
+      tags: ['Auth'],
+      summary: 'Refresh access token using cookie',
+      response: {
+        200: z.object({ accessToken: z.string() }),
+        401: z.object({ error: z.string(), message: z.string() }),
+      },
+    },
+  }, async (request, reply) => {
     const token = request.cookies.refreshToken;
     if (!token) {
       return reply.status(401).send({ error: 'UNAUTHORIZED', message: 'Refresh token não fornecido.' });

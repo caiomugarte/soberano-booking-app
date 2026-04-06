@@ -6,6 +6,7 @@
 
 | Feature | Status | Spec |
 |---|---|---|
+| swagger-docs | Implemented | `.specs/features/swagger-docs/spec.md` |
 | whatsapp-human-jitter | Tasks ready — ready to execute | `.specs/features/whatsapp-human-jitter/spec.md` |
 | multi-tenant-saas | Tasks ready — ready to execute | `.specs/features/multi-tenant-saas/spec.md` |
 | whatsapp-ai-booking | Tasks ready — ready to execute | `.specs/features/whatsapp-ai-booking/spec.md` |
