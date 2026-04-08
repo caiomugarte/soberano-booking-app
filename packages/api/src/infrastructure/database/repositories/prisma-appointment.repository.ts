@@ -131,7 +131,7 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
   ): Promise<AppointmentWithDetails> {
     return prisma.appointment.update({
       where: { id },
-      data: { date, startTime, endTime, cancelToken },
+      data: { date, startTime, endTime, cancelToken, reminderSent: false, barberReminderSent: false },
       include: includeRelations,
     }) as unknown as AppointmentWithDetails;
   }
