@@ -19,7 +19,7 @@ ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 
 # Run tests — fails the build if any test fails
-RUN npm -w @soberano/web run test
+RUN NODE_ENV=test npm -w @soberano/web run test
 
 # Build shared types, then the React app
 RUN npm -w @soberano/shared run build

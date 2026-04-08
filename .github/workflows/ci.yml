@@ -24,9 +24,12 @@ jobs:
       - name: Build shared package
         run: npm -w @soberano/shared run build
 
-      - name: Run tests
+      - name: Run API tests
         run: npm -w @soberano/api run test
         env:
           DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
           JWT_SECRET: placeholder-secret-that-is-at-least-32-characters-long
           JWT_REFRESH_SECRET: placeholder-refresh-secret-that-is-at-least-32-chars
+
+      - name: Run web tests
+        run: npm -w @soberano/web run test
