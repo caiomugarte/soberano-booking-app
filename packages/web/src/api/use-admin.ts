@@ -15,6 +15,7 @@ export interface AdminAppointment {
 }
 
 export interface AdminMe {
+  id: string;
   firstName: string;
   lastName: string;
   avatarUrl: string | null;

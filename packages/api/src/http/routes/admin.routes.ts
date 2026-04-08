@@ -24,7 +24,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   app.get('/admin/me', async (request: FastifyRequest & { barberId?: string }, reply) => {
     const barber = await barberRepo.findById(request.barberId!);
     if (!barber) return reply.status(404).send({ error: 'NOT_FOUND' });
-    return { firstName: barber.firstName, lastName: barber.lastName, avatarUrl: barber.avatarUrl };
+    return { id: barber.id, firstName: barber.firstName, lastName: barber.lastName, avatarUrl: barber.avatarUrl };
   });
 
   // Get barber's appointments for a date

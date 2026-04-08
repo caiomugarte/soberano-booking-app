@@ -782,7 +782,7 @@ export default function DashboardPage() {
           isPending={deleteMutation.isPending}
         />
       )}
-      {showBookingModal && <AdminBookingModal onClose={() => setShowBookingModal(false)} />}
+      {showBookingModal && <AdminBookingModal barberId={me?.id ?? null} onClose={() => setShowBookingModal(false)} />}
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <a href="/" className="flex items-center gap-2.5 no-underline">
@@ -792,9 +792,10 @@ export default function DashboardPage() {
         <div className="flex items-center gap-4">
           <button
             onClick={() => setShowBookingModal(true)}
-            className="text-xs px-3 py-1.5 rounded-lg border border-gold text-gold hover:bg-gold/10 transition-colors cursor-pointer bg-transparent"
+            className="text-xs px-3 py-1.5 rounded-lg border border-gold text-gold hover:bg-gold/10 transition-colors cursor-pointer bg-transparent whitespace-nowrap"
           >
-            + Agendamento
+            <span className="sm:hidden">+ Agendar</span>
+            <span className="hidden sm:inline">+ Agendamento</span>
           </button>
           {me && <BarberProfile barber={me} onLogout={handleLogout} onAgenda={() => navigate('/admin/schedule')} />}
         </div>
