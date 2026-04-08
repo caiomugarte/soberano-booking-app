@@ -10,7 +10,7 @@ export function registerGetAvailableSlots(server: McpServer, apiBaseUrl: string)
       date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe('Date in YYYY-MM-DD format'),
     },
     async ({ barberId, date }) => {
-      const url = `${apiBaseUrl}/slots?barberId=${encodeURIComponent(barberId)}&date=${encodeURIComponent(date)}`;
+      const url = `${apiBaseUrl}/api/slots?barberId=${encodeURIComponent(barberId)}&date=${encodeURIComponent(date)}`;
       const response = await fetch(url);
       if (!response.ok) {
         const body = await response.text();

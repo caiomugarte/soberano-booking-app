@@ -8,6 +8,7 @@ interface ChatwootContact {
 
 interface ChatwootConversation {
   id: number;
+  inbox_id: number;
 }
 
 /**
@@ -147,8 +148,10 @@ export class ChatwootClient {
     const conversations = result.payload ?? [];
     console.log(`[Chatwoot] Contact ${contactId} has ${conversations.length} conversations`);
 
-    if (conversations.length > 0) {
-      return conversations[0];
+    const match = conversations.find((c) => c.inbox_id === this.inboxId);
+    if (match) {
+      console.log(`[Chatwoot] Found conversation id=${match.id} for inbox ${this.inboxId}`);
+      return match;
     }
 
     // Create new conversation
