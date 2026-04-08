@@ -265,6 +265,11 @@ function EditAppointmentModal({
   const dateChanged = date !== appointment.date.slice(0, 10);
   const timeChanged = time !== appointment.startTime;
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const selectedDate = date ? new Date(date + 'T00:00:00') : null;
+  const newDateIsInThePast = selectedDate !== null && selectedDate < today;
+
   const customerValid = name.trim().length > 0 && (phone === '' || /^\d{10,11}$/.test(phone));
   const scheduleValid = TIME_REGEX.test(time) && date.length > 0;
   const hasChanges = nameChanged || phoneChanged || serviceChanged || dateChanged || timeChanged;
@@ -376,7 +381,7 @@ function EditAppointmentModal({
                 </div>
               </div>
             )}
-            {(dateChanged || timeChanged) && (
+            {(dateChanged || timeChanged) && !newDateIsInThePast && (
               <p className="text-xs text-gold/80 mt-2">O cliente receberá uma mensagem no WhatsApp com o novo horário.</p>
             )}
           </div>

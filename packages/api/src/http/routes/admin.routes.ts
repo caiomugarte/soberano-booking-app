@@ -191,7 +191,10 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       } : {}),
     });
 
-    if (timeOrDateChanged && updated.customer.phone) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isInThePast = newDate < today;
+    if (timeOrDateChanged && !isInThePast && updated.customer.phone) {
       notificationService.sendChangeNotice(updated).catch((err) => {
         console.error('[WhatsApp] Failed to send change notice after admin reschedule:', err);
       });
