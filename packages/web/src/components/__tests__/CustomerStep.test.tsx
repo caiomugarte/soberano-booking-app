@@ -1,9 +1,14 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CustomerStep } from '../booking/CustomerStep';
 import { useBookingStore } from '../../stores/booking.store';
+
+vi.mock('../../api/use-admin', () => ({
+  useAdminCustomerLookup: () => ({ data: undefined, isLoading: false }),
+}));
 
 vi.mock('../ui/StickyBar', () => ({
   StickyBar: ({ visible, onNext }: { visible: boolean; onNext: () => void }) => (
@@ -18,10 +23,13 @@ vi.mock('../ui/Panel', () => ({
 }));
 
 function renderCustomerStep() {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <MemoryRouter>
-      <CustomerStep />
-    </MemoryRouter>,
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <CustomerStep />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
