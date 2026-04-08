@@ -18,4 +18,8 @@ export class PrismaCustomerRepository implements CustomerRepository {
   async createWalkin(name: string): Promise<CustomerEntity> {
     return prisma.customer.create({ data: { name } });
   }
+
+  async updateName(id: string, name: string): Promise<CustomerEntity> {
+    return prisma.customer.update({ where: { id }, data: { name } });
+  }
 }

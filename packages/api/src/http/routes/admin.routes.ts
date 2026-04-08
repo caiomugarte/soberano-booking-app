@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { authGuard } from '../middleware/auth.middleware.js';
@@ -129,6 +130,112 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     }
     const customer = await customerRepo.findByPhone(phone);
     return { name: customer ? customer.name : null };
+  });
+
+  // Admin reschedules an appointment (service, date, time)
+  app.patch<{ Params: { id: string } }>('/admin/appointments/:id/schedule', async (request, reply) => {
+    const { id } = request.params;
+    const schema = z.object({
+      serviceId: z.string().uuid().optional(),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida').optional(),
+      startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Horário inválido').optional(),
+    }).refine((d) => d.serviceId || d.date || d.startTime, {
+      message: 'Informe ao menos um campo para atualizar.',
+    });
+
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    }
+
+    const appointment = await appointmentRepo.findById(id);
+    if (!appointment) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Agendamento não encontrado.' });
+
+    const { serviceId, date: dateStr, startTime } = parsed.data;
+
+    // Resolve service (new or existing)
+    const service = serviceId ? await serviceRepo.findById(serviceId) : appointment.service;
+    if (!service) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Serviço não encontrado.' });
+
+    const newDate = dateStr ? new Date(dateStr + 'T00:00:00') : new Date(appointment.date);
+    const newStartTime = startTime ?? appointment.startTime;
+    const currentDateStr = (appointment.date as Date).toISOString().slice(0, 10);
+    const timeOrDateChanged =
+      (!!dateStr && dateStr !== currentDateStr) ||
+      (!!startTime && startTime !== appointment.startTime);
+
+    // Recalculate endTime from service duration
+    const [h, m] = newStartTime.split(':').map(Number);
+    const endMinutes = h * 60 + m + service.duration;
+    const newEndTime = `${String(Math.floor(endMinutes / 60)).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
+
+    // Check slot availability if date/time is changing, excluding this appointment
+    if (timeOrDateChanged) {
+      const bookedSlots = await appointmentRepo.findBookedSlots(appointment.barberId, newDate, id);
+      if (bookedSlots.includes(newStartTime)) {
+        return reply.status(409).send({ error: 'SLOT_TAKEN', message: 'Horário já ocupado.' });
+      }
+    }
+
+    const newCancelToken = timeOrDateChanged ? crypto.randomBytes(32).toString('hex') : undefined;
+
+    const updated = await appointmentRepo.updateSchedule(id, {
+      ...(serviceId ? { serviceId, priceCents: service.priceCents } : {}),
+      endTime: newEndTime,
+      ...(timeOrDateChanged ? {
+        date: newDate,
+        startTime: newStartTime,
+        cancelToken: newCancelToken!,
+        reminderSent: false,
+        barberReminderSent: false,
+      } : {}),
+    });
+
+    if (timeOrDateChanged && updated.customer.phone) {
+      notificationService.sendChangeNotice(updated).catch((err) => {
+        console.error('[WhatsApp] Failed to send change notice after admin reschedule:', err);
+      });
+    }
+
+    return { message: 'Agendamento atualizado.' };
+  });
+
+  // Admin edits customer info on an appointment (name and/or phone)
+  app.patch<{ Params: { id: string } }>('/admin/appointments/:id/customer', async (request, reply) => {
+    const { id } = request.params;
+    const schema = z.object({
+      name: z.string().min(1).max(100).optional(),
+      phone: z.string().regex(/^\d{10,11}$/, 'Telefone deve ter 10 ou 11 dígitos').optional(),
+    }).refine((d) => d.name || d.phone, { message: 'Informe nome ou telefone.' });
+
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    }
+
+    const appointment = await appointmentRepo.findById(id);
+    if (!appointment) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Agendamento não encontrado.' });
+
+    const { name, phone } = parsed.data;
+    const currentCustomer = appointment.customer;
+    const phoneChanged = phone && phone !== currentCustomer.phone;
+
+    if (phoneChanged) {
+      const newName = name ?? currentCustomer.name;
+      const newCustomer = await customerRepo.upsertByPhone(phone, newName);
+      await appointmentRepo.updateCustomer(id, newCustomer.id);
+      // Re-fetch to get updated appointment with relations for notification
+      const updated = await appointmentRepo.findById(id);
+      if (updated) {
+        notificationService.sendBookingConfirmation(updated).catch((err) => {
+          console.error('[WhatsApp] Failed to send confirmation after phone update:', err);
+        });
+      }
+    } else if (name) {
+      await customerRepo.updateName(currentCustomer.id, name);
+    }
+
+    return { message: 'Dados do cliente atualizados.' };
   });
 
   // Barber cancels an appointment and notifies the customer

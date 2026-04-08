@@ -9,7 +9,7 @@ export interface AdminAppointment {
   endTime: string;
   status: string;
   priceCents: number;
-  service: { name: string; icon: string };
+  service: { id: string; name: string; icon: string };
   customer: { name: string; phone: string };
   barber: { firstName: string; lastName: string; avatarUrl: string | null };
 }
@@ -141,6 +141,34 @@ export function useAdminCreateBooking() {
       authRequest('/admin/appointments', {
         method: 'POST',
         body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-appointments'] });
+    },
+  });
+}
+
+export function useAdminUpdateAppointmentSchedule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, serviceId, date, startTime }: { id: string; serviceId?: string; date?: string; startTime?: string }) =>
+      authRequest(`/admin/appointments/${id}/schedule`, {
+        method: 'PATCH',
+        body: JSON.stringify({ serviceId, date, startTime }),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-appointments'] });
+    },
+  });
+}
+
+export function useAdminUpdateAppointmentCustomer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name, phone }: { id: string; name?: string; phone?: string }) =>
+      authRequest(`/admin/appointments/${id}/customer`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name, phone }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-appointments'] });

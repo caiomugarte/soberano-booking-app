@@ -22,7 +22,7 @@ export interface AppointmentRepository {
   create(data: CreateAppointmentData): Promise<AppointmentWithDetails>;
   findByCancelToken(token: string): Promise<AppointmentWithDetails | null>;
   findById(id: string): Promise<AppointmentWithDetails | null>;
-  findBookedSlots(barberId: string, date: Date): Promise<string[]>;
+  findBookedSlots(barberId: string, date: Date, excludeId?: string): Promise<string[]>;
   findByBarberAndDate(barberId: string, date: Date): Promise<{ appointments: AppointmentWithDetails[]; total: number; summary: { confirmed: number; completed: number; revenueCents: number } }>;
   findUpcomingWithoutReminder(minutesAhead: number): Promise<AppointmentWithDetails[]>;
   updateStatus(id: string, status: string, cancelledAt?: Date): Promise<void>;
@@ -33,4 +33,15 @@ export interface AppointmentRepository {
   getStatsByDateRange(barberId: string, from: Date, to: Date): Promise<DayStat[]>;
   findByBarberAndDateRange(barberId: string, from: Date, to: Date): Promise<AppointmentWithDetails[]>;
   deleteById(id: string): Promise<void>;
+  updateCustomer(id: string, customerId: string): Promise<void>;
+  updateSchedule(id: string, data: {
+    serviceId?: string;
+    priceCents?: number;
+    date?: Date;
+    startTime?: string;
+    endTime?: string;
+    cancelToken?: string;
+    reminderSent?: boolean;
+    barberReminderSent?: boolean;
+  }): Promise<AppointmentWithDetails>;
 }

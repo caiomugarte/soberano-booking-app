@@ -6,13 +6,14 @@ export interface Slot {
   available: boolean;
 }
 
-export function useSlots(barberId: string | null, date: string | null) {
+export function useSlots(barberId: string | null, date: string | null, excludeId?: string) {
   return useQuery({
-    queryKey: ['slots', barberId, date],
-    queryFn: () =>
-      api
-        .get<{ slots: Slot[] }>(`/slots?barberId=${barberId}&date=${date}`)
-        .then((r) => r.slots),
+    queryKey: ['slots', barberId, date, excludeId],
+    queryFn: () => {
+      const params = new URLSearchParams({ barberId: barberId!, date: date! });
+      if (excludeId) params.set('excludeId', excludeId);
+      return api.get<{ slots: Slot[] }>(`/slots?${params}`).then((r) => r.slots);
+    },
     enabled: !!barberId && !!date,
     staleTime: 1000 * 30,
   });

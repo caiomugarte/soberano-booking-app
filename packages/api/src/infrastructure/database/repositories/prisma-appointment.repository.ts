@@ -44,12 +44,13 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
     }) as unknown as AppointmentWithDetails | null;
   }
 
-  async findBookedSlots(barberId: string, date: Date): Promise<string[]> {
+  async findBookedSlots(barberId: string, date: Date, excludeId?: string): Promise<string[]> {
     const appointments = await prisma.appointment.findMany({
       where: {
         barberId,
         date,
         status: 'confirmed',
+        ...(excludeId ? { NOT: { id: excludeId } } : {}),
       },
       select: { startTime: true },
     });
@@ -171,6 +172,30 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
       where: { id },
       data: { barberReminderSent: true },
     });
+  }
+
+  async updateCustomer(id: string, customerId: string): Promise<void> {
+    await prisma.appointment.update({
+      where: { id },
+      data: { customerId },
+    });
+  }
+
+  async updateSchedule(id: string, data: {
+    serviceId?: string;
+    priceCents?: number;
+    date?: Date;
+    startTime?: string;
+    endTime?: string;
+    cancelToken?: string;
+    reminderSent?: boolean;
+    barberReminderSent?: boolean;
+  }): Promise<AppointmentWithDetails> {
+    return prisma.appointment.update({
+      where: { id },
+      data,
+      include: includeRelations,
+    }) as unknown as AppointmentWithDetails;
   }
 
   async findByBarberAndDateRange(barberId: string, from: Date, to: Date): Promise<AppointmentWithDetails[]> {
