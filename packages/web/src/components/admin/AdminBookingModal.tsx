@@ -4,14 +4,16 @@ import { Input } from '../ui/Input.tsx';
 import { formatPhone, stripPhone } from '../../lib/format.ts';
 import { useAdminCreateBooking, useAdminCustomerLookup } from '../../api/use-admin.ts';
 import { useServices } from '../../api/use-services.ts';
+import { useSlots } from '../../api/use-slots.ts';
 
 interface AdminBookingModalProps {
+  barberId: string | null;
   onClose: () => void;
 }
 
 const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-export function AdminBookingModal({ onClose }: AdminBookingModalProps) {
+export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps) {
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [serviceId, setServiceId] = useState('');
@@ -23,6 +25,7 @@ export function AdminBookingModal({ onClose }: AdminBookingModalProps) {
   const { data: services } = useServices();
   const customerLookup = useAdminCustomerLookup(lookupPhone);
   const createBooking = useAdminCreateBooking();
+  const { data: slots } = useSlots(barberId, date || null);
 
   // Debounced lookup trigger
   useEffect(() => {
@@ -84,7 +87,8 @@ export function AdminBookingModal({ onClose }: AdminBookingModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-dark-surface border border-dark-border rounded-2xl p-6 w-full max-w-sm">
+      <div className="bg-dark-surface border border-dark-border rounded-2xl w-full max-w-sm max-h-[90dvh] overflow-hidden flex flex-col">
+      <div className="overflow-y-auto p-6">
         <div className="flex items-center justify-between mb-5">
           <h2 className="font-serif text-base tracking-widest uppercase text-gold">Novo Agendamento</h2>
           <button
@@ -132,13 +136,20 @@ export function AdminBookingModal({ onClose }: AdminBookingModalProps) {
           <label className="block text-[11px] tracking-[0.12em] uppercase text-muted mb-2">
             Data
           </label>
-          <input
-            type="date"
-            value={date}
-            max="2099-12-31"
-            onChange={(e) => setDate(e.target.value)}
-            className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-[#F0EDE8] outline-none focus:border-gold"
-          />
+          <div className="relative">
+            {!date && (
+              <span className="absolute inset-0 flex items-center px-4 text-sm text-[#F0EDE8] pointer-events-none">
+                Selecione uma data
+              </span>
+            )}
+            <input
+              type="date"
+              value={date}
+              max="2099-12-31"
+              onChange={(e) => setDate(e.target.value)}
+              className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-[#F0EDE8] outline-none focus:border-gold appearance-none min-h-[50px]"
+            />
+          </div>
         </div>
 
         <div className="mb-5">
@@ -150,6 +161,27 @@ export function AdminBookingModal({ onClose }: AdminBookingModalProps) {
             onBlur={handleTimeBlur}
           />
           {timeError && <p className="text-red-400 text-xs mt-1">{timeError}</p>}
+          {slots && slots.filter((s) => s.available).length > 0 && (
+            <div className="mt-2">
+            <p className="text-[11px] tracking-[0.12em] uppercase text-muted mb-1.5">Horários Disponíveis</p>
+            <div className="flex flex-wrap gap-1.5">
+              {slots.filter((s) => s.available).map((s) => (
+                <button
+                  key={s.time}
+                  type="button"
+                  onClick={() => { setTime(s.time); setTimeError(''); }}
+                  className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors cursor-pointer
+                    ${time === s.time
+                      ? 'border-gold bg-gold/20 text-gold'
+                      : 'border-dark-border bg-dark text-muted hover:border-gold/40 hover:text-[#F0EDE8]'
+                    }`}
+                >
+                  {s.time}
+                </button>
+              ))}
+            </div>
+            </div>
+          )}
         </div>
 
         <Button
@@ -164,6 +196,7 @@ export function AdminBookingModal({ onClose }: AdminBookingModalProps) {
         {createBooking.isError && (
           <p className="text-red-400 text-xs text-center mt-2">{(createBooking.error as Error)?.message}</p>
         )}
+      </div>
       </div>
     </div>
   );

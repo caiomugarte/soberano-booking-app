@@ -25,8 +25,9 @@ export async function bookingRoutes(app: FastifyInstance): Promise<void> {
   // Get available slots
   app.get('/slots', async (request) => {
     const query = slotsQuerySchema.parse(request.query);
+    const { excludeId } = request.query as { excludeId?: string };
     const useCase = new GetAvailableSlots(appointmentRepo, shiftRepo);
-    const slots = await useCase.execute(query.barberId, query.date);
+    const slots = await useCase.execute(query.barberId, query.date, excludeId);
     return { slots };
   });
 
