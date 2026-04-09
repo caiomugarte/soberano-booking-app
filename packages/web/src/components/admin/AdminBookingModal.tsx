@@ -1,4 +1,4 @@
-import { useEffect, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { Button } from '../ui/Button.tsx';
 import { Input } from '../ui/Input.tsx';
 import { formatPhone, stripPhone } from '../../lib/format.ts';
@@ -21,6 +21,7 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
   const [time, setTime] = useState('');
   const [timeError, setTimeError] = useState('');
   const [lookupPhone, setLookupPhone] = useState('');
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const { data: services } = useServices();
   const customerLookup = useAdminCustomerLookup(lookupPhone);
@@ -136,18 +137,20 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
           <label className="block text-[11px] tracking-[0.12em] uppercase text-muted mb-2">
             Data
           </label>
-          <div className="relative">
-            {!date && (
-              <span className="absolute inset-0 flex items-center px-4 text-sm text-[#F0EDE8] pointer-events-none">
-                Selecione uma data
+          <div className="relative w-full bg-dark border border-dark-border rounded-xl min-h-[50px] focus-within:border-gold">
+            <div className="absolute inset-0 px-4 text-sm flex items-center pointer-events-none select-none">
+              <span className={date ? 'text-[#F0EDE8]' : 'text-muted'}>
+                {date ? date.split('-').reverse().join('/') : 'Selecione uma data'}
               </span>
-            )}
+            </div>
             <input
+              ref={dateInputRef}
               type="date"
               value={date}
               max="2099-12-31"
               onChange={(e) => setDate(e.target.value)}
-              className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-[#F0EDE8] outline-none focus:border-gold appearance-none min-h-[50px]"
+              onClick={() => dateInputRef.current?.showPicker?.()}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             />
           </div>
         </div>
