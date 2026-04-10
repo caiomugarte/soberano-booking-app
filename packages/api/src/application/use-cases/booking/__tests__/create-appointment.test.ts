@@ -86,6 +86,7 @@ function makeUseCase(overrides?: {
 }
 
 const validInput = {
+  tenantId: 'test-tenant-id',
   serviceId: 'svc-1',
   barberId: 'barber-1',
   date: FUTURE_TUESDAY,
