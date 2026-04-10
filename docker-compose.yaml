@@ -9,11 +9,10 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
-      BASE_URL: ${BASE_URL}
-      CHATWOOT_BASE_URL: ${CHATWOOT_BASE_URL:-}
-      CHATWOOT_API_TOKEN: ${CHATWOOT_API_TOKEN:-}
-      CHATWOOT_ACCOUNT_ID: ${CHATWOOT_ACCOUNT_ID:-}
-      CHATWOOT_INBOX_ID: ${CHATWOOT_INBOX_ID:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      SUPER_ADMIN_JWT_SECRET: ${SUPER_ADMIN_JWT_SECRET}
+      SUPER_ADMIN_EMAIL: ${SUPER_ADMIN_EMAIL}
+      SUPER_ADMIN_PASSWORD_HASH: ${SUPER_ADMIN_PASSWORD_HASH}
     networks:
       - default
       - coolify
@@ -39,8 +38,19 @@ services:
     build:
       context: .
       dockerfile: packages/web/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_TENANT_SLUG: ${VITE_TENANT_SLUG:-soberano}
     depends_on:
       - api
+    restart: unless-stopped
+
+  web-admin:
+    build:
+      context: .
+      dockerfile: packages/web-admin/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
     restart: unless-stopped
 
 networks:

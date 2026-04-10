@@ -1,10 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { barberLoginSchema } from '@soberano/shared';
-import { PrismaBarberRepository } from '../../infrastructure/database/repositories/prisma-barber.repository.js';
+import { PrismaProviderRepository } from '../../infrastructure/database/repositories/prisma-provider.repository.js';
 import { AuthenticateBarber } from '../../application/use-cases/barber/authenticate-barber.js';
 import { verifyRefreshToken, generateAccessToken, generateRefreshToken } from '../../infrastructure/auth/jwt.service.js';
-
-const barberRepo = new PrismaBarberRepository();
 
 const REFRESH_COOKIE_OPTIONS = {
   httpOnly: true,
@@ -19,7 +17,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
   }, async (request, reply) => {
     const input = barberLoginSchema.parse(request.body);
-    const useCase = new AuthenticateBarber(barberRepo);
+    const providerRepo = new PrismaProviderRepository(request.tenantPrisma);
+    const useCase = new AuthenticateBarber(providerRepo);
     const { accessToken, refreshToken } = await useCase.execute(input.email, input.password);
 
     reply.setCookie('refreshToken', refreshToken, REFRESH_COOKIE_OPTIONS);
@@ -39,8 +38,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     try {
       const payload = verifyRefreshToken(token);
-      const accessToken = generateAccessToken(payload.barberId);
-      const newRefreshToken = generateRefreshToken(payload.barberId);
+      const accessToken = generateAccessToken(payload.providerId, payload.tenantId);
+      const newRefreshToken = generateRefreshToken(payload.providerId, payload.tenantId);
 
       reply.setCookie('refreshToken', newRefreshToken, REFRESH_COOKIE_OPTIONS);
       return { accessToken };

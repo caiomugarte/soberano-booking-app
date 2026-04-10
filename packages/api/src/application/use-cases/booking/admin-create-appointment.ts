@@ -1,27 +1,27 @@
 import crypto from 'node:crypto';
 import type { AppointmentRepository } from '../../../domain/repositories/appointment.repository.js';
 import type { ServiceRepository } from '../../../domain/repositories/service.repository.js';
-import type { BarberRepository } from '../../../domain/repositories/barber.repository.js';
+import type { ProviderRepository } from '../../../domain/repositories/provider.repository.js';
 import type { CustomerRepository } from '../../../domain/repositories/customer.repository.js';
 import type { AppointmentWithDetails } from '../../../domain/entities/appointment.js';
 import { NotFoundError, SlotTakenError } from '../../../shared/errors.js';
 import { WhatsAppNotificationService } from '../../../infrastructure/notifications/whatsapp-notification.service.js';
-import { env } from '../../../config/env.js';
-
 interface AdminCreateAppointmentInput {
+  tenantId: string;
   serviceId: string;
   barberId: string;
   date: string;
   startTime: string;
   customerName: string;
   customerPhone?: string;
+  bookingUrl: string;
 }
 
 export class AdminCreateAppointment {
   constructor(
     private appointmentRepo: AppointmentRepository,
     private serviceRepo: ServiceRepository,
-    private barberRepo: BarberRepository,
+    private barberRepo: ProviderRepository,
     private customerRepo: CustomerRepository,
     private notificationService: WhatsAppNotificationService,
   ) {}
@@ -47,6 +47,7 @@ export class AdminCreateAppointment {
     let appointment: AppointmentWithDetails;
     try {
       appointment = await this.appointmentRepo.create({
+        tenantId: input.tenantId,
         barberId: input.barberId,
         serviceId: input.serviceId,
         customerId: customer.id,
@@ -73,7 +74,7 @@ export class AdminCreateAppointment {
       });
     }
 
-    const cancelUrl = `${env.BASE_URL}/agendamento/${cancelToken}`;
+    const cancelUrl = `${input.bookingUrl}/agendamento/${cancelToken}`;
     return { appointment, cancelUrl };
   }
 }

@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../stores/auth.store.ts';
 import { authRequest, API_BASE } from './auth-request.ts';
+import { TENANT_SLUG } from '../config/env.js';
+import { api } from '../config/api.ts';
 
 export interface AdminAppointment {
   id: string;
@@ -35,7 +37,7 @@ export function useLogin() {
     mutationFn: (data: { email: string; password: string }) =>
       fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-Slug': TENANT_SLUG },
         body: JSON.stringify(data),
       }).then(async (res) => {
         if (!res.ok) {
@@ -179,7 +181,7 @@ export function useAdminUpdateAppointmentCustomer() {
 export function useAdminCustomerLookup(phone: string) {
   return useQuery({
     queryKey: ['admin-customer-lookup', phone],
-    queryFn: () => authRequest<{ name: string | null }>('/admin/customers/lookup?phone=' + phone),
+    queryFn: () => api.get<{ name: string | null }>('/customer/name?phone=' + phone),
     enabled: phone.length >= 10,
     staleTime: 30_000,
   });

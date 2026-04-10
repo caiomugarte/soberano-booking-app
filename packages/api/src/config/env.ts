@@ -7,12 +7,10 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32),
   JWT_REFRESH_SECRET: z.string().min(32),
 
-  CHATWOOT_BASE_URL: z.string().url().optional(),
-  CHATWOOT_API_TOKEN: z.string().optional(),
-  CHATWOOT_ACCOUNT_ID: z.coerce.number().optional(),
-  CHATWOOT_INBOX_ID: z.coerce.number().optional(),
-
-  BASE_URL: z.string().url().default('http://localhost:5173'),
+  ALLOWED_ORIGINS: z.string().transform((val) => val.split(',').map((s) => s.trim())),
+  SUPER_ADMIN_JWT_SECRET: z.string().min(32),
+  SUPER_ADMIN_EMAIL: z.string().email(),
+  SUPER_ADMIN_PASSWORD_HASH: z.string(),
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -164,6 +164,33 @@ Brazilian phone numbers are stored without `+55`. Chatwoot contacts are searched
 
 ---
 
+## Skills
+
+These skills are available in this environment. **Use them proactively** — don't wait for the user to ask.
+
+| Skill | Invoke with | When to use |
+|-------|-------------|-------------|
+| `tlc-spec-driven` | `/tlc-spec-driven` | Any feature that touches multiple packages, requires DB migrations, or has architectural decisions. Runs Specify → Design → Tasks → Execute. **Always use this before implementing a non-trivial feature.** |
+| `codenavi` | `/codenavi` | Exploring unfamiliar parts of the codebase, tracing a flow, brownfield mapping, or before implementing anything in an area you haven't read. |
+| `coding-guidelines` | `/coding-guidelines` | When writing or modifying any code — enforces SOLID, Clean Architecture, Clean Code, and unit testing rules specific to this stack. |
+| `best-practices` | `/best-practices` | Security audits, modernizing code, checking for vulnerabilities, applying web best practices. |
+| `security-best-practices` | `/security-best-practices` | Explicit security review of new endpoints, auth flows, or any code handling user input, tokens, or external data. |
+| `react-best-practices` | `/react-best-practices` | Writing or reviewing React/Vite components — performance patterns, hooks rules, TanStack Query usage. |
+| `frontend-design` | `/frontend-design` | Building new UI pages or components where visual quality matters — avoids generic AI-looking output. |
+| `docs-writer` | `/docs-writer` | Writing or updating `AGENTS.md`, `prd.md`, `README`, or any file in `docs/`. |
+| `commit` | `/commit` | Generating a conventional commit message from the current diff. Use before every commit. |
+
+### Decision guide
+
+- **Planning a feature?** → `/tlc-spec-driven` first, always.
+- **Navigating unfamiliar code?** → `/codenavi` before touching anything.
+- **Writing backend code?** → `/coding-guidelines` + `/security-best-practices` for any endpoint handling auth or user input.
+- **Writing frontend code?** → `/coding-guidelines` + `/react-best-practices`.
+- **Building a new UI page?** → `/frontend-design` + `/react-best-practices`.
+- **Ready to commit?** → `/commit`.
+
+---
+
 ## What NOT to do
 
 - Do not put business logic in Fastify routes — routes are thin controllers only.

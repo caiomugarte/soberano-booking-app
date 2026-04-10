@@ -10,7 +10,7 @@ export async function authGuard(request: FastifyRequest, reply: FastifyReply): P
   try {
     const token = authHeader.slice(7);
     const payload = verifyAccessToken(token);
-    (request as FastifyRequest & { barberId: string }).barberId = payload.barberId;
+    (request as FastifyRequest & { providerId: string }).providerId = payload.providerId;
   } catch {
     return reply.status(401).send({ error: 'UNAUTHORIZED', message: 'Token inválido ou expirado.' });
   }

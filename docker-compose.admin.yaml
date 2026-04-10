@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  web-admin:
+    build:
+      context: .
+      dockerfile: packages/web-admin/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+    restart: unless-stopped
+    networks:
+      - coolify
+
+networks:
+  coolify:
+    external: true

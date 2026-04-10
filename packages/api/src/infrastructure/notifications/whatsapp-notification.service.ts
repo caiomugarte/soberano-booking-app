@@ -1,5 +1,5 @@
 import type { AppointmentWithDetails } from '../../domain/entities/appointment.js';
-import { env } from '../../config/env.js';
+import type { TenantConfig } from '@soberano/shared';
 import { ChatwootClient } from './chatwoot.client.js';
 
 const WEEKDAYS_PT: Record<number, string> = {
@@ -24,11 +24,7 @@ function formatCurrency(cents: number): string {
 }
 
 export class WhatsAppNotificationService {
-  private client: ChatwootClient;
-
-  constructor() {
-    this.client = new ChatwootClient();
-  }
+  constructor(private config: TenantConfig, private client: ChatwootClient) {}
 
   private async sendWithRetry(phone: string, name: string, message: string, retries = 3): Promise<void> {
     if (!this.client.isEnabled()) {
@@ -53,14 +49,14 @@ export class WhatsAppNotificationService {
 
   async sendBookingConfirmation(appointment: AppointmentWithDetails): Promise<void> {
     if (!appointment.customer.phone) return;
-    const cancelUrl = `${env.BASE_URL}/agendamento/${appointment.cancelToken}`;
+    const cancelUrl = `${this.config.bookingUrl}/agendamento/${appointment.cancelToken}`;
     const message = [
       `✅ *Agendamento confirmado!*`,
       ``,
-      `📍 *Soberano Barbearia*`,
+      `📍 *${this.config.businessName}*`,
       ``,
       `✂️ Serviço: ${appointment.service.name}`,
-      `💈 Barbeiro: ${appointment.barber.firstName} ${appointment.barber.lastName}`,
+      `💈 ${this.config.providerLabel}: ${appointment.barber.firstName} ${appointment.barber.lastName}`,
       `📅 Data: ${formatDate(appointment.date)}`,
       `🕐 Horário: ${appointment.startTime}`,
       `💰 Valor: ${formatCurrency(appointment.priceCents)}`,
@@ -81,17 +77,17 @@ export class WhatsAppNotificationService {
     const message = [
       `❌ *Seu agendamento foi cancelado*`,
       ``,
-      `📍 *Soberano Barbearia*`,
+      `📍 *${this.config.businessName}*`,
       ``,
       `✂️ Serviço: ${appointment.service.name}`,
-      `💈 Barbeiro: ${appointment.barber.firstName} ${appointment.barber.lastName}`,
+      `💈 ${this.config.providerLabel}: ${appointment.barber.firstName} ${appointment.barber.lastName}`,
       `📅 Data: ${formatDate(appointment.date)}`,
       `🕐 Horário: ${appointment.startTime}`,
       ``,
       `📝 Motivo: ${reason}`,
       ``,
       `Pedimos desculpas pelo transtorno. Para reagendar:`,
-      env.BASE_URL,
+      this.config.bookingUrl,
     ].join('\n');
 
     await this.sendWithRetry(
@@ -106,7 +102,7 @@ export class WhatsAppNotificationService {
     const message = [
       `❌ *Agendamento cancelado*`,
       ``,
-      `📍 *Soberano Barbearia*`,
+      `📍 *${this.config.businessName}*`,
       ``,
       `✂️ Serviço: ${appointment.service.name}`,
       `📅 Data: ${formatDate(appointment.date)}`,
@@ -114,7 +110,7 @@ export class WhatsAppNotificationService {
       ``,
       `Seu agendamento foi cancelado com sucesso.`,
       `Para fazer um novo agendamento, acesse:`,
-      env.BASE_URL,
+      this.config.bookingUrl,
     ].join('\n');
 
     await this.sendWithRetry(
@@ -126,14 +122,14 @@ export class WhatsAppNotificationService {
 
   async sendChangeNotice(appointment: AppointmentWithDetails): Promise<void> {
     if (!appointment.customer.phone) return;
-    const cancelUrl = `${env.BASE_URL}/agendamento/${appointment.cancelToken}`;
+    const cancelUrl = `${this.config.bookingUrl}/agendamento/${appointment.cancelToken}`;
     const message = [
       `🔄 *Agendamento alterado!*`,
       ``,
-      `📍 *Soberano Barbearia*`,
+      `📍 *${this.config.businessName}*`,
       ``,
       `✂️ Serviço: ${appointment.service.name}`,
-      `💈 Barbeiro: ${appointment.barber.firstName} ${appointment.barber.lastName}`,
+      `💈 ${this.config.providerLabel}: ${appointment.barber.firstName} ${appointment.barber.lastName}`,
       `📅 Nova data: ${formatDate(appointment.date)}`,
       `🕐 Novo horário: ${appointment.startTime}`,
       `💰 Valor: ${formatCurrency(appointment.priceCents)}`,
@@ -151,14 +147,14 @@ export class WhatsAppNotificationService {
 
   async sendReminder(appointment: AppointmentWithDetails): Promise<void> {
     if (!appointment.customer.phone) return;
-    const cancelUrl = `${env.BASE_URL}/agendamento/${appointment.cancelToken}`;
+    const cancelUrl = `${this.config.bookingUrl}/agendamento/${appointment.cancelToken}`;
     const message = [
       `⏰ *Lembrete: seu horário é em breve!*`,
       ``,
-      `📍 *Soberano Barbearia*`,
+      `📍 *${this.config.businessName}*`,
       ``,
       `✂️ Serviço: ${appointment.service.name}`,
-      `💈 Barbeiro: ${appointment.barber.firstName} ${appointment.barber.lastName}`,
+      `💈 ${this.config.providerLabel}: ${appointment.barber.firstName} ${appointment.barber.lastName}`,
       `🕐 Horário: ${appointment.startTime}`,
       ``,
       `Caso precise cancelar:`,

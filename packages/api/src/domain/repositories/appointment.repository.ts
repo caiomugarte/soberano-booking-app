@@ -1,6 +1,7 @@
 import type { AppointmentWithDetails } from '../entities/appointment.js';
 
 export interface CreateAppointmentData {
+  tenantId: string;
   barberId: string;
   serviceId: string;
   customerId: string;

@@ -3,27 +3,29 @@ import { CreateAppointment } from '../create-appointment.js';
 import { NotFoundError, SlotTakenError, ValidationError } from '../../../../shared/errors.js';
 import type { AppointmentRepository } from '../../../../domain/repositories/appointment.repository.js';
 import type { ServiceRepository } from '../../../../domain/repositories/service.repository.js';
-import type { BarberRepository } from '../../../../domain/repositories/barber.repository.js';
+import type { ProviderRepository } from '../../../../domain/repositories/provider.repository.js';
 import type { CustomerRepository } from '../../../../domain/repositories/customer.repository.js';
-import type { BarberShiftRepository } from '../../../../domain/repositories/barber-shift.repository.js';
+import type { ProviderShiftRepository } from '../../../../domain/repositories/provider-shift.repository.js';
 import type { WhatsAppNotificationService } from '../../../../infrastructure/notifications/whatsapp-notification.service.js';
 
 const FUTURE_TUESDAY = '2026-06-16'; // Tuesday — a work day
 
 const activeService = {
   id: 'svc-1', slug: 'corte', name: 'Corte', icon: '✂️',
-  priceCents: 3500, duration: 30, isActive: true, sortOrder: 1,
+  priceCents: 3500, duration: 30, isActive: true, sortOrder: 1, tenantId: 'test-tenant-id',
 };
 
 const activeBarber = {
   id: 'barber-1', slug: 'joao', firstName: 'João', lastName: 'Silva',
   email: 'joao@s.com', password: 'hash', phone: null, avatarUrl: null, isActive: true,
+  tenantId: 'test-tenant-id',
 };
 
-const customer = { id: 'cust-1', name: 'Maria', phone: '11999998888' };
+const customer = { id: 'cust-1', name: 'Maria', phone: '11999998888', tenantId: 'test-tenant-id' };
 
 const appointmentResult = {
   id: 'appt-1',
+  tenantId: 'test-tenant-id',
   barberId: 'barber-1',
   serviceId: 'svc-1',
   customerId: 'cust-1',
@@ -56,7 +58,7 @@ function makeUseCase(overrides?: {
     findById: vi.fn().mockResolvedValue(overrides?.barber !== undefined ? overrides.barber : activeBarber),
     findAllActive: vi.fn(),
     findByEmail: vi.fn(),
-  } as unknown as BarberRepository;
+  } as unknown as ProviderRepository;
 
   const customerRepo = {
     upsertByPhone: vi.fn().mockResolvedValue(customer),
@@ -73,11 +75,12 @@ function makeUseCase(overrides?: {
   } as unknown as WhatsAppNotificationService;
 
   const shiftRepo = {
-    findByBarberAndDay: vi.fn().mockImplementation((_, day: number) =>
+    findByProviderAndDay: vi.fn().mockImplementation((_, day: number) =>
       // Simulate Mon–Sat (1–6) with a full-day shift; Sun (0) has no shifts
-      Promise.resolve(day === 0 ? [] : [{ id: 's1', barberId: 'barber-1', dayOfWeek: day, startTime: '09:00', endTime: '18:30' }])
+      Promise.resolve(day === 0 ? [] : [{ id: 's1', providerId: 'barber-1', dayOfWeek: day, startTime: '09:00', endTime: '18:30' }])
     ),
-  } as unknown as BarberShiftRepository;
+    findAbsencesByProviderAndDate: vi.fn().mockResolvedValue([]),
+  } as unknown as ProviderShiftRepository;
 
   return new CreateAppointment(appointmentRepo, serviceRepo, barberRepo, customerRepo, notificationService, shiftRepo);
 }
@@ -89,6 +92,7 @@ const validInput = {
   startTime: '10:00',
   customerName: 'Maria',
   customerPhone: '11999998888',
+  bookingUrl: 'https://example.com',
 };
 
 describe('CreateAppointment', () => {

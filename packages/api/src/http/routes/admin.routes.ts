@@ -3,46 +3,44 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { authGuard } from '../middleware/auth.middleware.js';
 import { PrismaAppointmentRepository } from '../../infrastructure/database/repositories/prisma-appointment.repository.js';
-import { PrismaBarberRepository } from '../../infrastructure/database/repositories/prisma-barber.repository.js';
+import { PrismaProviderRepository } from '../../infrastructure/database/repositories/prisma-provider.repository.js';
 import { PrismaServiceRepository } from '../../infrastructure/database/repositories/prisma-service.repository.js';
 import { PrismaCustomerRepository } from '../../infrastructure/database/repositories/prisma-customer.repository.js';
 import { WhatsAppNotificationService } from '../../infrastructure/notifications/whatsapp-notification.service.js';
+import { ChatwootClient } from '../../infrastructure/notifications/chatwoot.client.js';
 import { AdminCreateAppointment } from '../../application/use-cases/booking/admin-create-appointment.js';
-import { APPOINTMENT_STATUS, bookingSchema } from '@soberano/shared';
+import { APPOINTMENT_STATUS, bookingSchema, tenantConfigSchema } from '@soberano/shared';
 import { NotFoundError, SlotTakenError, ValidationError } from '../../shared/errors.js';
-
-const appointmentRepo = new PrismaAppointmentRepository();
-const barberRepo = new PrismaBarberRepository();
-const serviceRepo = new PrismaServiceRepository();
-const customerRepo = new PrismaCustomerRepository();
-const notificationService = new WhatsAppNotificationService();
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
   // All admin routes require authentication
   app.addHook('onRequest', authGuard);
 
-  // Get the logged-in barber's profile
-  app.get('/admin/me', async (request: FastifyRequest & { barberId?: string }, reply) => {
-    const barber = await barberRepo.findById(request.barberId!);
-    if (!barber) return reply.status(404).send({ error: 'NOT_FOUND' });
-    return { id: barber.id, firstName: barber.firstName, lastName: barber.lastName, avatarUrl: barber.avatarUrl };
+  // Get the logged-in provider's profile
+  app.get('/admin/me', async (request, reply) => {
+    const providerRepo = new PrismaProviderRepository(request.tenantPrisma);
+    const provider = await providerRepo.findById(request.providerId!);
+    if (!provider) return reply.status(404).send({ error: 'NOT_FOUND' });
+    return { id: provider.id, firstName: provider.firstName, lastName: provider.lastName, avatarUrl: provider.avatarUrl };
   });
 
-  // Get barber's appointments for a date
-  app.get('/admin/appointments', async (request: FastifyRequest & { barberId?: string }) => {
+  // Get provider's appointments for a date
+  app.get('/admin/appointments', async (request) => {
     const { date } = request.query as { date?: string };
-    const barberId = request.barberId!;
+    const providerId = request.providerId!;
 
     const targetDate = date ? new Date(date + 'T00:00:00') : new Date();
     targetDate.setHours(0, 0, 0, 0);
 
-    const { appointments, total, summary } = await appointmentRepo.findByBarberAndDate(barberId, targetDate);
+    const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
+    const { appointments, total, summary } = await appointmentRepo.findByBarberAndDate(providerId, targetDate);
     return { appointments, total, summary };
   });
 
   // Delete an appointment
   app.delete<{ Params: { id: string } }>('/admin/appointments/:id', async (request, reply) => {
     const { id } = request.params;
+    const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
     const appointment = await appointmentRepo.findById(id);
     if (!appointment) return reply.status(404).send({ error: 'NOT_FOUND' });
     await appointmentRepo.deleteById(id);
@@ -50,11 +48,12 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Get all appointments for a date range (weekly calendar view)
-  app.get('/admin/appointments/range', async (request: FastifyRequest & { barberId?: string }, reply) => {
+  app.get('/admin/appointments/range', async (request, reply) => {
     const { from, to } = request.query as { from?: string; to?: string };
     if (!from || !to) return reply.status(400).send({ error: 'BAD_REQUEST', message: 'from e to são obrigatórios.' });
+    const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
     const appointments = await appointmentRepo.findByBarberAndDateRange(
-      request.barberId!,
+      request.providerId!,
       new Date(from + 'T00:00:00'),
       new Date(to + 'T00:00:00'),
     );
@@ -62,12 +61,13 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Get aggregated stats for a date range (weekly / monthly views)
-  app.get('/admin/stats', async (request: FastifyRequest & { barberId?: string }, reply) => {
+  app.get('/admin/stats', async (request, reply) => {
     const { from, to } = request.query as { from?: string; to?: string };
     if (!from || !to) return reply.status(400).send({ error: 'BAD_REQUEST', message: 'from e to são obrigatórios.' });
     const fromDate = new Date(from + 'T00:00:00');
     const toDate = new Date(to + 'T00:00:00');
-    const days = await appointmentRepo.getStatsByDateRange(request.barberId!, fromDate, toDate);
+    const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
+    const days = await appointmentRepo.getStatsByDateRange(request.providerId!, fromDate, toDate);
     return { days };
   });
 
@@ -83,12 +83,13 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       });
     }
 
+    const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
     await appointmentRepo.updateStatus(id, status);
     return { message: 'Status atualizado.' };
   });
 
   // Admin manually creates an appointment for a customer
-  app.post('/admin/appointments', async (request: FastifyRequest & { barberId?: string }, reply) => {
+  app.post('/admin/appointments', async (request: FastifyRequest, reply) => {
     const adminBookingSchema = bookingSchema.omit({ barberId: true }).extend({
       customerPhone: z.string().regex(/^\d{10,11}$/, 'Telefone deve ter 10 ou 11 dígitos').optional(),
     });
@@ -97,16 +98,24 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
     }
 
+    const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
+    const serviceRepo = new PrismaServiceRepository(request.tenantPrisma);
+    const providerRepo = new PrismaProviderRepository(request.tenantPrisma);
+    const customerRepo = new PrismaCustomerRepository(request.tenantPrisma);
+    const config = tenantConfigSchema.parse(request.tenant.config);
+    const chatwootClient = new ChatwootClient(config);
+    const notificationService = new WhatsAppNotificationService(config, chatwootClient);
+
     const useCase = new AdminCreateAppointment(
       appointmentRepo,
       serviceRepo,
-      barberRepo,
+      providerRepo,
       customerRepo,
       notificationService,
     );
 
     try {
-      const result = await useCase.execute({ ...parsed.data, barberId: request.barberId! });
+      const result = await useCase.execute({ ...parsed.data, tenantId: request.tenant.id, barberId: request.providerId!, bookingUrl: config.bookingUrl });
       return reply.status(201).send(result);
     } catch (err) {
       if (err instanceof SlotTakenError) {
@@ -123,11 +132,12 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // Look up a customer by phone number
-  app.get('/admin/customers/lookup', async (request: FastifyRequest & { barberId?: string }, reply) => {
+  app.get('/admin/customers/lookup', async (request, reply) => {
     const { phone } = request.query as { phone?: string };
     if (!phone) {
       return reply.status(400).send({ error: 'BAD_REQUEST', message: 'phone é obrigatório.' });
     }
+    const customerRepo = new PrismaCustomerRepository(request.tenantPrisma);
     const customer = await customerRepo.findByPhone(phone);
     return { name: customer ? customer.name : null };
   });
@@ -148,6 +158,8 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
     }
 
+    const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
+    const serviceRepo = new PrismaServiceRepository(request.tenantPrisma);
     const appointment = await appointmentRepo.findById(id);
     if (!appointment) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Agendamento não encontrado.' });
 
@@ -157,7 +169,8 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const service = serviceId ? await serviceRepo.findById(serviceId) : appointment.service;
     if (!service) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Serviço não encontrado.' });
 
-    const newDate = dateStr ? new Date(dateStr + 'T00:00:00') : new Date(appointment.date);
+    const newDateStr = dateStr ?? (appointment.date as Date).toISOString().slice(0, 10);
+    const newDate = new Date(newDateStr + 'T00:00:00');
     const newStartTime = startTime ?? appointment.startTime;
     const currentDateStr = (appointment.date as Date).toISOString().slice(0, 10);
     const timeOrDateChanged =
@@ -195,6 +208,9 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     today.setHours(0, 0, 0, 0);
     const isInThePast = newDate < today;
     if (timeOrDateChanged && !isInThePast && updated.customer.phone) {
+      const config = tenantConfigSchema.parse(request.tenant.config);
+      const chatwootClient = new ChatwootClient(config);
+      const notificationService = new WhatsAppNotificationService(config, chatwootClient);
       notificationService.sendChangeNotice(updated).catch((err) => {
         console.error('[WhatsApp] Failed to send change notice after admin reschedule:', err);
       });
@@ -216,6 +232,8 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
     }
 
+    const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
+    const customerRepo = new PrismaCustomerRepository(request.tenantPrisma);
     const appointment = await appointmentRepo.findById(id);
     if (!appointment) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Agendamento não encontrado.' });
 
@@ -230,6 +248,9 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       // Re-fetch to get updated appointment with relations for notification
       const updated = await appointmentRepo.findById(id);
       if (updated) {
+        const config = tenantConfigSchema.parse(request.tenant.config);
+        const chatwootClient = new ChatwootClient(config);
+        const notificationService = new WhatsAppNotificationService(config, chatwootClient);
         notificationService.sendBookingConfirmation(updated).catch((err) => {
           console.error('[WhatsApp] Failed to send confirmation after phone update:', err);
         });
@@ -241,11 +262,12 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return { message: 'Dados do cliente atualizados.' };
   });
 
-  // Barber cancels an appointment and notifies the customer
+  // Provider cancels an appointment and notifies the customer
   app.post<{ Params: { id: string } }>('/admin/appointments/:id/cancel', async (request, reply) => {
     const { id } = request.params;
     const { reason } = z.object({ reason: z.string().min(1).max(300) }).parse(request.body);
 
+    const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
     const appointment = await appointmentRepo.findById(id);
     if (!appointment) {
       return reply.status(404).send({ error: 'NOT_FOUND', message: 'Agendamento não encontrado.' });
@@ -257,6 +279,9 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     await appointmentRepo.updateStatus(id, APPOINTMENT_STATUS.CANCELLED, new Date());
 
     // Fire-and-forget notification to customer
+    const config = tenantConfigSchema.parse(request.tenant.config);
+    const chatwootClient = new ChatwootClient(config);
+    const notificationService = new WhatsAppNotificationService(config, chatwootClient);
     notificationService.sendBarberCancellationToCustomer(appointment, reason).catch((err) => {
       console.error('[WhatsApp] Failed to send barber cancellation notice:', err);
     });

@@ -1,5 +1,6 @@
 export interface BarberEntity {
   id: string;
+  tenantId: string;
   slug: string;
   firstName: string;
   lastName: string;
