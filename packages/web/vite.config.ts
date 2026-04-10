@@ -12,4 +12,12 @@ export default defineConfig({
       },
     },
   },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test-setup.ts'],
+    define: {
+      'import.meta.env.VITE_TENANT_SLUG': JSON.stringify('test'),
+      'import.meta.env.VITE_API_URL': JSON.stringify('http://localhost:3000'),
+    },
+  },
 });
