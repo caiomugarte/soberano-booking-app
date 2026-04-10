@@ -64,9 +64,15 @@ export class GetAvailableSlots {
     if (!fullDayAbsence) {
       for (const absence of absences) {
         if (absence.startTime && absence.endTime) {
-          generateSlotsForShift(absence.startTime, absence.endTime).forEach((s) =>
-            absentSlots.add(s),
-          );
+          const absStart = timeToMinutes(absence.startTime);
+          const absEnd = timeToMinutes(absence.endTime);
+          for (const slot of allSlots) {
+            const slotStart = timeToMinutes(slot);
+            const slotEnd = slotStart + 30;
+            if (slotStart < absEnd && slotEnd > absStart) {
+              absentSlots.add(slot);
+            }
+          }
         }
       }
     }
