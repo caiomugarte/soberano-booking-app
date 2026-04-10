@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { GetAvailableSlots } from '../get-available-slots.js';
 import type { AppointmentRepository } from '../../../../domain/repositories/appointment.repository.js';
-import type { BarberShiftRepository } from '../../../../domain/repositories/barber-shift.repository.js';
+import type { ProviderShiftRepository } from '../../../../domain/repositories/provider-shift.repository.js';
 
 // A Monday in the future
 const FUTURE_MONDAY = '2026-06-15';
@@ -12,14 +12,14 @@ function makeRepos(overrides?: {
   absences?: { startTime: string | null; endTime: string | null }[];
 }) {
   const shiftRepo = {
-    findByBarberAndDay: vi.fn().mockResolvedValue(overrides?.shifts ?? [{ startTime: '09:00', endTime: '12:00' }]),
-    findAbsencesByBarberAndDate: vi.fn().mockResolvedValue(overrides?.absences ?? []),
-    findAllByBarber: vi.fn(),
-    replaceForBarber: vi.fn(),
-    findAbsencesByBarber: vi.fn(),
+    findByProviderAndDay: vi.fn().mockResolvedValue(overrides?.shifts ?? [{ startTime: '09:00', endTime: '12:00' }]),
+    findAbsencesByProviderAndDate: vi.fn().mockResolvedValue(overrides?.absences ?? []),
+    findAllByProvider: vi.fn(),
+    replaceForProvider: vi.fn(),
+    findAbsencesByProvider: vi.fn(),
     createAbsence: vi.fn(),
     deleteAbsence: vi.fn(),
-  } as unknown as BarberShiftRepository;
+  } as unknown as ProviderShiftRepository;
 
   const appointmentRepo = {
     findBookedSlots: vi.fn().mockResolvedValue(overrides?.booked ?? []),

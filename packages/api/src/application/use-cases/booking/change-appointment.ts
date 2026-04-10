@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { APPOINTMENT_STATUS } from '@soberano/shared';
 import type { AppointmentRepository } from '../../../domain/repositories/appointment.repository.js';
-import type { BarberShiftRepository } from '../../../domain/repositories/barber-shift.repository.js';
+import type { ProviderShiftRepository } from '../../../domain/repositories/provider-shift.repository.js';
 import type { AppointmentWithDetails } from '../../../domain/entities/appointment.js';
 import { NotFoundError, SlotTakenError, ValidationError } from '../../../shared/errors.js';
 import { WhatsAppNotificationService } from '../../../infrastructure/notifications/whatsapp-notification.service.js';
@@ -10,7 +10,7 @@ export class ChangeAppointment {
   constructor(
     private appointmentRepo: AppointmentRepository,
     private notificationService: WhatsAppNotificationService,
-    private shiftRepo: BarberShiftRepository,
+    private shiftRepo: ProviderShiftRepository,
   ) {}
 
   async execute(
@@ -45,7 +45,7 @@ export class ChangeAppointment {
     }
 
     // Validate that barber has a shift covering the requested slot
-    const shifts = await this.shiftRepo.findByBarberAndDay(appointment.barberId, date.getDay());
+    const shifts = await this.shiftRepo.findByProviderAndDay(appointment.barberId, date.getDay());
     if (!shifts.length) {
       throw new ValidationError('Barbeiro não atende neste dia da semana.');
     }

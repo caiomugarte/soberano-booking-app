@@ -1,9 +1,7 @@
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authGuard } from '../middleware/auth.middleware.js';
-import { PrismaBarberShiftRepository } from '../../infrastructure/database/repositories/prisma-barber-shift.repository.js';
-
-const shiftRepo = new PrismaBarberShiftRepository();
+import { PrismaProviderShiftRepository } from '../../infrastructure/database/repositories/prisma-provider-shift.repository.js';
 
 const shiftSchema = z.object({
   dayOfWeek: z.number().int().min(0).max(6),
@@ -22,30 +20,34 @@ export async function scheduleRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('onRequest', authGuard);
 
   // Get my shifts (all days)
-  app.get('/admin/schedule/shifts', async (request: FastifyRequest & { barberId?: string }) => {
-    const shifts = await shiftRepo.findAllByBarber(request.barberId!);
+  app.get('/admin/schedule/shifts', async (request) => {
+    const shiftRepo = new PrismaProviderShiftRepository(request.tenantPrisma);
+    const shifts = await shiftRepo.findAllByProvider(request.providerId!);
     return { shifts };
   });
 
   // Replace all my shifts (send full schedule at once)
-  app.put('/admin/schedule/shifts', async (request: FastifyRequest & { barberId?: string }) => {
+  app.put('/admin/schedule/shifts', async (request) => {
     const { shifts } = request.body as { shifts: unknown[] };
     const parsed = z.array(shiftSchema).parse(shifts);
-    await shiftRepo.replaceForBarber(request.barberId!, parsed);
+    const shiftRepo = new PrismaProviderShiftRepository(request.tenantPrisma);
+    await shiftRepo.replaceForProvider(request.providerId!, parsed);
     return { message: 'Horários atualizados.' };
   });
 
   // Get my absences
-  app.get('/admin/schedule/absences', async (request: FastifyRequest & { barberId?: string }) => {
-    const absences = await shiftRepo.findAbsencesByBarber(request.barberId!);
+  app.get('/admin/schedule/absences', async (request) => {
+    const shiftRepo = new PrismaProviderShiftRepository(request.tenantPrisma);
+    const absences = await shiftRepo.findAbsencesByProvider(request.providerId!);
     return { absences };
   });
 
   // Add absence
-  app.post('/admin/schedule/absences', async (request: FastifyRequest & { barberId?: string }, reply) => {
+  app.post('/admin/schedule/absences', async (request, reply) => {
     const input = absenceSchema.parse(request.body);
+    const shiftRepo = new PrismaProviderShiftRepository(request.tenantPrisma);
     const absence = await shiftRepo.createAbsence({
-      barberId: request.barberId!,
+      providerId: request.providerId!,
       date: new Date(input.date + 'T00:00:00'),
       startTime: input.startTime ?? null,
       endTime: input.endTime ?? null,
@@ -56,6 +58,7 @@ export async function scheduleRoutes(app: FastifyInstance): Promise<void> {
 
   // Delete absence
   app.delete<{ Params: { id: string } }>('/admin/schedule/absences/:id', async (request, reply) => {
+    const shiftRepo = new PrismaProviderShiftRepository(request.tenantPrisma);
     try {
       await shiftRepo.deleteAbsence(request.params.id);
     } catch (err: unknown) {

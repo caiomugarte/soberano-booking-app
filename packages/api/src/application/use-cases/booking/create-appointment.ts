@@ -1,31 +1,32 @@
 import crypto from 'node:crypto';
 import type { AppointmentRepository } from '../../../domain/repositories/appointment.repository.js';
 import type { ServiceRepository } from '../../../domain/repositories/service.repository.js';
-import type { BarberRepository } from '../../../domain/repositories/barber.repository.js';
+import type { ProviderRepository } from '../../../domain/repositories/provider.repository.js';
 import type { CustomerRepository } from '../../../domain/repositories/customer.repository.js';
-import type { BarberShiftRepository } from '../../../domain/repositories/barber-shift.repository.js';
+import type { ProviderShiftRepository } from '../../../domain/repositories/provider-shift.repository.js';
 import type { AppointmentWithDetails } from '../../../domain/entities/appointment.js';
 import { NotFoundError, SlotTakenError, ValidationError } from '../../../shared/errors.js';
 import { WhatsAppNotificationService } from '../../../infrastructure/notifications/whatsapp-notification.service.js';
-import { env } from '../../../config/env.js';
 
 interface CreateAppointmentInput {
+  tenantId: string;
   serviceId: string;
   barberId: string;
   date: string;
   startTime: string;
   customerName: string;
   customerPhone: string;
+  bookingUrl: string;
 }
 
 export class CreateAppointment {
   constructor(
     private appointmentRepo: AppointmentRepository,
     private serviceRepo: ServiceRepository,
-    private barberRepo: BarberRepository,
+    private barberRepo: ProviderRepository,
     private customerRepo: CustomerRepository,
     private notificationService: WhatsAppNotificationService,
-    private shiftRepo: BarberShiftRepository,
+    private shiftRepo: ProviderShiftRepository,
   ) {}
 
   async execute(input: CreateAppointmentInput): Promise<{ appointment: AppointmentWithDetails; cancelUrl: string }> {
@@ -51,7 +52,7 @@ export class CreateAppointment {
     }
 
     // Validate that barber has a shift covering the requested slot
-    const shifts = await this.shiftRepo.findByBarberAndDay(input.barberId, date.getDay());
+    const shifts = await this.shiftRepo.findByProviderAndDay(input.barberId, date.getDay());
     if (!shifts.length) {
       throw new ValidationError('Barbeiro não atende neste dia da semana.');
     }
@@ -77,6 +78,7 @@ export class CreateAppointment {
     let appointment: AppointmentWithDetails;
     try {
       appointment = await this.appointmentRepo.create({
+        tenantId: input.tenantId,
         barberId: input.barberId,
         serviceId: input.serviceId,
         customerId: customer.id,
@@ -103,7 +105,7 @@ export class CreateAppointment {
       console.error('[Notification] Failed to notify barber:', err);
     });
 
-    const cancelUrl = `${env.BASE_URL}/agendamento/${cancelToken}`;
+    const cancelUrl = `${input.bookingUrl}/agendamento/${cancelToken}`;
     return { appointment, cancelUrl };
   }
 }

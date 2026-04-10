@@ -8,15 +8,16 @@ import {
 
 describe('generateAccessToken / verifyAccessToken', () => {
   it('generates a non-empty string', () => {
-    const token = generateAccessToken('barber-123');
+    const token = generateAccessToken('provider-123', 'tenant-abc');
     expect(typeof token).toBe('string');
     expect(token.length).toBeGreaterThan(0);
   });
 
-  it('verifies the token and returns the correct barberId', () => {
-    const token = generateAccessToken('barber-abc');
+  it('verifies the token and returns the correct providerId', () => {
+    const token = generateAccessToken('provider-abc', 'tenant-xyz');
     const payload = verifyAccessToken(token);
-    expect(payload.barberId).toBe('barber-abc');
+    expect(payload.providerId).toBe('provider-abc');
+    expect(payload.tenantId).toBe('tenant-xyz');
   });
 
   it('throws on an invalid token', () => {
@@ -24,7 +25,7 @@ describe('generateAccessToken / verifyAccessToken', () => {
   });
 
   it('throws on a tampered token', () => {
-    const token = generateAccessToken('barber-abc');
+    const token = generateAccessToken('provider-abc', 'tenant-xyz');
     const tampered = token.slice(0, -4) + 'xxxx';
     expect(() => verifyAccessToken(tampered)).toThrow();
   });
@@ -32,19 +33,20 @@ describe('generateAccessToken / verifyAccessToken', () => {
 
 describe('generateRefreshToken / verifyRefreshToken', () => {
   it('generates a non-empty string', () => {
-    const token = generateRefreshToken('barber-123');
+    const token = generateRefreshToken('provider-123', 'tenant-abc');
     expect(typeof token).toBe('string');
     expect(token.length).toBeGreaterThan(0);
   });
 
-  it('verifies the refresh token and returns the correct barberId', () => {
-    const token = generateRefreshToken('barber-xyz');
+  it('verifies the refresh token and returns the correct providerId', () => {
+    const token = generateRefreshToken('provider-xyz', 'tenant-abc');
     const payload = verifyRefreshToken(token);
-    expect(payload.barberId).toBe('barber-xyz');
+    expect(payload.providerId).toBe('provider-xyz');
+    expect(payload.tenantId).toBe('tenant-abc');
   });
 
   it('access token cannot be verified as a refresh token', () => {
-    const accessToken = generateAccessToken('barber-abc');
+    const accessToken = generateAccessToken('provider-abc', 'tenant-xyz');
     expect(() => verifyRefreshToken(accessToken)).toThrow();
   });
 });

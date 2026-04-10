@@ -1,10 +1,10 @@
-import type { BarberRepository } from '../../../domain/repositories/barber.repository.js';
+import type { ProviderRepository } from '../../../domain/repositories/provider.repository.js';
 import { comparePassword } from '../../../infrastructure/auth/password.service.js';
 import { generateAccessToken, generateRefreshToken } from '../../../infrastructure/auth/jwt.service.js';
 import { UnauthorizedError } from '../../../shared/errors.js';
 
 export class AuthenticateBarber {
-  constructor(private barberRepo: BarberRepository) {}
+  constructor(private barberRepo: ProviderRepository) {}
 
   async execute(email: string, password: string): Promise<{ accessToken: string; refreshToken: string }> {
     const barber = await this.barberRepo.findByEmail(email);
@@ -18,8 +18,8 @@ export class AuthenticateBarber {
     }
 
     return {
-      accessToken: generateAccessToken(barber.id),
-      refreshToken: generateRefreshToken(barber.id),
+      accessToken: generateAccessToken(barber.id, barber.tenantId),
+      refreshToken: generateRefreshToken(barber.id, barber.tenantId),
     };
   }
 }

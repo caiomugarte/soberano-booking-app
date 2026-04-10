@@ -14,9 +14,11 @@ RUN npm ci --include=dev
 COPY packages/shared ./packages/shared
 COPY packages/web ./packages/web
 
-# API URL injected at build time (e.g. https://api.soberano.altion.com.br)
+# Build-time env vars
 ARG VITE_API_URL
+ARG VITE_TENANT_SLUG
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_TENANT_SLUG=$VITE_TENANT_SLUG
 
 # Run tests — fails the build if any test fails
 RUN npm -w @soberano/web run test

@@ -1,4 +1,5 @@
-import { prisma } from '../../../config/database.js';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PrismaClientOrExtended = any;
 import type { AppointmentWithDetails } from '../../../domain/entities/appointment.js';
 import type {
   AppointmentRepository,
@@ -7,7 +8,7 @@ import type {
 } from '../../../domain/repositories/appointment.repository.js';
 
 const includeRelations = {
-  barber: {
+  provider: {
     select: {
       id: true,
       slug: true,
@@ -22,32 +23,44 @@ const includeRelations = {
   customer: true,
 } as const;
 
+// Maps Prisma result (provider/providerId) → domain entity (barber/barberId)
+function mapAppointment(raw: any): AppointmentWithDetails {
+  const { provider, providerId, ...rest } = raw;
+  return { ...rest, barberId: providerId, barber: provider } as AppointmentWithDetails;
+}
+
 export class PrismaAppointmentRepository implements AppointmentRepository {
+  constructor(private db: PrismaClientOrExtended) {}
+
   async create(data: CreateAppointmentData): Promise<AppointmentWithDetails> {
-    return prisma.appointment.create({
-      data,
+    const { barberId, tenantId, ...rest } = data as any;
+    const raw = await this.db.appointment.create({
+      data: { ...rest, providerId: barberId, tenantId },
       include: includeRelations,
-    }) as unknown as AppointmentWithDetails;
+    });
+    return mapAppointment(raw);
   }
 
   async findByCancelToken(token: string): Promise<AppointmentWithDetails | null> {
-    return prisma.appointment.findUnique({
+    const raw = await this.db.appointment.findUnique({
       where: { cancelToken: token },
       include: includeRelations,
-    }) as unknown as AppointmentWithDetails | null;
+    });
+    return raw ? mapAppointment(raw) : null;
   }
 
   async findById(id: string): Promise<AppointmentWithDetails | null> {
-    return prisma.appointment.findUnique({
+    const raw = await this.db.appointment.findUnique({
       where: { id },
       include: includeRelations,
-    }) as unknown as AppointmentWithDetails | null;
+    });
+    return raw ? mapAppointment(raw) : null;
   }
 
   async findBookedSlots(barberId: string, date: Date, excludeId?: string): Promise<string[]> {
-    const appointments = await prisma.appointment.findMany({
+    const appointments = await this.db.appointment.findMany({
       where: {
-        barberId,
+        providerId: barberId,
         date,
         status: 'confirmed',
         ...(excludeId ? { NOT: { id: excludeId } } : {}),
@@ -61,22 +74,22 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
     barberId: string,
     date: Date,
   ): Promise<{ appointments: AppointmentWithDetails[]; total: number; summary: { confirmed: number; completed: number; revenueCents: number } }> {
-    const where = { barberId, date };
-    const [appointments, confirmedCount, completedAgg] = await prisma.$transaction([
-      prisma.appointment.findMany({
+    const where = { providerId: barberId, date };
+    const [appointments, confirmedCount, completedAgg] = await this.db.$transaction([
+      this.db.appointment.findMany({
         where,
         include: includeRelations,
         orderBy: { startTime: 'asc' },
       }),
-      prisma.appointment.count({ where: { barberId, date, status: 'confirmed' } }),
-      prisma.appointment.aggregate({
-        where: { barberId, date, status: 'completed' },
+      this.db.appointment.count({ where: { providerId: barberId, date, status: 'confirmed' } }),
+      this.db.appointment.aggregate({
+        where: { providerId: barberId, date, status: 'completed' },
         _sum: { priceCents: true },
         _count: true,
       }),
     ]);
     return {
-      appointments: appointments as unknown as AppointmentWithDetails[],
+      appointments: appointments.map(mapAppointment),
       total: appointments.length,
       summary: {
         confirmed: confirmedCount,
@@ -87,39 +100,28 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
   }
 
   async deleteById(id: string): Promise<void> {
-    await prisma.appointment.delete({ where: { id } });
+    await this.db.appointment.delete({ where: { id } });
   }
 
   async findUpcomingWithoutReminder(minutesAhead: number): Promise<AppointmentWithDetails[]> {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
     const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     const futureMinutes = now.getMinutes() + minutesAhead;
     const futureHours = now.getHours() + Math.floor(futureMinutes / 60);
     const maxTime = `${String(futureHours).padStart(2, '0')}:${String(futureMinutes % 60).padStart(2, '0')}`;
 
-    return prisma.appointment.findMany({
-      where: {
-        status: 'confirmed',
-        reminderSent: false,
-        date: today,
-        startTime: {
-          gte: currentTime,
-          lte: maxTime,
-        },
-      },
+    const rows = await this.db.appointment.findMany({
+      where: { status: 'confirmed', reminderSent: false, date: today, startTime: { gte: currentTime, lte: maxTime } },
       include: includeRelations,
-    }) as unknown as AppointmentWithDetails[];
+    });
+    return rows.map(mapAppointment);
   }
 
   async updateStatus(id: string, status: string, cancelledAt?: Date): Promise<void> {
-    await prisma.appointment.update({
+    await this.db.appointment.update({
       where: { id },
-      data: {
-        status,
-        ...(cancelledAt && { cancelledAt }),
-      },
+      data: { status, ...(cancelledAt && { cancelledAt }) },
     });
   }
 
@@ -130,55 +132,39 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
     endTime: string,
     cancelToken: string,
   ): Promise<AppointmentWithDetails> {
-    return prisma.appointment.update({
+    const raw = await this.db.appointment.update({
       where: { id },
       data: { date, startTime, endTime, cancelToken, reminderSent: false, barberReminderSent: false },
       include: includeRelations,
-    }) as unknown as AppointmentWithDetails;
+    });
+    return mapAppointment(raw);
   }
 
   async markReminderSent(id: string): Promise<void> {
-    await prisma.appointment.update({
-      where: { id },
-      data: { reminderSent: true },
-    });
+    await this.db.appointment.update({ where: { id }, data: { reminderSent: true } });
   }
 
   async findUpcomingWithoutBarberReminder(minutesAhead: number): Promise<AppointmentWithDetails[]> {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
     const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     const futureMinutes = now.getMinutes() + minutesAhead;
     const futureHours = now.getHours() + Math.floor(futureMinutes / 60);
     const maxTime = `${String(futureHours).padStart(2, '0')}:${String(futureMinutes % 60).padStart(2, '0')}`;
 
-    return prisma.appointment.findMany({
-      where: {
-        status: 'confirmed',
-        barberReminderSent: false,
-        date: today,
-        startTime: {
-          gte: currentTime,
-          lte: maxTime,
-        },
-      },
+    const rows = await this.db.appointment.findMany({
+      where: { status: 'confirmed', barberReminderSent: false, date: today, startTime: { gte: currentTime, lte: maxTime } },
       include: includeRelations,
-    }) as unknown as AppointmentWithDetails[];
+    });
+    return rows.map(mapAppointment);
   }
 
   async markBarberReminderSent(id: string): Promise<void> {
-    await prisma.appointment.update({
-      where: { id },
-      data: { barberReminderSent: true },
-    });
+    await this.db.appointment.update({ where: { id }, data: { barberReminderSent: true } });
   }
 
   async updateCustomer(id: string, customerId: string): Promise<void> {
-    await prisma.appointment.update({
-      where: { id },
-      data: { customerId },
-    });
+    await this.db.appointment.update({ where: { id }, data: { customerId } });
   }
 
   async updateSchedule(id: string, data: {
@@ -191,31 +177,33 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
     reminderSent?: boolean;
     barberReminderSent?: boolean;
   }): Promise<AppointmentWithDetails> {
-    return prisma.appointment.update({
+    const raw = await this.db.appointment.update({
       where: { id },
       data,
       include: includeRelations,
-    }) as unknown as AppointmentWithDetails;
+    });
+    return mapAppointment(raw);
   }
 
   async findByBarberAndDateRange(barberId: string, from: Date, to: Date): Promise<AppointmentWithDetails[]> {
-    return prisma.appointment.findMany({
-      where: { barberId, date: { gte: from, lte: to } },
+    const rows = await this.db.appointment.findMany({
+      where: { providerId: barberId, date: { gte: from, lte: to } },
       include: includeRelations,
       orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
-    }) as unknown as AppointmentWithDetails[];
+    });
+    return rows.map(mapAppointment);
   }
 
   async getStatsByDateRange(barberId: string, from: Date, to: Date): Promise<DayStat[]> {
-    const where = { barberId, date: { gte: from, lte: to } };
+    const where = { providerId: barberId, date: { gte: from, lte: to } };
     const [confirmedGroups, completedGroups] = await Promise.all([
-      prisma.appointment.groupBy({
+      this.db.appointment.groupBy({
         by: ['date'],
         where: { ...where, status: 'confirmed' },
         orderBy: { date: 'asc' },
         _count: { _all: true },
       }),
-      prisma.appointment.groupBy({
+      this.db.appointment.groupBy({
         by: ['date'],
         where: { ...where, status: 'completed' },
         orderBy: { date: 'asc' },

@@ -32,3 +32,15 @@ export class ValidationError extends AppError {
     super(message, 422, 'VALIDATION_ERROR');
   }
 }
+
+export class TenantNotFoundError extends AppError {
+  constructor() {
+    super('Tenant não encontrado.', 404, 'TENANT_NOT_FOUND');
+  }
+}
+
+export class TenantInactiveError extends AppError {
+  constructor() {
+    super('Tenant inativo.', 403, 'TENANT_INACTIVE');
+  }
+}

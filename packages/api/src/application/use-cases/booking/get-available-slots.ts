@@ -1,5 +1,5 @@
 import type { AppointmentRepository } from '../../../domain/repositories/appointment.repository.js';
-import type { BarberShiftRepository } from '../../../domain/repositories/barber-shift.repository.js';
+import type { ProviderShiftRepository } from '../../../domain/repositories/provider-shift.repository.js';
 
 function timeToMinutes(time: string): number {
   const [h, m] = time.split(':').map(Number);
@@ -30,7 +30,7 @@ export interface SlotResult {
 export class GetAvailableSlots {
   constructor(
     private appointmentRepo: AppointmentRepository,
-    private shiftRepo: BarberShiftRepository,
+    private shiftRepo: ProviderShiftRepository,
   ) {}
 
   async execute(barberId: string, dateStr: string, excludeId?: string): Promise<SlotResult[]> {
@@ -43,7 +43,7 @@ export class GetAvailableSlots {
     if (date < today) return [];
 
     // Get barber's shifts for this day
-    const shifts = await this.shiftRepo.findByBarberAndDay(barberId, dayOfWeek);
+    const shifts = await this.shiftRepo.findByProviderAndDay(barberId, dayOfWeek);
     if (!shifts.length) return []; // barber doesn't work this day
 
     // Generate all possible slots from each shift window
@@ -54,7 +54,7 @@ export class GetAvailableSlots {
     const bookedSet = new Set(bookedSlots);
 
     // Get absences for this date
-    const absences = await this.shiftRepo.findAbsencesByBarberAndDate(barberId, date);
+    const absences = await this.shiftRepo.findAbsencesByProviderAndDate(barberId, date);
 
     // Full day absence → all slots unavailable
     const fullDayAbsence = absences.some((a) => !a.startTime && !a.endTime);
