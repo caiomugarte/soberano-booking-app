@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLogin } from '../hooks/useLogin.ts';
+import { Button } from '../components/Button.tsx';
+import { Input } from '../components/Input.tsx';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -19,41 +21,44 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-full max-w-md bg-white rounded-xl shadow p-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Admin Login</h1>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input
+    <div className="min-h-screen flex items-center justify-center bg-dark">
+      <div className="w-full max-w-sm px-4">
+        <div className="bg-dark-surface border border-dark-border rounded-2xl shadow-xl p-8 animate-fadeUp">
+          <div className="text-center mb-8">
+            <h1 className="font-serif text-2xl text-gold">Altion</h1>
+            <p className="text-muted text-sm mt-1">Platform Admin</p>
+          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
+              label="Email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+              autoComplete="email"
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Senha</label>
-            <input
+            <Input
+              label="Senha"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+              autoComplete="current-password"
             />
-          </div>
-          {login.error && (
-            <p className="text-sm text-red-600">{login.error.message}</p>
-          )}
-          <button
-            type="submit"
-            disabled={login.isPending}
-            className="w-full bg-gray-900 text-white rounded-lg py-2 text-sm font-medium hover:bg-gray-800 disabled:opacity-50"
-          >
-            {login.isPending ? 'Entrando...' : 'Entrar'}
-          </button>
-        </form>
+            {login.error && (
+              <p className="text-sm text-red-400">{login.error.message}</p>
+            )}
+            <Button
+              type="submit"
+              variant="primary"
+              size="md"
+              className="w-full mt-2"
+              disabled={login.isPending}
+            >
+              {login.isPending ? 'Entrando...' : 'Entrar'}
+            </Button>
+          </form>
+        </div>
       </div>
     </div>
   );

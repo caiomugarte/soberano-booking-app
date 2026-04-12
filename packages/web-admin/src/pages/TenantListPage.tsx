@@ -1,6 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { platformRequest } from '../api/platform.ts';
+import { AppShell } from '../components/AppShell.tsx';
+import { Button } from '../components/Button.tsx';
+import { Badge } from '../components/Badge.tsx';
+import { Skeleton } from '../components/Skeleton.tsx';
+import { Card } from '../components/Card.tsx';
 
 interface Tenant {
   id: string;
@@ -17,46 +22,62 @@ export function TenantListPage() {
   });
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Tenants</h1>
-        <Link
-          to="/tenants/new"
-          className="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800"
-        >
-          Novo Tenant
+    <AppShell
+      breadcrumb="Tenants"
+      actions={
+        <Link to="/tenants/new">
+          <Button variant="primary" size="sm">+ Novo Tenant</Button>
         </Link>
-      </div>
-
+      }
+    >
       {isLoading ? (
-        <p className="text-gray-500 text-sm">Carregando...</p>
+        <div className="bg-dark-surface border border-dark-border rounded-xl overflow-hidden">
+          <div className="bg-dark-surface2 px-6 py-3 border-b border-dark-border h-10" />
+          <div className="divide-y divide-dark-border">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="px-6 py-4 flex gap-6 items-center">
+                <Skeleton height="h-3" width="w-20" />
+                <Skeleton height="h-3" width="w-36" />
+                <Skeleton height="h-3" width="w-20" />
+                <Skeleton height="h-3" width="w-14" />
+              </div>
+            ))}
+          </div>
+        </div>
       ) : !data?.tenants.length ? (
-        <p className="text-gray-500 text-sm">Nenhum tenant cadastrado.</p>
+        <Card>
+          <div className="text-center py-8">
+            <p className="text-muted text-sm mb-4">Nenhum tenant cadastrado ainda.</p>
+            <Link to="/tenants/new">
+              <Button variant="primary">Criar primeiro tenant</Button>
+            </Link>
+          </div>
+        </Card>
       ) : (
-        <div className="bg-white rounded-xl shadow overflow-hidden">
+        <div className="bg-dark-surface border border-dark-border rounded-xl overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-dark-surface2 border-b border-dark-border">
               <tr>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Slug</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Nome</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Tipo</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-                <th className="px-4 py-3" />
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted uppercase tracking-widest">Slug</th>
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted uppercase tracking-widest">Nome</th>
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted uppercase tracking-widest">Tipo</th>
+                <th className="text-left px-6 py-3 text-xs font-medium text-muted uppercase tracking-widest">Status</th>
+                <th className="px-6 py-3" />
               </tr>
             </thead>
             <tbody>
               {data.tenants.map((tenant) => (
-                <tr key={tenant.id} className="border-b border-gray-100 last:border-0">
-                  <td className="px-4 py-3 font-mono text-gray-800">{tenant.slug}</td>
-                  <td className="px-4 py-3 text-gray-800">{tenant.name}</td>
-                  <td className="px-4 py-3 text-gray-600">{tenant.type}</td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${tenant.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                <tr key={tenant.id} className="border-b border-dark-border last:border-0 hover:bg-dark-surface2 transition-colors">
+                  <td className="px-6 py-4 font-mono text-white text-xs">{tenant.slug}</td>
+                  <td className="px-6 py-4 text-white">{tenant.name}</td>
+                  <td className="px-6 py-4 text-muted">{tenant.type}</td>
+                  <td className="px-6 py-4">
+                    <Badge variant={tenant.isActive ? 'active' : 'inactive'}>
                       {tenant.isActive ? 'Ativo' : 'Inativo'}
-                    </span>
+                    </Badge>
                   </td>
-                  <td className="px-4 py-3 text-right">
-                    <Link to={`/tenants/${tenant.id}`} className="text-gray-900 hover:underline text-xs font-medium">
+                  <td className="px-6 py-4 text-right">
+                    <Link to={`/tenants/${tenant.id}`} className="text-gold hover:underline text-xs font-medium">
                       Editar
                     </Link>
                   </td>
@@ -66,6 +87,6 @@ export function TenantListPage() {
           </table>
         </div>
       )}
-    </div>
+    </AppShell>
   );
 }
