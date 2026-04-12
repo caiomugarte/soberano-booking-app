@@ -4,17 +4,18 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Altion brand palette
         gold: {
-          DEFAULT: '#C9A96E',
-          light: '#E8C98A',
+          DEFAULT: '#00b7d7', // Altion cyan
+          light: '#22d3ee',   // hover state
         },
         dark: {
-          DEFAULT: '#0C0C0C',
-          surface: '#161616',
-          surface2: '#1E1E1E',
-          border: '#2A2A2A',
+          DEFAULT: '#0A0A0A',
+          surface: '#111111',
+          surface2: '#1A1A1A',
+          border: '#262626',
         },
-        muted: '#7A7672',
+        muted: '#a1a1aa',
       },
       keyframes: {
         fadeUp: {
