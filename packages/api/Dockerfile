@@ -29,6 +29,7 @@ RUN DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholde
     SUPER_ADMIN_EMAIL="test@example.com" \
     SUPER_ADMIN_PASSWORD_HASH='$2a$10$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' \
     ALLOWED_ORIGINS="http://localhost:5173" \
+    INTERNAL_API_SECRET="testinternalapisecret1234" \
     npm -w @soberano/shared run test && \
     DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholder" \
     JWT_SECRET="testsecretthatisfortycharacterslong1234567890ab" \
@@ -37,6 +38,7 @@ RUN DATABASE_URL="postgresql://placeholder:placeholder@localhost:5432/placeholde
     SUPER_ADMIN_EMAIL="test@example.com" \
     SUPER_ADMIN_PASSWORD_HASH='$2a$10$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' \
     ALLOWED_ORIGINS="http://localhost:5173" \
+    INTERNAL_API_SECRET="testinternalapisecret1234" \
     npm -w @soberano/api run test
 
 # Build shared types, then API
