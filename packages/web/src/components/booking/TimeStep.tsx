@@ -33,10 +33,8 @@ export function TimeStep() {
     maxDate.setDate(maxDate.getDate() + MAX_WEEKS_AHEAD * 7);
     if (next > maxDate) { initializing.current = false; return; }
     setDate(dateToString(next));
-    // Advance week view if needed: compute offset from today's Monday
-    const mondayThisWeek = new Date(today);
-    mondayThisWeek.setDate(today.getDate() - ((today.getDay() + 6) % 7));
-    const diffDays = Math.floor((next.getTime() - mondayThisWeek.getTime()) / 86400000);
+    // Advance week view if needed: compute offset from today (matches getWeekDates which is today-anchored)
+    const diffDays = Math.floor((next.getTime() - today.getTime()) / 86400000);
     setWeekOffset(Math.floor(diffDays / 7));
   }, [slots, loadingSlots]);
 
