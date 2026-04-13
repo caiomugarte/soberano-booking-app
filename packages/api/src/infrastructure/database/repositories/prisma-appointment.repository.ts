@@ -99,6 +99,21 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
     };
   }
 
+  async findUpcomingByCustomerPhone(phone: string): Promise<AppointmentWithDetails | null> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const raw = await this.db.appointment.findFirst({
+      where: {
+        customer: { phone },
+        status: 'confirmed',
+        date: { gte: today },
+      },
+      orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
+      include: includeRelations,
+    });
+    return raw ? mapAppointment(raw) : null;
+  }
+
   async deleteById(id: string): Promise<void> {
     await this.db.appointment.delete({ where: { id } });
   }

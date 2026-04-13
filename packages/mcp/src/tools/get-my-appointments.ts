@@ -14,25 +14,18 @@ function normalizePhone(raw: string): string {
   return phone;
 }
 
-export function registerCreateBooking(server: McpServer, apiBaseUrl: string, tenantSlug: string): void {
+export function registerGetMyAppointments(server: McpServer, apiBaseUrl: string, tenantSlug: string): void {
   server.tool(
-    'create_booking',
-    'Creates an appointment for the customer. Confirm service, barber, date, and time before calling.',
+    'get_my_appointments',
+    'Retrieves the customer\'s next upcoming appointment by phone number. Call this before cancel or reschedule actions.',
     {
-      serviceId: z.string().uuid().describe('Service ID from list_services'),
-      barberId: z.string().uuid().describe('Barber ID from list_barbers'),
-      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe('Date in YYYY-MM-DD format'),
-      startTime: z.string().regex(/^\d{2}:\d{2}$/).describe('Start time in HH:mm format'),
-      customerName: z.string().min(1).describe("Customer's full name"),
       customerPhone: z.string().describe('Customer phone number (may include +55 country code)'),
     },
-    async ({ serviceId, barberId, date, startTime, customerName, customerPhone }) => {
+    async ({ customerPhone }) => {
       const phone = normalizePhone(customerPhone);
 
-      const response = await fetch(`${apiBaseUrl}/api/book`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Tenant-Slug': tenantSlug },
-        body: JSON.stringify({ serviceId, barberId, date, startTime, customerName, customerPhone: phone }),
+      const response = await fetch(`${apiBaseUrl}/api/appointments/by-phone?phone=${encodeURIComponent(phone)}`, {
+        headers: { 'X-Tenant-Slug': tenantSlug },
       });
 
       if (response.status === 404) {
@@ -49,24 +42,10 @@ export function registerCreateBooking(server: McpServer, apiBaseUrl: string, ten
         }
       }
 
-      if (response.status === 409) {
-        return {
-          isError: true,
-          content: [{ type: 'text' as const, text: 'Horário já ocupado. Verifique outros horários disponíveis.' }],
-        };
-      }
-
       if (response.status === 400) {
-        let message = 'Validation error';
-        try {
-          const body = await response.json() as { message?: string; error?: string };
-          message = body.message ?? body.error ?? message;
-        } catch {
-          // ignore parse error
-        }
         return {
           isError: true,
-          content: [{ type: 'text' as const, text: message }],
+          content: [{ type: 'text' as const, text: 'Telefone inválido.' }],
         };
       }
 
@@ -77,7 +56,7 @@ export function registerCreateBooking(server: McpServer, apiBaseUrl: string, ten
         };
       }
 
-      const data = await response.json();
+      const data = await response.json() as { appointment: unknown };
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(data) }],
       };

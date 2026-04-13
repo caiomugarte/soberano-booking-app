@@ -11,6 +11,8 @@
 | multi-tenant-saas | Tasks approved — ready to execute | `.specs/features/multi-tenant-saas/tasks.md` |
 | whatsapp-ai-booking | Tasks ready — ready to execute | `.specs/features/whatsapp-ai-booking/spec.md` |
 | barber-admin-improvements | Tasks ready — ready to execute | `.specs/features/barber-admin-improvements/spec.md` |
+| mcp-booking-management | Tasks ready — ready to execute | `.specs/features/mcp-booking-management/spec.md` |
+| mcp-tenant-header | Tasks ready — ready to execute | `.specs/features/mcp-tenant-header/spec.md` |
 | admin-manual-booking | Specify — awaiting gray area clarification | `.specs/features/admin-manual-booking/spec.md` |
 | admin-barber-identity | Unknown | `.specs/features/admin-barber-identity/spec.md` |
 | barber-photos | Unknown | `.specs/features/barber-photos/spec.md` |

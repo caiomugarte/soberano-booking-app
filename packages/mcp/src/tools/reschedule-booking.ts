@@ -1,38 +1,21 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-function normalizePhone(raw: string): string {
-  let phone = raw.replace(/\s+/g, '');
-  if (phone.startsWith('+55')) {
-    const stripped = phone.slice(3);
-    if (stripped.length >= 10 && stripped.length <= 11) return stripped;
-  }
-  if (phone.startsWith('55') && phone.length >= 12 && phone.length <= 13) {
-    const stripped = phone.slice(2);
-    if (stripped.length >= 10 && stripped.length <= 11) return stripped;
-  }
-  return phone;
-}
-
-export function registerCreateBooking(server: McpServer, apiBaseUrl: string, tenantSlug: string): void {
+export function registerRescheduleBooking(server: McpServer, apiBaseUrl: string, tenantSlug: string): void {
   server.tool(
-    'create_booking',
-    'Creates an appointment for the customer. Confirm service, barber, date, and time before calling.',
+    'reschedule_booking',
+    'Reschedules an appointment to a new date and time. Requires the cancel token from get_my_appointments. Always confirm the new slot is available (get_available_slots) before calling.',
     {
-      serviceId: z.string().uuid().describe('Service ID from list_services'),
-      barberId: z.string().uuid().describe('Barber ID from list_barbers'),
-      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe('Date in YYYY-MM-DD format'),
-      startTime: z.string().regex(/^\d{2}:\d{2}$/).describe('Start time in HH:mm format'),
-      customerName: z.string().min(1).describe("Customer's full name"),
-      customerPhone: z.string().describe('Customer phone number (may include +55 country code)'),
+      cancelToken: z.string().describe('Cancel token from get_my_appointments'),
+      phoneLastFour: z.string().regex(/^\d{4}$/).describe('Last 4 digits of customer phone'),
+      newDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).describe('New date in YYYY-MM-DD format'),
+      newStartTime: z.string().regex(/^\d{2}:\d{2}$/).describe('New start time in HH:mm format'),
     },
-    async ({ serviceId, barberId, date, startTime, customerName, customerPhone }) => {
-      const phone = normalizePhone(customerPhone);
-
-      const response = await fetch(`${apiBaseUrl}/api/book`, {
-        method: 'POST',
+    async ({ cancelToken, phoneLastFour, newDate, newStartTime }) => {
+      const response = await fetch(`${apiBaseUrl}/api/appointment/${encodeURIComponent(cancelToken)}/change`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'X-Tenant-Slug': tenantSlug },
-        body: JSON.stringify({ serviceId, barberId, date, startTime, customerName, customerPhone: phone }),
+        body: JSON.stringify({ phoneLastFour, date: newDate, startTime: newStartTime }),
       });
 
       if (response.status === 404) {
@@ -40,6 +23,10 @@ export function registerCreateBooking(server: McpServer, apiBaseUrl: string, ten
         if (body.error === 'TENANT_NOT_FOUND') {
           return { isError: true, content: [{ type: 'text' as const, text: 'Tenant não encontrado. Verifique a configuração do servidor MCP.' }] };
         }
+        return {
+          isError: true,
+          content: [{ type: 'text' as const, text: 'Agendamento não encontrado.' }],
+        };
       }
 
       if (response.status === 403) {
@@ -52,12 +39,12 @@ export function registerCreateBooking(server: McpServer, apiBaseUrl: string, ten
       if (response.status === 409) {
         return {
           isError: true,
-          content: [{ type: 'text' as const, text: 'Horário já ocupado. Verifique outros horários disponíveis.' }],
+          content: [{ type: 'text' as const, text: 'Horário já ocupado. Tente outro horário.' }],
         };
       }
 
       if (response.status === 400) {
-        let message = 'Validation error';
+        let message = 'Erro de validação.';
         try {
           const body = await response.json() as { message?: string; error?: string };
           message = body.message ?? body.error ?? message;

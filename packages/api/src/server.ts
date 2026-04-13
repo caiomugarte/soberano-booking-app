@@ -15,6 +15,7 @@ import { authRoutes } from './http/routes/auth.routes.js';
 import { adminRoutes } from './http/routes/admin.routes.js';
 import { scheduleRoutes } from './http/routes/schedule.routes.js';
 import { platformRoutes } from './http/routes/platform.routes.js';
+import { internalRoutes } from './http/routes/internal.routes.js';
 import { startReminderJob } from './infrastructure/jobs/reminder.job.js';
 
 const app = Fastify({
@@ -38,6 +39,7 @@ await app.register(rateLimit, {
 // Tenant middleware — runs for all routes except platform routes
 app.addHook('preHandler', async (request, reply) => {
   if (request.url.startsWith('/api/platform/')) return;
+  if (request.url.startsWith('/api/internal/')) return;
   return tenantMiddleware(request, reply);
 });
 
@@ -83,6 +85,7 @@ await app.register(authRoutes, { prefix: '/api' });
 await app.register(adminRoutes, { prefix: '/api' });
 await app.register(scheduleRoutes, { prefix: '/api' });
 await app.register(platformRoutes, { prefix: '/api/platform' });
+await app.register(internalRoutes, { prefix: '/api' });
 
 // Start
 try {
