@@ -5,7 +5,7 @@ function todayInCampoGrande(): string {
   return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Campo_Grande' }).format(new Date());
 }
 
-export function registerGetNextAvailableDate(server: McpServer, apiBaseUrl: string): void {
+export function registerGetNextAvailableDate(server: McpServer, apiBaseUrl: string, tenantSlug: string): void {
   server.tool(
     'get_next_available_date',
     "Finds the earliest date with available slots for a barber (up to maxDaysAhead days). Use when a customer asks 'when is the next available slot?'",
@@ -19,9 +19,18 @@ export function registerGetNextAvailableDate(server: McpServer, apiBaseUrl: stri
       const maxDays = maxDaysAhead ?? 30;
 
       const url = `${apiBaseUrl}/api/slots/next-available?barberId=${encodeURIComponent(barberId)}&from=${encodeURIComponent(from)}&maxDays=${maxDays}`;
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: { 'X-Tenant-Slug': tenantSlug },
+      });
 
       if (!response.ok) {
+        const body = await response.json().catch(() => ({})) as { error?: string };
+        if (response.status === 404 && body.error === 'TENANT_NOT_FOUND') {
+          return { isError: true, content: [{ type: 'text' as const, text: 'Tenant não encontrado. Verifique a configuração do servidor MCP.' }] };
+        }
+        if (response.status === 403 && body.error === 'TENANT_INACTIVE') {
+          return { isError: true, content: [{ type: 'text' as const, text: 'Tenant inativo. Contate o suporte.' }] };
+        }
         return {
           isError: true,
           content: [{ type: 'text' as const, text: `API error: ${response.status}` }],

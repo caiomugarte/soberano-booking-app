@@ -14,7 +14,7 @@ function normalizePhone(raw: string): string {
   return phone;
 }
 
-export function registerCreateBooking(server: McpServer, apiBaseUrl: string): void {
+export function registerCreateBooking(server: McpServer, apiBaseUrl: string, tenantSlug: string): void {
   server.tool(
     'create_booking',
     'Creates an appointment for the customer. Confirm service, barber, date, and time before calling.',
@@ -31,9 +31,23 @@ export function registerCreateBooking(server: McpServer, apiBaseUrl: string): vo
 
       const response = await fetch(`${apiBaseUrl}/api/book`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-Slug': tenantSlug },
         body: JSON.stringify({ serviceId, barberId, date, startTime, customerName, customerPhone: phone }),
       });
+
+      if (response.status === 404) {
+        const body = await response.json().catch(() => ({})) as { error?: string };
+        if (body.error === 'TENANT_NOT_FOUND') {
+          return { isError: true, content: [{ type: 'text' as const, text: 'Tenant não encontrado. Verifique a configuração do servidor MCP.' }] };
+        }
+      }
+
+      if (response.status === 403) {
+        const body = await response.json().catch(() => ({})) as { error?: string };
+        if (body.error === 'TENANT_INACTIVE') {
+          return { isError: true, content: [{ type: 'text' as const, text: 'Tenant inativo. Contate o suporte.' }] };
+        }
+      }
 
       if (response.status === 409) {
         return {

@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-export function registerBookBarberAbsence(server: McpServer, apiBaseUrl: string, internalApiSecret: string): void {
+export function registerBookBarberAbsence(server: McpServer, apiBaseUrl: string, internalApiSecret: string, tenantSlug: string): void {
   server.tool(
     'book_barber_absence',
     "Registers a barber absence (day off). Use when the barber says they won't be working on a specific date. barberId is known from the workflow context — never ask the barber for it.",
@@ -18,6 +18,7 @@ export function registerBookBarberAbsence(server: McpServer, apiBaseUrl: string,
         headers: {
           'Content-Type': 'application/json',
           'X-Internal-Secret': internalApiSecret,
+          'X-Tenant-Slug': tenantSlug,
         },
         body: JSON.stringify({ barberId, date, startTime, endTime, reason }),
       });
@@ -30,10 +31,21 @@ export function registerBookBarberAbsence(server: McpServer, apiBaseUrl: string,
       }
 
       if (response.status === 404) {
+        const body = await response.json().catch(() => ({})) as { error?: string };
+        if (body.error === 'TENANT_NOT_FOUND') {
+          return { isError: true, content: [{ type: 'text' as const, text: 'Tenant não encontrado. Verifique a configuração do servidor MCP.' }] };
+        }
         return {
           isError: true,
           content: [{ type: 'text' as const, text: 'Barbeiro não encontrado.' }],
         };
+      }
+
+      if (response.status === 403) {
+        const body = await response.json().catch(() => ({})) as { error?: string };
+        if (body.error === 'TENANT_INACTIVE') {
+          return { isError: true, content: [{ type: 'text' as const, text: 'Tenant inativo. Contate o suporte.' }] };
+        }
       }
 
       if (response.status === 400) {

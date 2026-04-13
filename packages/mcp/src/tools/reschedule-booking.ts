@@ -1,7 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 
-export function registerRescheduleBooking(server: McpServer, apiBaseUrl: string): void {
+export function registerRescheduleBooking(server: McpServer, apiBaseUrl: string, tenantSlug: string): void {
   server.tool(
     'reschedule_booking',
     'Reschedules an appointment to a new date and time. Requires the cancel token from get_my_appointments. Always confirm the new slot is available (get_available_slots) before calling.',
@@ -14,15 +14,26 @@ export function registerRescheduleBooking(server: McpServer, apiBaseUrl: string)
     async ({ cancelToken, phoneLastFour, newDate, newStartTime }) => {
       const response = await fetch(`${apiBaseUrl}/api/appointment/${encodeURIComponent(cancelToken)}/change`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-Tenant-Slug': tenantSlug },
         body: JSON.stringify({ phoneLastFour, date: newDate, startTime: newStartTime }),
       });
 
       if (response.status === 404) {
+        const body = await response.json().catch(() => ({})) as { error?: string };
+        if (body.error === 'TENANT_NOT_FOUND') {
+          return { isError: true, content: [{ type: 'text' as const, text: 'Tenant não encontrado. Verifique a configuração do servidor MCP.' }] };
+        }
         return {
           isError: true,
           content: [{ type: 'text' as const, text: 'Agendamento não encontrado.' }],
         };
+      }
+
+      if (response.status === 403) {
+        const body = await response.json().catch(() => ({})) as { error?: string };
+        if (body.error === 'TENANT_INACTIVE') {
+          return { isError: true, content: [{ type: 'text' as const, text: 'Tenant inativo. Contate o suporte.' }] };
+        }
       }
 
       if (response.status === 409) {

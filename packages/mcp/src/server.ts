@@ -12,17 +12,19 @@ import { registerRescheduleBooking } from './tools/reschedule-booking.js';
 import { registerGetNextAvailableDate } from './tools/get-next-available-date.js';
 import { registerBookBarberAbsence } from './tools/book-barber-absence.js';
 
-function createMcpServer(): McpServer {
-  const server = new McpServer({ name: 'soberano-mcp', version: '1.0.0' });
-  registerListServices(server, env.apiBaseUrl);
-  registerListBarbers(server, env.apiBaseUrl);
-  registerGetAvailableSlots(server, env.apiBaseUrl);
-  registerCreateBooking(server, env.apiBaseUrl);
-  registerGetMyAppointments(server, env.apiBaseUrl);
-  registerCancelBooking(server, env.apiBaseUrl);
-  registerRescheduleBooking(server, env.apiBaseUrl);
-  registerGetNextAvailableDate(server, env.apiBaseUrl);
-  registerBookBarberAbsence(server, env.apiBaseUrl, env.internalApiSecret);
+const MCP_PATH_RE = /^\/mcp\/([^/?]+)/;
+
+function createMcpServer(tenantSlug: string): McpServer {
+  const server = new McpServer({ name: 'altion-mcp', version: '1.0.0' });
+  registerListServices(server, env.apiBaseUrl, tenantSlug);
+  registerListBarbers(server, env.apiBaseUrl, tenantSlug);
+  registerGetAvailableSlots(server, env.apiBaseUrl, tenantSlug);
+  registerCreateBooking(server, env.apiBaseUrl, tenantSlug);
+  registerGetMyAppointments(server, env.apiBaseUrl, tenantSlug);
+  registerCancelBooking(server, env.apiBaseUrl, tenantSlug);
+  registerRescheduleBooking(server, env.apiBaseUrl, tenantSlug);
+  registerGetNextAvailableDate(server, env.apiBaseUrl, tenantSlug);
+  registerBookBarberAbsence(server, env.apiBaseUrl, env.internalApiSecret, tenantSlug);
   return server;
 }
 
@@ -51,18 +53,20 @@ const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse
     return;
   }
 
-  if (req.url === '/mcp' || req.url?.startsWith('/mcp?')) {
-    const body = req.method === 'POST' ? await readBody(req) : undefined;
-    const server = createMcpServer();
-    const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-    res.on('close', () => { server.close(); });
-    await server.connect(transport);
-    await transport.handleRequest(req, res, body);
+  const match = req.url?.match(MCP_PATH_RE);
+  if (!match) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'TENANT_SLUG_REQUIRED' }));
     return;
   }
 
-  res.writeHead(404);
-  res.end();
+  const tenantSlug = match[1];
+  const body = req.method === 'POST' ? await readBody(req) : undefined;
+  const server = createMcpServer(tenantSlug);
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  res.on('close', () => { server.close(); });
+  await server.connect(transport);
+  await transport.handleRequest(req, res, body);
 });
 
 httpServer.listen(env.port, () => {

@@ -7,7 +7,8 @@
   "scripts": {
     "dev:api": "npm -w @soberano/api run dev",
     "dev:web": "npm -w @soberano/web run dev",
-    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\" \"npm run dev:admin\"",
+    "dev:mcp": "npm -w @soberano/mcp run dev",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\" \"npm run dev:admin\" \"npm run dev:mcp\"",
     "build:api": "npm -w @soberano/api run build",
     "build:web": "npm -w @soberano/web run build",
     "dev:admin": "npm -w @soberano/web-admin run dev",

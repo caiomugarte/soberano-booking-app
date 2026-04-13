@@ -14,7 +14,7 @@ function normalizePhone(raw: string): string {
   return phone;
 }
 
-export function registerGetMyAppointments(server: McpServer, apiBaseUrl: string): void {
+export function registerGetMyAppointments(server: McpServer, apiBaseUrl: string, tenantSlug: string): void {
   server.tool(
     'get_my_appointments',
     'Retrieves the customer\'s next upcoming appointment by phone number. Call this before cancel or reschedule actions.',
@@ -24,7 +24,23 @@ export function registerGetMyAppointments(server: McpServer, apiBaseUrl: string)
     async ({ customerPhone }) => {
       const phone = normalizePhone(customerPhone);
 
-      const response = await fetch(`${apiBaseUrl}/api/appointments/by-phone?phone=${encodeURIComponent(phone)}`);
+      const response = await fetch(`${apiBaseUrl}/api/appointments/by-phone?phone=${encodeURIComponent(phone)}`, {
+        headers: { 'X-Tenant-Slug': tenantSlug },
+      });
+
+      if (response.status === 404) {
+        const body = await response.json().catch(() => ({})) as { error?: string };
+        if (body.error === 'TENANT_NOT_FOUND') {
+          return { isError: true, content: [{ type: 'text' as const, text: 'Tenant não encontrado. Verifique a configuração do servidor MCP.' }] };
+        }
+      }
+
+      if (response.status === 403) {
+        const body = await response.json().catch(() => ({})) as { error?: string };
+        if (body.error === 'TENANT_INACTIVE') {
+          return { isError: true, content: [{ type: 'text' as const, text: 'Tenant inativo. Contate o suporte.' }] };
+        }
+      }
 
       if (response.status === 400) {
         return {
