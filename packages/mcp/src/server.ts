@@ -6,6 +6,11 @@ import { registerListServices } from './tools/list-services.js';
 import { registerListBarbers } from './tools/list-barbers.js';
 import { registerGetAvailableSlots } from './tools/get-available-slots.js';
 import { registerCreateBooking } from './tools/create-booking.js';
+import { registerGetMyAppointments } from './tools/get-my-appointments.js';
+import { registerCancelBooking } from './tools/cancel-booking.js';
+import { registerRescheduleBooking } from './tools/reschedule-booking.js';
+import { registerGetNextAvailableDate } from './tools/get-next-available-date.js';
+import { registerBookBarberAbsence } from './tools/book-barber-absence.js';
 
 function createMcpServer(): McpServer {
   const server = new McpServer({ name: 'soberano-mcp', version: '1.0.0' });
@@ -13,6 +18,11 @@ function createMcpServer(): McpServer {
   registerListBarbers(server, env.apiBaseUrl);
   registerGetAvailableSlots(server, env.apiBaseUrl);
   registerCreateBooking(server, env.apiBaseUrl);
+  registerGetMyAppointments(server, env.apiBaseUrl);
+  registerCancelBooking(server, env.apiBaseUrl);
+  registerRescheduleBooking(server, env.apiBaseUrl);
+  registerGetNextAvailableDate(server, env.apiBaseUrl);
+  registerBookBarberAbsence(server, env.apiBaseUrl, env.internalApiSecret);
   return server;
 }
 

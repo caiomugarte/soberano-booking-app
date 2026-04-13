@@ -15,7 +15,8 @@
     "db:migrate": "npm -w @soberano/api run db:migrate",
     "db:seed": "npm -w @soberano/api run db:seed",
     "db:studio": "npm -w @soberano/api run db:studio",
-    "test": "npm -w @soberano/shared run test && npm -w @soberano/api run test && npm -w @soberano/web run test"
+    "test": "npm -w @soberano/shared run test && npm -w @soberano/api run test && npm -w @soberano/web run test",
+    "gen:secret": "node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

@@ -33,6 +33,7 @@ export interface AppointmentRepository {
   markBarberReminderSent(id: string): Promise<void>;
   getStatsByDateRange(barberId: string, from: Date, to: Date): Promise<DayStat[]>;
   findByBarberAndDateRange(barberId: string, from: Date, to: Date): Promise<AppointmentWithDetails[]>;
+  findUpcomingByCustomerPhone(phone: string): Promise<AppointmentWithDetails | null>;
   deleteById(id: string): Promise<void>;
   updateCustomer(id: string, customerId: string): Promise<void>;
   updateSchedule(id: string, data: {

@@ -11,6 +11,7 @@ const envSchema = z.object({
   SUPER_ADMIN_JWT_SECRET: z.string().min(32),
   SUPER_ADMIN_EMAIL: z.string().email(),
   SUPER_ADMIN_PASSWORD_HASH: z.string(),
+  INTERNAL_API_SECRET: z.string().min(16),
 });
 
 export type Env = z.infer<typeof envSchema>;
