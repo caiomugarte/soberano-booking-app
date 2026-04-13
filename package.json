@@ -7,14 +7,16 @@
   "scripts": {
     "dev:api": "npm -w @soberano/api run dev",
     "dev:web": "npm -w @soberano/web run dev",
+    "dev:web-marques": "npm -w @soberano/web-marques run dev",
     "dev:mcp": "npm -w @soberano/mcp run dev",
-    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\" \"npm run dev:admin\" \"npm run dev:mcp\"",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\" \"npm run dev:admin\" \"npm run dev:mcp\" \"npm run dev:web-marques\"",
     "build:api": "npm -w @soberano/api run build",
     "build:web": "npm -w @soberano/web run build",
     "dev:admin": "npm -w @soberano/web-admin run dev",
     "build:admin": "npm -w @soberano/web-admin run build",
     "db:migrate": "npm -w @soberano/api run db:migrate",
     "db:seed": "npm -w @soberano/api run db:seed",
+    "db:seed:marques": "npm -w @soberano/api run db:seed:marques",
     "db:studio": "npm -w @soberano/api run db:studio",
     "test": "npm -w @soberano/shared run test && npm -w @soberano/api run test && npm -w @soberano/web run test",
     "gen:secret": "node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
