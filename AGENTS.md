@@ -170,7 +170,7 @@ These skills are available in this environment. **Use them proactively** — don
 
 | Skill | Invoke with | When to use |
 |-------|-------------|-------------|
-| `tlc-spec-driven` | `/tlc-spec-driven` | Any feature that touches multiple packages, requires DB migrations, or has architectural decisions. Runs Specify → Design → Tasks → Execute. **Always use this before implementing a non-trivial feature.** |
+| `tlc-spec-driven` | `/tlc-spec-driven` | Feature planning, project initialization, brownfield codebase mapping, and creating tasks from a `spec.md`. Runs 4 adaptive phases — **Specify → Design → Tasks → Execute** — auto-sized by scope. Design and Tasks are skipped when not needed. Use **Quick Mode** (within the skill) for fixes ≤3 files. **Never create tasks from a spec.md manually — always invoke this skill.** |
 | `codenavi` | `/codenavi` | Exploring unfamiliar parts of the codebase, tracing a flow, brownfield mapping, or before implementing anything in an area you haven't read. |
 | `coding-guidelines` | `/coding-guidelines` | When writing or modifying any code — enforces SOLID, Clean Architecture, Clean Code, and unit testing rules specific to this stack. |
 | `best-practices` | `/best-practices` | Security audits, modernizing code, checking for vulnerabilities, applying web best practices. |
@@ -182,7 +182,15 @@ These skills are available in this environment. **Use them proactively** — don
 
 ### Decision guide
 
-- **Planning a feature?** → `/tlc-spec-driven` first, always.
+**When to use `/tlc-spec-driven`:**
+- Feature touches multiple packages, requires DB migrations, or has architectural decisions → full pipeline (Specify → Design → Tasks → Execute)
+- Feature scope is unclear or has ambiguous gray areas → full pipeline (the skill handles clarification internally)
+- Creating tasks from an existing `spec.md` → always invoke this skill, never `TaskCreate` directly
+- Initializing a new project or mapping an existing codebase → use the project-init or brownfield-mapping commands within the skill
+- Bug fix or small change ≤3 files with known cause → use **Quick Mode** within the skill (`/tlc-spec-driven` then say "quick fix")
+- Straightforward feature, <10 tasks, no architectural decisions → Medium scope: Specify + Execute only (Design/Tasks auto-skipped)
+
+**Other skill decisions:**
 - **Navigating unfamiliar code?** → `/codenavi` before touching anything.
 - **Writing backend code?** → `/coding-guidelines` + `/security-best-practices` for any endpoint handling auth or user input.
 - **Writing frontend code?** → `/coding-guidelines` + `/react-best-practices`.
