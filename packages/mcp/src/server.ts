@@ -39,6 +39,22 @@ function unauthorized(res: ServerResponse): void {
   res.end(JSON.stringify({ error: 'Unauthorized' }));
 }
 
+function handleCors(req: IncomingMessage, res: ServerResponse): boolean {
+  const origin = req.headers['origin'];
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type, Accept, Mcp-Session-Id, Mcp-Protocol-Version');
+    res.setHeader('Access-Control-Max-Age', '86400');
+  }
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return true;
+  }
+  return false;
+}
+
 async function readBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
   for await (const chunk of req) {
@@ -48,6 +64,8 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
 }
 
 const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+  if (handleCors(req, res)) return;
+
   if (!isAuthorized(req.headers['authorization'])) {
     unauthorized(res);
     return;
