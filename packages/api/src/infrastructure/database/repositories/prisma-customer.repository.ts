@@ -11,16 +11,16 @@ export class PrismaCustomerRepository implements CustomerRepository {
     return this.db.customer.findFirst({ where: { phone } });
   }
 
-  async upsertByPhone(phone: string, name: string): Promise<CustomerEntity> {
+  async upsertByPhone(phone: string, name: string, tenantId: string): Promise<CustomerEntity> {
     const existing = await this.findByPhone(phone);
     if (existing) {
       return this.db.customer.update({ where: { id: existing.id }, data: { name } });
     }
-    return this.db.customer.create({ data: { phone, name } });
+    return this.db.customer.create({ data: { phone, name, tenantId } });
   }
 
-  async createWalkin(name: string): Promise<CustomerEntity> {
-    return this.db.customer.create({ data: { name } });
+  async createWalkin(name: string, tenantId: string): Promise<CustomerEntity> {
+    return this.db.customer.create({ data: { name, tenantId } });
   }
 
   async updateName(id: string, name: string): Promise<CustomerEntity> {

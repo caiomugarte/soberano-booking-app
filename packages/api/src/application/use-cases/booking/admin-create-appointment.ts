@@ -40,8 +40,8 @@ export class AdminCreateAppointment {
     const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
 
     const customer = input.customerPhone
-      ? await this.customerRepo.upsertByPhone(input.customerPhone, input.customerName)
-      : await this.customerRepo.createWalkin(input.customerName);
+      ? await this.customerRepo.upsertByPhone(input.customerPhone, input.customerName, input.tenantId)
+      : await this.customerRepo.createWalkin(input.customerName, input.tenantId);
     const cancelToken = crypto.randomBytes(32).toString('hex');
 
     let appointment: AppointmentWithDetails;

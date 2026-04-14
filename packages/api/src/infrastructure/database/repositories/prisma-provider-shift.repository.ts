@@ -26,12 +26,13 @@ export class PrismaProviderShiftRepository implements ProviderShiftRepository {
 
   async replaceForProvider(
     providerId: string,
+    tenantId: string,
     shifts: Omit<ProviderShiftEntity, 'id' | 'providerId'>[],
   ): Promise<void> {
     await this.db.$transaction([
-      this.db.providerShift.deleteMany({ where: { providerId } }),
+      this.db.providerShift.deleteMany({ where: { providerId, tenantId } }),
       this.db.providerShift.createMany({
-        data: shifts.map((s) => ({ ...s, providerId })),
+        data: shifts.map((s) => ({ ...s, providerId, tenantId })),
       }),
     ]);
   }

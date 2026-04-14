@@ -243,7 +243,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
     if (phoneChanged) {
       const newName = name ?? currentCustomer.name;
-      const newCustomer = await customerRepo.upsertByPhone(phone, newName);
+      const newCustomer = await customerRepo.upsertByPhone(phone, newName, request.tenant.id);
       await appointmentRepo.updateCustomer(id, newCustomer.id);
       // Re-fetch to get updated appointment with relations for notification
       const updated = await appointmentRepo.findById(id);
