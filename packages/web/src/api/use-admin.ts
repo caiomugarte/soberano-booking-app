@@ -37,6 +37,7 @@ export function useLogin() {
     mutationFn: (data: { email: string; password: string }) =>
       fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-Tenant-Slug': TENANT_SLUG },
         body: JSON.stringify(data),
       }).then(async (res) => {

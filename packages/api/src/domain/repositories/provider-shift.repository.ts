@@ -19,7 +19,7 @@ export interface ProviderAbsenceEntity {
 export interface ProviderShiftRepository {
   findByProviderAndDay(providerId: string, dayOfWeek: number): Promise<ProviderShiftEntity[]>;
   findAllByProvider(providerId: string): Promise<ProviderShiftEntity[]>;
-  replaceForProvider(providerId: string, shifts: Omit<ProviderShiftEntity, 'id' | 'providerId'>[]): Promise<void>;
+  replaceForProvider(providerId: string, tenantId: string, shifts: Omit<ProviderShiftEntity, 'id' | 'providerId'>[]): Promise<void>;
 
   findAbsencesByProviderAndDate(providerId: string, date: Date): Promise<ProviderAbsenceEntity[]>;
   findAbsencesByProvider(providerId: string): Promise<ProviderAbsenceEntity[]>;

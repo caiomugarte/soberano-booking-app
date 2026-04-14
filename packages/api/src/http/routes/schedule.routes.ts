@@ -31,7 +31,7 @@ export async function scheduleRoutes(app: FastifyInstance): Promise<void> {
     const { shifts } = request.body as { shifts: unknown[] };
     const parsed = z.array(shiftSchema).parse(shifts);
     const shiftRepo = new PrismaProviderShiftRepository(request.tenantPrisma);
-    await shiftRepo.replaceForProvider(request.providerId!, parsed);
+    await shiftRepo.replaceForProvider(request.providerId!, request.tenant.id, parsed);
     return { message: 'Horários atualizados.' };
   });
 

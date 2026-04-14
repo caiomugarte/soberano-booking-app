@@ -40,6 +40,8 @@ await app.register(rateLimit, {
 app.addHook('preHandler', async (request, reply) => {
   if (request.url.startsWith('/api/platform/')) return;
   if (request.url.startsWith('/api/internal/')) return;
+  if (request.url === '/api/auth/refresh') return;
+  if (request.url === '/api/auth/logout') return;
   return tenantMiddleware(request, reply);
 });
 
