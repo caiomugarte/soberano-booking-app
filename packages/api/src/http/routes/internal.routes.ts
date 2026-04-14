@@ -46,6 +46,7 @@ export async function internalRoutes(app: FastifyInstance): Promise<void> {
     const tenantPrisma = createTenantPrisma(provider.tenantId);
     const shiftRepo = new PrismaProviderShiftRepository(tenantPrisma);
     const absence = await shiftRepo.createAbsence({
+      tenantId: provider.tenantId,
       providerId: barberId,
       date: new Date(date + 'T00:00:00'),
       startTime: startTime ?? null,
