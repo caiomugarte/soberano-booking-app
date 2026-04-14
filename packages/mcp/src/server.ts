@@ -11,6 +11,9 @@ import { registerCancelBooking } from './tools/cancel-booking.js';
 import { registerRescheduleBooking } from './tools/reschedule-booking.js';
 import { registerGetNextAvailableDate } from './tools/get-next-available-date.js';
 import { registerBookBarberAbsence } from './tools/book-barber-absence.js';
+import { registerListBarberAbsences } from './tools/list-barber-absences.js';
+import { registerCancelBarberAbsence } from './tools/cancel-barber-absence.js';
+import { registerEditBarberAbsence } from './tools/edit-barber-absence.js';
 
 const MCP_PATH_RE = /^\/mcp\/([^/?]+)/;
 
@@ -25,6 +28,9 @@ function createMcpServer(tenantSlug: string): McpServer {
   registerRescheduleBooking(server, env.apiBaseUrl, tenantSlug);
   registerGetNextAvailableDate(server, env.apiBaseUrl, tenantSlug);
   registerBookBarberAbsence(server, env.apiBaseUrl, env.internalApiSecret, tenantSlug);
+  registerListBarberAbsences(server, env.apiBaseUrl, env.internalApiSecret, tenantSlug);
+  registerCancelBarberAbsence(server, env.apiBaseUrl, env.internalApiSecret, tenantSlug);
+  registerEditBarberAbsence(server, env.apiBaseUrl, env.internalApiSecret, tenantSlug);
   return server;
 }
 

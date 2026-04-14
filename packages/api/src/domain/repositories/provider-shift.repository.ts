@@ -24,5 +24,6 @@ export interface ProviderShiftRepository {
   findAbsencesByProviderAndDate(providerId: string, date: Date): Promise<ProviderAbsenceEntity[]>;
   findAbsencesByProvider(providerId: string): Promise<ProviderAbsenceEntity[]>;
   createAbsence(data: Omit<ProviderAbsenceEntity, 'id'>): Promise<ProviderAbsenceEntity>;
+  updateAbsence(id: string, data: Partial<Pick<ProviderAbsenceEntity, 'date' | 'startTime' | 'endTime' | 'reason'>>): Promise<ProviderAbsenceEntity>;
   deleteAbsence(id: string): Promise<void>;
 }
