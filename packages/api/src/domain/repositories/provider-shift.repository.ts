@@ -8,6 +8,7 @@ export interface ProviderShiftEntity {
 
 export interface ProviderAbsenceEntity {
   id: string;
+  tenantId: string;
   providerId: string;
   date: Date;
   startTime: string | null;
