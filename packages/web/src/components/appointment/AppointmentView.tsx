@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppointment, useCancelAppointment, useChangeAppointment } from '../../api/use-appointment.ts';
 import { useSlots, type Slot } from '../../api/use-slots.ts';
@@ -25,10 +25,41 @@ export function AppointmentView({ token }: { token: string }) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [newDate, setNewDate] = useState<string | null>(null);
   const [newSlot, setNewSlot] = useState<string | null>(null);
+  const initializing = useRef(true);
   const { data: slots, isLoading: loadingSlots } = useSlots(
     appointment?.barberId ?? null,
     newDate,
   );
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Initialize to today when entering change view
+  useEffect(() => {
+    if (view === 'change' && !newDate) {
+      setNewDate(dateToString(today));
+    }
+  }, [view]);
+
+  // Auto-advance to next day if no slots (e.g. barber doesn't work that day)
+  useEffect(() => {
+    if (!initializing.current || !newDate || loadingSlots || !slots || slots.length > 0) return;
+    const next = new Date(newDate + 'T00:00:00');
+    next.setDate(next.getDate() + 1);
+    const maxDate = new Date(today);
+    maxDate.setDate(maxDate.getDate() + MAX_WEEKS_AHEAD * 7);
+    if (next > maxDate) { initializing.current = false; return; }
+    setNewDate(dateToString(next));
+    const mondayThisWeek = new Date(today);
+    mondayThisWeek.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    const diffDays = Math.floor((next.getTime() - mondayThisWeek.getTime()) / 86400000);
+    setWeekOffset(Math.floor(diffDays / 7));
+  }, [slots, loadingSlots]);
+
+  // Mark initialization done once slots load
+  useEffect(() => {
+    if (slots && slots.length > 0) initializing.current = false;
+  }, [slots]);
 
   if (isLoading) {
     return (
@@ -95,7 +126,6 @@ export function AppointmentView({ token }: { token: string }) {
 
   // Change flow
   if (view === 'change') {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
     const weekDates = getWeekDates(weekOffset);
 
     if (changeMutation.isSuccess) {
@@ -134,7 +164,7 @@ export function AppointmentView({ token }: { token: string }) {
                 const disabled = d < today;
                 const ds = dateToString(d);
                 return (
-                  <button key={ds} disabled={disabled} onClick={() => { setNewDate(ds); setNewSlot(null); }}
+                  <button key={ds} disabled={disabled} onClick={() => { initializing.current = false; setNewDate(ds); setNewSlot(null); }}
                     className={`flex flex-col items-center gap-1 py-2.5 px-1 rounded-[10px] border transition-all duration-200 ${disabled ? 'opacity-30 cursor-not-allowed border-dark-border bg-dark-surface2' : 'cursor-pointer'} ${newDate === ds ? 'border-gold bg-gold/[0.08]' : !disabled ? 'border-dark-border bg-dark-surface2 hover:border-gold/40' : ''}`}>
                     <span className="text-[9px] tracking-[0.1em] uppercase text-muted">{DAY_NAMES[d.getDay()]}</span>
                     <span className="text-lg font-bold">{d.getDate()}</span>

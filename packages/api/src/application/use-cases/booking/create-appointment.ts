@@ -69,7 +69,7 @@ export class CreateAppointment {
     const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
 
     // Upsert customer
-    const customer = await this.customerRepo.upsertByPhone(input.customerPhone, input.customerName);
+    const customer = await this.customerRepo.upsertByPhone(input.customerPhone, input.customerName, input.tenantId);
 
     // Generate cancel token
     const cancelToken = crypto.randomBytes(32).toString('hex');
