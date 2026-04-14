@@ -53,6 +53,13 @@ export class PrismaProviderShiftRepository implements ProviderShiftRepository {
     return this.db.providerAbsence.create({ data }) as unknown as ProviderAbsenceEntity;
   }
 
+  async updateAbsence(
+    id: string,
+    data: Partial<Pick<ProviderAbsenceEntity, 'date' | 'startTime' | 'endTime' | 'reason'>>,
+  ): Promise<ProviderAbsenceEntity> {
+    return this.db.providerAbsence.update({ where: { id }, data }) as unknown as ProviderAbsenceEntity;
+  }
+
   async deleteAbsence(id: string): Promise<void> {
     await this.db.providerAbsence.delete({ where: { id } });
   }
