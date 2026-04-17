@@ -2,6 +2,8 @@ import Fastify, { type FastifyError } from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
+import swagger from '@fastify/swagger';
+import swaggerUI from '@fastify/swagger-ui';
 import { ZodError } from 'zod';
 import { env } from './config/env.js';
 import { prisma } from './config/database.js';
@@ -36,12 +38,25 @@ await app.register(rateLimit, {
   timeWindow: '1 minute',
 });
 
+if (env.NODE_ENV === 'development') {
+  await app.register(swagger, {
+    openapi: {
+      info: { title: 'Soberano API', version: '1.0.0' },
+    },
+  });
+
+  await app.register(swaggerUI, {
+    routePrefix: '/docs',
+  });
+}
+
 // Tenant middleware — runs for all routes except platform routes
 app.addHook('preHandler', async (request, reply) => {
   if (request.url.startsWith('/api/platform/')) return;
   if (request.url.startsWith('/api/internal/')) return;
   if (request.url === '/api/auth/refresh') return;
   if (request.url === '/api/auth/logout') return;
+  if (request.url.startsWith('/docs')) return;
   return tenantMiddleware(request, reply);
 });
 
