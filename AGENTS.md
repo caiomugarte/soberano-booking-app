@@ -171,7 +171,7 @@ These skills are available in this environment. **Use them proactively** — don
 | Skill | Invoke with | When to use |
 |-------|-------------|-------------|
 | `tlc-spec-driven` | `/tlc-spec-driven` | Feature planning, project initialization, brownfield codebase mapping, and creating tasks from a `spec.md`. Runs 4 adaptive phases — **Specify → Design → Tasks → Execute** — auto-sized by scope. Design and Tasks are skipped when not needed. Use **Quick Mode** (within the skill) for fixes ≤3 files. **Never create tasks from a spec.md manually — always invoke this skill.** |
-| `codenavi` | `/codenavi` | Exploring unfamiliar parts of the codebase, tracing a flow, brownfield mapping, or before implementing anything in an area you haven't read. |
+| `codenavi` | `/codenavi` | Exploring unfamiliar parts of the codebase, tracing a flow, brownfield mapping, or before implementing anything in an area you haven't read. Prefer over the `Explore` subagent when the area will be revisited across sessions — findings persist in `.notebook/`. Use `Explore` only for one-off mapping that won't be needed again. |
 | `coding-guidelines` | `/coding-guidelines` | When writing or modifying any code — enforces SOLID, Clean Architecture, Clean Code, and unit testing rules specific to this stack. |
 | `best-practices` | `/best-practices` | Security audits, modernizing code, checking for vulnerabilities, applying web best practices. |
 | `security-best-practices` | `/security-best-practices` | Explicit security review of new endpoints, auth flows, or any code handling user input, tokens, or external data. |
@@ -191,7 +191,7 @@ These skills are available in this environment. **Use them proactively** — don
 - Straightforward feature, <10 tasks, no architectural decisions → Medium scope: Specify + Execute only (Design/Tasks auto-skipped)
 
 **Other skill decisions:**
-- **Navigating unfamiliar code?** → `/codenavi` before touching anything.
+- **Navigating unfamiliar code?** → `/codenavi` before touching anything (persists to `.notebook/`). Use `Explore` subagent only for one-off research you won't need again.
 - **Writing backend code?** → `/coding-guidelines` + `/security-best-practices` for any endpoint handling auth or user input.
 - **Writing frontend code?** → `/coding-guidelines` + `/react-best-practices`.
 - **Building a new UI page?** → `/frontend-design` + `/react-best-practices`.
