@@ -1,34 +1,28 @@
-# Repository Singleton Pattern (Gotcha)
+# Repository Per-Request Pattern
 
-**Tags:** repositories, architecture, gotcha
-**Discovered:** 2026-04-09
+**Tags:** repositories, architecture, pattern
+**Originally a gotcha (resolved):** per-request injection was Option B, now implemented
 
-## The Pattern
+## Current Pattern
 
-In every route file, repositories are instantiated at module level:
+Route handlers instantiate repositories per-request using `request.tenantPrisma`:
 
+```typescript
+// Inside route handler (e.g. booking.routes.ts:34-35)
+const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
+const shiftRepo = new PrismaProviderShiftRepository(request.tenantPrisma);
 ```
-packages/api/src/http/routes/booking.routes.ts:13-18
-packages/api/src/http/routes/admin.routes.ts:14-19
+
+`request.tenantPrisma` is a Prisma client extended with a `$allOperations` hook that auto-injects `tenantId` into all queries for tenant-scoped models. Set by `tenant.middleware.ts` on every request.
+
+## Repository Constructor Signature
+
+All Prisma repository constructors accept a `PrismaClientOrExtended` type (typed as `any` to accept both regular and extended clients):
+
+```typescript
+constructor(private prisma: PrismaClientOrExtended) {}
 ```
 
-These singletons are created once at startup. They hold no reference to the current request.
+## Exception: Internal Routes
 
-## Why This Matters for Multi-Tenancy
-
-Tenant context (resolved from `X-Tenant-Slug` header) lives in the HTTP request. If repos are singletons, they can't access tenant context without receiving it explicitly.
-
-## Options to Fix
-
-**Option A:** Pass `tenantId` explicitly to every repository method.
-- Pros: Explicit, visible
-- Cons: Invasive — changes every method signature
-
-**Option B:** Use Prisma Client Extension with `$allOperations` hook, initialized per-request.
-- The extension wraps all queries and injects `tenantId` from a closure
-- Route handlers instantiate a tenant-scoped Prisma client per request
-- Repos receive this scoped client in their constructor (or via Fastify request decoration)
-- Pros: Less invasive, single injection point
-- Cons: Slightly more complex setup
-
-**Option B is preferred** for this codebase given the repo interface pattern already in place.
+`packages/api/src/http/routes/internal.routes.ts` bypasses tenant middleware. It uses the global `prisma` (imported as `_prisma as any`) only to resolve `provider.tenantId` from a `barberId`, then creates its own `createTenantPrisma(provider.tenantId)` and passes it to repos.

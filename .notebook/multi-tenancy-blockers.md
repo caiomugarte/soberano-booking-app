@@ -1,23 +1,13 @@
-# Multi-Tenancy Blockers
+# Multi-Tenancy Blockers — RESOLVED
 
-**Tags:** multi-tenancy, architecture, critical
-**Discovered:** 2026-04-09 during brownfield mapping
+**Tags:** multi-tenancy, architecture
+**Originally discovered:** 2026-04-09 | **Resolved:** by 2026-04-17
 
-## 4 Critical Blockers
+All 4 blockers documented here have been resolved. See `multi-tenancy-implementation.md` for the current architecture.
 
-### 1. No tenant isolation in DB queries
-All Prisma repository methods return global data. No `tenantId` filter anywhere.
-- All files: `packages/api/src/infrastructure/database/repositories/prisma-*.repository.ts`
+## Summary of Resolutions
 
-### 2. Repositories are module-level singletons
-Repos are instantiated at module load in route files (e.g., `booking.routes.ts:13-18`). They have no per-request context. Tenant context cannot be injected post-init.
-- See: `repository-singleton-pattern.md`
-
-### 3. Brand hardcoded in notification service
-`packages/api/src/infrastructure/notifications/whatsapp-notification.service.ts` — "Soberano Barbearia" and "Barbeiro" appear in 6+ message templates.
-
-### 4. CORS allows single origin only
-`packages/api/src/server.ts:26` — `origin: env.BASE_URL` is a single string. Multi-frontend requires array or dynamic function.
-
-## Reminder job also affected
-`packages/api/src/infrastructure/jobs/reminder.job.ts` — global queries, hardcoded brand in messages. Must be tenant-aware.
+1. **No tenant isolation** → `createTenantPrisma()` Prisma extension auto-injects `tenantId` in all queries.
+2. **Singleton repos** → Repos instantiated per-request with `request.tenantPrisma`. No more module-level singletons.
+3. **Hardcoded brand** → `WhatsAppNotificationService` takes `TenantConfig` in constructor. Brand from `Tenant.config` JSON column.
+4. **CORS single origin** → `env.ALLOWED_ORIGINS` is split to array, supports multiple frontends.

@@ -1,31 +1,27 @@
-# Notification Service — Hardcoded Brand (Gotcha)
+# Notification Service — Tenant-Aware Brand
 
-**Tags:** notifications, whatsapp, multi-tenancy
-**Discovered:** 2026-04-09
+**Tags:** notifications, whatsapp, multi-tenancy, tenant-config
+**Originally a blocker (resolved):** brand is now from TenantConfig
 
-## Location
+## Current Pattern
 
 `packages/api/src/infrastructure/notifications/whatsapp-notification.service.ts`
 
-## Problem
+Constructor: `constructor(private config: TenantConfig, private client: ChatwootClient)`
 
-Every message method hardcodes `"📍 *Soberano Barbearia*"` and `"💈 Barbeiro:"`:
-- `sendBookingConfirmation` (L57)
-- `sendBarberCancellationToCustomer` (L82)
-- `sendCancellationNotice` (L106)
-- `sendChangeNotice` (L130)
-- `sendReminder` (L155)
-- `sendBarberReminder` (L177)
+- `config.businessName` → replaces old hardcoded "Soberano Barbearia"
+- `config.providerLabel` → replaces old hardcoded "Barbeiro"
+- `config.bookingUrl` → replaces old hardcoded `env.BASE_URL` for cancel links
 
-## Fix
-
-The `WhatsAppNotificationService` constructor should accept a `TenantConfig` object:
+Route handlers build the notification service per-request:
 ```typescript
-interface TenantNotificationConfig {
-  businessName: string;
-  providerLabel: string;   // "Barbeiro" | "Psicóloga" | "Terapeuta"
-  bookingUrl: string;      // tenant's BASE_URL
-}
+const tenantConfig = tenantConfigSchema.parse(request.tenant.config);
+const client = new ChatwootClient(tenantConfig);
+const notificationService = new WhatsAppNotificationService(tenantConfig, client);
 ```
 
-This config is fetched from the resolved `Tenant` record on each request and passed when instantiating the service. Store in `Tenant.config: Json` column.
+## TenantConfig Shape
+
+Defined in `packages/shared/src/tenant-config.schema.ts`. Required fields: `businessName`, `providerLabel`, `bookingUrl`. Optional: `chatwootBaseUrl`, `chatwootApiToken`, `chatwootAccountId`, `chatwootInboxId`.
+
+If Chatwoot credentials are absent, `client.isEnabled()` returns false and notifications are silently skipped (logged to console).
