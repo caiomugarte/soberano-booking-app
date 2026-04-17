@@ -16,9 +16,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@fastify/cors": "^10.0.2",
     "@fastify/cookie": "^11.0.2",
+    "@fastify/cors": "^10.0.2",
     "@fastify/rate-limit": "^10.2.2",
+    "@fastify/swagger": "^9.7.0",
+    "@fastify/swagger-ui": "^5.2.5",
     "@prisma/client": "^6.5.0",
     "@soberano/shared": "*",
     "bcryptjs": "^2.4.3",
