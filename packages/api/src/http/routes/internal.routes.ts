@@ -7,6 +7,7 @@ import { createTenantPrisma } from '../../config/tenant-prisma.js';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const prisma = _prisma as any;
 import { PrismaProviderShiftRepository } from '../../infrastructure/database/repositories/prisma-provider-shift.repository.js';
+import { PrismaAppointmentRepository } from '../../infrastructure/database/repositories/prisma-appointment.repository.js';
 
 const absenceBodySchema = z.object({
   barberId: z.string().uuid(),
@@ -169,5 +170,80 @@ export async function internalRoutes(app: FastifyInstance): Promise<void> {
       endTime: updated.endTime,
       reason: updated.reason,
     });
+  });
+
+  app.get('/internal/provider-appointments', async (request, reply) => {
+    const secret = request.headers['x-internal-secret'];
+    if (!secret || secret !== env.INTERNAL_API_SECRET) {
+      return reply.status(401).send({ error: 'UNAUTHORIZED', message: 'Não autorizado.' });
+    }
+
+    const { barberId, date } = request.query as { barberId?: string; date?: string };
+
+    if (!barberId || !/^[0-9a-f-]{36}$/i.test(barberId)) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: 'barberId inválido.' });
+    }
+
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: 'date inválido. Use o formato YYYY-MM-DD.' });
+    }
+
+    const provider = await prisma.provider.findUnique({ where: { id: barberId } });
+    if (!provider) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Barbeiro não encontrado.' });
+    }
+
+    const tenantPrisma = createTenantPrisma(provider.tenantId);
+    const appointmentRepo = new PrismaAppointmentRepository(tenantPrisma);
+    const { appointments } = await appointmentRepo.findByBarberAndDate(barberId, new Date(date + 'T00:00:00'));
+
+    const confirmed = appointments
+      .filter((a) => a.status === 'confirmed')
+      .map((a) => ({
+        id: a.id,
+        customerName: a.customer.name,
+        startTime: a.startTime,
+        endTime: a.endTime,
+        serviceName: a.service.name,
+      }));
+
+    return reply.status(200).send({ appointments: confirmed });
+  });
+
+  app.get('/internal/provider-stats', async (request, reply) => {
+    const secret = request.headers['x-internal-secret'];
+    if (!secret || secret !== env.INTERNAL_API_SECRET) {
+      return reply.status(401).send({ error: 'UNAUTHORIZED', message: 'Não autorizado.' });
+    }
+
+    const { barberId, from, to } = request.query as { barberId?: string; from?: string; to?: string };
+
+    if (!barberId || !/^[0-9a-f-]{36}$/i.test(barberId)) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: 'barberId inválido.' });
+    }
+
+    if (!from || !/^\d{4}-\d{2}-\d{2}$/.test(from)) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: 'from inválido. Use o formato YYYY-MM-DD.' });
+    }
+
+    if (!to || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: 'to inválido. Use o formato YYYY-MM-DD.' });
+    }
+
+    const provider = await prisma.provider.findUnique({ where: { id: barberId } });
+    if (!provider) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Barbeiro não encontrado.' });
+    }
+
+    const tenantPrisma = createTenantPrisma(provider.tenantId);
+    const appointmentRepo = new PrismaAppointmentRepository(tenantPrisma);
+    const days = await appointmentRepo.getStatsByDateRange(barberId, new Date(from + 'T00:00:00'), new Date(to + 'T00:00:00'));
+
+    const totals = days.reduce(
+      (acc, d) => ({ confirmed: acc.confirmed + d.confirmed, completed: acc.completed + d.completed, revenueCents: acc.revenueCents + d.revenueCents }),
+      { confirmed: 0, completed: 0, revenueCents: 0 },
+    );
+
+    return reply.status(200).send({ days, totals });
   });
 }
