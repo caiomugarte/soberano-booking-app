@@ -15,6 +15,7 @@ import { registerListBarberAbsences } from './tools/list-barber-absences.js';
 import { registerCancelBarberAbsence } from './tools/cancel-barber-absence.js';
 import { registerEditBarberAbsence } from './tools/edit-barber-absence.js';
 import { registerGetBarberAppointments } from './tools/get-barber-appointments.js';
+import { registerGetBarberFinancialReport } from './tools/get-barber-financial-report.js';
 
 const MCP_PATH_RE = /^\/mcp\/([^/?]+)/;
 
@@ -33,6 +34,7 @@ function createMcpServer(tenantSlug: string): McpServer {
   registerCancelBarberAbsence(server, env.apiBaseUrl, env.internalApiSecret, tenantSlug);
   registerEditBarberAbsence(server, env.apiBaseUrl, env.internalApiSecret, tenantSlug);
   registerGetBarberAppointments(server, env.apiBaseUrl, env.internalApiSecret, tenantSlug);
+  registerGetBarberFinancialReport(server, env.apiBaseUrl, env.internalApiSecret, tenantSlug);
   return server;
 }
 
