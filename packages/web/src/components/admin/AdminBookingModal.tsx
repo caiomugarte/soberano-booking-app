@@ -17,6 +17,7 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [serviceId, setServiceId] = useState('');
+  const [priceDisplay, setPriceDisplay] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [timeError, setTimeError] = useState('');
@@ -54,11 +55,15 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
 
   const strippedPhone = stripPhone(phone);
 
+  const parsedPriceCents = Math.round(parseFloat(priceDisplay.replace(',', '.')) * 100);
+  const isPriceValid = priceDisplay === '' || (!isNaN(parsedPriceCents) && parsedPriceCents > 0);
+
   const isValid =
     name.trim().length >= 2 &&
     serviceId.length > 0 &&
     date.length > 0 &&
-    TIME_REGEX.test(time);
+    TIME_REGEX.test(time) &&
+    isPriceValid;
 
   function handleTimeChange(e: ChangeEvent<HTMLInputElement>) {
     const digits = e.target.value.replace(/\D/g, '').slice(0, 4);
@@ -77,12 +82,16 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
 
   function handleSubmit() {
     if (!isValid) return;
+    const selectedService = services?.find((s) => s.id === serviceId);
+    const customPrice = priceDisplay !== '' ? parsedPriceCents : undefined;
+    const defaultPrice = selectedService?.priceCents;
     createBooking.mutate({
       serviceId,
       date,
       startTime: time,
       customerName: name.trim(),
       ...(strippedPhone.length >= 10 ? { customerPhone: strippedPhone } : {}),
+      ...(customPrice !== undefined && customPrice !== defaultPrice ? { priceCents: customPrice } : {}),
     });
   }
 
@@ -121,7 +130,12 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
           </label>
           <select
             value={serviceId}
-            onChange={(e) => setServiceId(e.target.value)}
+            onChange={(e) => {
+              const id = e.target.value;
+              setServiceId(id);
+              const svc = services?.find((s) => s.id === id);
+              setPriceDisplay(svc ? (svc.priceCents / 100).toFixed(2).replace('.', ',') : '');
+            }}
             className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-[#F0EDE8] outline-none focus:border-gold appearance-none"
           >
             <option value="">Selecione um serviço</option>
@@ -132,6 +146,14 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
             ))}
           </select>
         </div>
+
+        <Input
+          label="Preço (R$)"
+          inputMode="decimal"
+          placeholder="0,00"
+          value={priceDisplay}
+          onChange={(e) => setPriceDisplay(e.target.value)}
+        />
 
         <div className="mb-5">
           <label className="block text-[11px] tracking-[0.12em] uppercase text-muted mb-2">

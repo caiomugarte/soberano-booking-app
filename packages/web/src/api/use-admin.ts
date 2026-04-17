@@ -135,6 +135,7 @@ export interface AdminBookingInput {
   startTime: string;
   customerName: string;
   customerPhone?: string;
+  priceCents?: number;
 }
 
 export function useAdminCreateBooking() {

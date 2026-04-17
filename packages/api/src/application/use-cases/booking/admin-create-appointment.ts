@@ -14,6 +14,7 @@ interface AdminCreateAppointmentInput {
   startTime: string;
   customerName: string;
   customerPhone?: string;
+  priceCents?: number;
   bookingUrl: string;
 }
 
@@ -54,7 +55,7 @@ export class AdminCreateAppointment {
         date,
         startTime: input.startTime,
         endTime,
-        priceCents: service.priceCents,
+        priceCents: input.priceCents ?? service.priceCents,
         cancelToken,
       });
     } catch (error: unknown) {

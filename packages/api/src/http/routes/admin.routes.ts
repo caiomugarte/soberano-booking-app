@@ -92,6 +92,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   app.post('/admin/appointments', async (request: FastifyRequest, reply) => {
     const adminBookingSchema = bookingSchema.omit({ barberId: true }).extend({
       customerPhone: z.string().regex(/^\d{10,11}$/, 'Telefone deve ter 10 ou 11 dígitos').optional(),
+      priceCents: z.number().int().positive().optional(),
     });
     const parsed = adminBookingSchema.safeParse(request.body);
     if (!parsed.success) {
