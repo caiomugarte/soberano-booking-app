@@ -14,7 +14,9 @@ COPY packages/web-bruno ./packages/web-bruno
 
 # Build-time env vars
 ARG VITE_API_URL
+ARG VITE_TENANT_SLUG
 ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_TENANT_SLUG=$VITE_TENANT_SLUG
 
 # Build the React app
 RUN npm -w psicologo run build
