@@ -18,6 +18,7 @@ import { adminRoutes } from './http/routes/admin.routes.js';
 import { scheduleRoutes } from './http/routes/schedule.routes.js';
 import { platformRoutes } from './http/routes/platform.routes.js';
 import { internalRoutes } from './http/routes/internal.routes.js';
+import { psychologyRoutes } from './http/routes/psychology.routes.js';
 import { startReminderJob } from './infrastructure/jobs/reminder.job.js';
 
 const app = Fastify({
@@ -103,6 +104,7 @@ await app.register(adminRoutes, { prefix: '/api' });
 await app.register(scheduleRoutes, { prefix: '/api' });
 await app.register(platformRoutes, { prefix: '/api/platform' });
 await app.register(internalRoutes, { prefix: '/api' });
+await app.register(psychologyRoutes, { prefix: '/api' });
 
 // Start
 try {

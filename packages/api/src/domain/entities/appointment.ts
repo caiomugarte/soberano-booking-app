@@ -18,6 +18,9 @@ export interface AppointmentEntity {
   barberReminderSent: boolean;
   cancelledAt: Date | null;
   createdAt: Date;
+  paymentStatus: string;
+  paidAt: Date | null;
+  appointmentNotes: string | null;
 }
 
 export interface AppointmentWithDetails extends AppointmentEntity {
