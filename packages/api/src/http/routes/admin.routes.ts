@@ -21,7 +21,46 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const providerRepo = new PrismaProviderRepository(request.tenantPrisma);
     const provider = await providerRepo.findById(request.providerId!);
     if (!provider) return reply.status(404).send({ error: 'NOT_FOUND' });
-    return { id: provider.id, firstName: provider.firstName, lastName: provider.lastName, avatarUrl: provider.avatarUrl };
+    return {
+      id: provider.id,
+      firstName: provider.firstName,
+      lastName: provider.lastName,
+      phone: provider.phone,
+      avatarUrl: provider.avatarUrl,
+      pixKey: provider.pixKey,
+      messageTemplate: provider.messageTemplate,
+    };
+  });
+
+  // Update the logged-in provider's profile
+  app.patch('/admin/me', async (request, reply) => {
+    const schema = z.object({
+      phone: z.string().regex(/^\d{10,11}$/, 'Telefone deve ter 10 ou 11 dígitos').nullable().optional(),
+      pixKey: z.string().max(255).optional(),
+      messageTemplate: z.string().max(2000).optional(),
+    }).refine((d) => d.phone !== undefined || d.pixKey !== undefined || d.messageTemplate !== undefined, {
+      message: 'Informe ao menos um campo para atualizar.',
+    });
+
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    }
+
+    const updated = await request.tenantPrisma.provider.update({
+      where: { id: request.providerId! },
+      data: parsed.data,
+    });
+
+    return {
+      id: updated.id,
+      firstName: updated.firstName,
+      lastName: updated.lastName,
+      phone: updated.phone,
+      avatarUrl: updated.avatarUrl,
+      pixKey: updated.pixKey,
+      messageTemplate: updated.messageTemplate,
+    };
   });
 
   // Get provider's appointments for a date
@@ -261,6 +300,28 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     }
 
     return { message: 'Dados do cliente atualizados.' };
+  });
+
+  // Mark an appointment as paid
+  app.patch<{ Params: { id: string } }>('/admin/appointments/:id/pay', async (request, reply) => {
+    const { id } = request.params;
+    const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
+    const appointment = await appointmentRepo.findById(id);
+    if (!appointment) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Agendamento não encontrado.' });
+    if (appointment.paymentStatus === 'paid') return reply.status(409).send({ error: 'ALREADY_PAID', message: 'Agendamento já marcado como pago.' });
+    const updated = await appointmentRepo.updatePaymentStatus(id, new Date());
+    return updated;
+  });
+
+  // Get financial summary for a date range
+  app.get('/admin/financial', async (request, reply) => {
+    const { from, to } = request.query as { from?: string; to?: string };
+    if (!from || !to) return reply.status(400).send({ error: 'BAD_REQUEST', message: 'from e to são obrigatórios.' });
+    const fromDate = new Date(from + 'T00:00:00');
+    const toDate = new Date(to + 'T00:00:00');
+    if (fromDate > toDate) return reply.status(400).send({ error: 'BAD_REQUEST', message: 'from não pode ser maior que to.' });
+    const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
+    return appointmentRepo.getFinancialSummary(request.providerId!, fromDate, toDate);
   });
 
   // Provider cancels an appointment and notifies the customer

@@ -5,6 +5,7 @@ import type {
   AppointmentRepository,
   CreateAppointmentData,
   DayStat,
+  FinancialSummary,
 } from '../../../domain/repositories/appointment.repository.js';
 
 const includeRelations = {
@@ -207,6 +208,35 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
       orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
     });
     return rows.map(mapAppointment);
+  }
+
+  async updatePaymentStatus(id: string, paidAt: Date): Promise<AppointmentWithDetails> {
+    const raw = await this.db.appointment.update({
+      where: { id },
+      data: { paymentStatus: 'paid', paidAt },
+      include: includeRelations,
+    });
+    return mapAppointment(raw);
+  }
+
+  async getFinancialSummary(providerId: string, from: Date, to: Date): Promise<FinancialSummary> {
+    const rows = await this.db.appointment.findMany({
+      where: { providerId, date: { gte: from, lte: to } },
+      include: includeRelations,
+      orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
+    });
+    const appointments = rows.map(mapAppointment);
+    const paidCount = appointments.filter((a: AppointmentWithDetails) => a.paymentStatus === 'paid').length;
+    const revenueCents = appointments
+      .filter((a: AppointmentWithDetails) => a.paymentStatus === 'paid')
+      .reduce((sum: number, a: AppointmentWithDetails) => sum + a.priceCents, 0);
+    return {
+      totalSessions: appointments.length,
+      paidCount,
+      pendingCount: appointments.length - paidCount,
+      revenueCents,
+      appointments,
+    };
   }
 
   async getStatsByDateRange(barberId: string, from: Date, to: Date): Promise<DayStat[]> {

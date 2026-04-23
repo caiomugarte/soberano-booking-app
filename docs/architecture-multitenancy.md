@@ -2,33 +2,35 @@
 
 ## Overview
 
-This project uses a **shared database, shared schema** multi-tenancy model for the barbershop SaaS platform. All barbershop clients share a single PostgreSQL database (`soberano_prod`) with every table scoped by a `tenant_id` column.
+This project uses a **shared database, shared schema** multi-tenancy model. All clients — barbershops and other service providers — share a single PostgreSQL database (`soberano_prod`) with every table scoped by a `tenant_id` column.
 
-Non-barbershop products (e.g. a psychologist booking app) are treated as **separate products** and get their own database and repository.
+The `Tenant` model carries a `type` field (`"barbershop"`, `"psychology"`, etc.) that lets each frontend and the API behave differently per vertical while the underlying booking engine stays shared.
 
 ---
 
-## Barbershop clients — shared database
+## All clients — shared database
 
-Every barbershop client is a row in the `tenants` table. All other tables (`providers`, `services`, `customers`, `appointments`, etc.) carry a `tenant_id` foreign key that isolates each client's data.
+Every client is a row in the `tenants` table. All other tables (`providers`, `services`, `customers`, `appointments`, etc.) carry a `tenant_id` foreign key that isolates each client's data.
 
 ```
 soberano_prod (single database)
 ├── tenants
 │   ├── { id, slug: "soberano",    type: "barbershop" }
 │   ├── { id, slug: "web-marques", type: "barbershop" }
-│   └── { id, slug: "...",         type: "barbershop" }
-├── providers  (tenant_id → tenants.id)
-├── services   (tenant_id → tenants.id)
-├── customers  (tenant_id → tenants.id)
-└── appointments (tenant_id → tenants.id)
+│   └── { id, slug: "bruno",       type: "psychology" }
+├── providers      (tenant_id → tenants.id)
+├── services       (tenant_id → tenants.id)
+├── customers      (tenant_id → tenants.id)
+├── appointments   (tenant_id → tenants.id)
+├── session_reports (tenant_id → tenants.id)  ← psychology only
+└── documents       (tenant_id → tenants.id)  ← psychology only
 ```
 
-### Onboarding a new barbershop client
+### Onboarding a new client
 
 No new database or migration is needed. The steps are:
 
-1. Insert a row into `tenants` with the client's `slug`, `name`, and config.
+1. Insert a row into `tenants` with the client's `slug`, `name`, and `type`.
 2. Seed the client's providers and services.
 3. Deploy their branded frontend (a new package under `packages/`).
 
@@ -41,41 +43,28 @@ No new database or migration is needed. The steps are:
 | Cross-client analytics | Trivial query | Requires federation |
 | Operational overhead | Flat | Grows with client count |
 
-Separate databases per barbershop would make sense only if clients required strict data residency guarantees or radically different schemas — neither applies here.
-
 ---
 
-## Non-barbershop products — separate database
+## Domain mapping across verticals
 
-When a new product vertical has a fundamentally different domain (different entities, different feature set), it lives in its own repository with its own Prisma schema and its own database on the same PostgreSQL instance.
+The core booking primitives are generic enough to serve multiple service verticals:
 
-```
-PostgreSQL instance (Coolify)
-├── soberano_prod     ← all barbershop tenants (shared, tenant_id pattern)
-└── psicologia_prod   ← psychologist product (separate repo + schema)
-```
+| Concept | Barbershop | Psychology |
+|---------|------------|------------|
+| `Tenant` | Barbershop business | Psychologist practice |
+| `Provider` | Barber | Psychologist |
+| `Service` | Haircut, shave, etc. | Individual, couple, family session |
+| `Customer` | Client | Patient |
+| `Appointment` | Booking | Session |
+| `ProviderShift` | Working hours | Working hours |
+| `ProviderAbsence` | Days off | Days off |
 
-Each product points to its own `DATABASE_URL`:
-
-```
-# Barbershop API
-DATABASE_URL=postgresql://user:pass@host:5432/soberano_prod
-
-# Psychologist API (separate repo)
-DATABASE_URL=postgresql://user:pass@host:5432/psicologia_prod
-```
-
-### Why a separate database (not a separate schema or shared tables)
-
-- **Prisma** handles one database per project natively. Schema-level separation requires manual config workarounds.
-- **Migrations are independent** — a breaking change in the psychologist schema never risks the barbershop data.
-- **Backups and restores are isolated** — each product can be backed up, restored, or handed off independently.
-- **The domains are genuinely different** — a psychologist app may require patient records, session notes, intake forms, and scheduling rules that have no equivalent in the barbershop model.
+Psychology-specific features (`session_reports`, `documents`, payment tracking fields) are additive — they are nullable columns and new tables that barbershop tenants never touch.
 
 ---
 
 ## Decision rule
 
-> **Is this a new barbershop client?** → New `Tenant` row in `soberano_prod`. No new database.
+> **Is this a new client in an existing vertical?** → New `Tenant` row. No new database, no new API.
 >
-> **Is this a new product with a different domain?** → New repository, new Prisma schema, new database on the same Postgres instance.
+> **Is this a new vertical with incompatible domain logic?** → Evaluate whether the booking primitives still map. If they do, extend the shared schema additively. If they don't, consider a separate service.

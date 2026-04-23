@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-gray-50 text-gray-800 antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer components {
+  .status-scheduled {
+    @apply bg-blue-50 text-blue-700 border-blue-200;
+  }
+  .status-confirmed {
+    @apply bg-emerald-50 text-emerald-700 border-emerald-200;
+  }
+  .status-completed {
+    @apply bg-slate-100 text-slate-500 border-slate-200;
+  }
+  .status-cancelled {
+    @apply bg-red-50 text-red-400 border-red-200 line-through;
+  }
+  .status-no_show {
+    @apply bg-amber-50 text-amber-600 border-amber-200;
+  }
+}

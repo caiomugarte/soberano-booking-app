@@ -22,6 +22,8 @@ model Tenant {
   services         Service[]
   customers        Customer[]
   appointments     Appointment[]
+  sessionReports   SessionReport[]
+  documents        Document[]
 
   @@map("tenants")
 }
@@ -35,15 +37,18 @@ model Provider {
   email     String   @db.VarChar(255)
   password  String   @db.VarChar(255)
   phone     String?  @db.VarChar(20)
-  avatarUrl String?  @map("avatar_url") @db.VarChar(500)
-  isActive  Boolean  @default(true) @map("is_active")
+  avatarUrl       String?  @map("avatar_url") @db.VarChar(500)
+  pixKey          String?  @map("pix_key") @db.VarChar(255)
+  messageTemplate String?  @map("message_template") @db.Text
+  isActive        Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  tenant       Tenant            @relation(fields: [tenantId], references: [id])
-  appointments Appointment[]
-  shifts       ProviderShift[]
-  absences     ProviderAbsence[]
+  tenant         Tenant            @relation(fields: [tenantId], references: [id])
+  appointments   Appointment[]
+  shifts         ProviderShift[]
+  absences       ProviderAbsence[]
+  sessionReports SessionReport[]
 
   @@unique([tenantId, slug])
   @@unique([tenantId, email])
@@ -105,11 +110,15 @@ model Customer {
   tenantId  String   @map("tenant_id") @db.Uuid
   name      String   @db.VarChar(200)
   phone     String?  @db.VarChar(20)
+  cpf       String?  @db.VarChar(14)
+  email     String?  @db.VarChar(255)
+  notes     String?  @db.Text
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
   appointments Appointment[]
+  documents    Document[]
 
   @@unique([tenantId, phone])
   @@map("customers")
@@ -133,14 +142,55 @@ model Appointment {
   createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  tenant   Tenant   @relation(fields: [tenantId], references: [id])
-  provider Provider @relation(fields: [providerId], references: [id])
-  service  Service  @relation(fields: [serviceId], references: [id])
-  customer Customer @relation(fields: [customerId], references: [id])
+  paymentStatus    String    @default("pending") @map("payment_status") @db.VarChar(20)
+  paidAt           DateTime? @map("paid_at") @db.Timestamptz
+  appointmentNotes String?   @map("appointment_notes") @db.Text
+
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  provider       Provider        @relation(fields: [providerId], references: [id])
+  service        Service         @relation(fields: [serviceId], references: [id])
+  customer       Customer        @relation(fields: [customerId], references: [id])
+  sessionReports SessionReport[]
 
   @@index([providerId, date, startTime])
   @@index([date, providerId])
   @@index([customerId])
   @@index([cancelToken])
   @@map("appointments")
+}
+
+model SessionReport {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  appointmentId String   @map("appointment_id") @db.Uuid
+  providerId    String   @map("provider_id") @db.Uuid
+  content       String   @db.Text
+  fileName      String?  @map("file_name") @db.VarChar(255)
+  fileType      String?  @map("file_type") @db.VarChar(100)
+  fileData      String?  @map("file_data") @db.Text
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+  provider    Provider    @relation(fields: [providerId], references: [id])
+
+  @@index([appointmentId])
+  @@map("session_reports")
+}
+
+model Document {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  customerId String   @map("customer_id") @db.Uuid
+  name       String   @db.VarChar(255)
+  type       String   @db.VarChar(100)
+  data       String   @db.Text
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@index([customerId])
+  @@map("documents")
 }

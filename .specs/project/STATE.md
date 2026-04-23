@@ -6,6 +6,8 @@
 
 | Feature | Status | Spec |
 |---|---|---|
+| web-bruno-api-migration | Tasks ready — ready to execute | `.specs/features/web-bruno-api-migration/tasks.md` |
+| psychology-api | Tasks draft — awaiting approval | `.specs/features/psychology-api/tasks.md` |
 | frontend-unit-tests | Tasks ready — ready to execute | `.specs/features/frontend-unit-tests/spec.md` |
 | whatsapp-human-jitter | Tasks ready — ready to execute | `.specs/features/whatsapp-human-jitter/spec.md` |
 | multi-tenant-saas | Tasks approved — ready to execute | `.specs/features/multi-tenant-saas/tasks.md` |
