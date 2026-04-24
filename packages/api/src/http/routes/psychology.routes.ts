@@ -40,7 +40,7 @@ function mapToSession(raw: any) {
 }
 
 export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
-  app.addHook('onRequest', authGuard);
+  app.addHook('preHandler', authGuard);
 
   // ─── Patient CRUD ───────────────────────────────────────────────────────────
 

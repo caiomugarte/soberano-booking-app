@@ -1,8 +1,6 @@
 import { create } from 'zustand'
 import { apiLogin } from '@/api/auth'
-import { configureHttpClient, apiFetch } from '@/api/http-client'
-
-const API_URL = (import.meta.env.VITE_API_URL as string | undefined) ?? ''
+import { configureHttpClient, apiFetch, tryRefreshToken, callLogout } from '@/api/http-client'
 
 interface AuthState {
   accessToken: string | null
@@ -22,17 +20,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   isInitialized: false,
 
   initialize: async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/auth/refresh`, { method: 'POST', credentials: 'include' })
-      if (res.ok) {
-        const { accessToken } = (await res.json()) as { accessToken: string }
-        set({ accessToken, isAuthenticated: true, isInitialized: true })
-      } else {
-        set({ isInitialized: true })
-      }
-    } catch {
-      set({ isInitialized: true })
-    }
+    const accessToken = await tryRefreshToken()
+    set((state) => {
+      if (state.isInitialized) return state
+      if (accessToken) return { ...state, accessToken, isAuthenticated: true, isInitialized: true }
+      return { ...state, accessToken: null, user: null, isAuthenticated: false, isInitialized: true }
+    })
   },
 
   login: async (email, password) => {
@@ -50,7 +43,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   logout: () => {
     set({ accessToken: null, user: null, isAuthenticated: false })
-    fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {})
+    callLogout()
   },
 
   setToken: (token) => set({ accessToken: token }),

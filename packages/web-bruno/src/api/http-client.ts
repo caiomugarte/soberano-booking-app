@@ -28,7 +28,7 @@ const TENANT_SLUG = (import.meta.env.VITE_TENANT_SLUG as string | undefined) ?? 
 
 async function doFetch(path: string, token: string | null, options?: RequestInit): Promise<Response> {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(options?.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
     ...(options?.headers as Record<string, string>),
   }
   if (token) headers['Authorization'] = `Bearer ${token}`
@@ -36,14 +36,22 @@ async function doFetch(path: string, token: string | null, options?: RequestInit
   return fetch(`${API_URL}${path}`, { ...options, headers, credentials: 'include' })
 }
 
+export async function tryRefreshToken(): Promise<string | null> {
+  const res = await doFetch('/api/auth/refresh', null, { method: 'POST' })
+  if (!res.ok) return null
+  const { accessToken } = (await res.json()) as { accessToken: string }
+  return accessToken
+}
+
+export function callLogout(): void {
+  doFetch('/api/auth/logout', null, { method: 'POST' }).catch(() => {})
+}
+
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await doFetch(path, _getAccessToken(), options)
 
   if (res.status === 401) {
-    const refreshRes = await fetch(`${API_URL}/api/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-    })
+    const refreshRes = await doFetch('/api/auth/refresh', null, { method: 'POST' })
     if (!refreshRes.ok) {
       _logout()
       throw new ApiError('UNAUTHORIZED', 'Sessão expirada', 401)
