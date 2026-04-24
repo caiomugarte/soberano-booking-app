@@ -41,7 +41,19 @@ VALUES (gen_random_uuid(), '{clientname}', '{Client Display Name}', '{vertical}'
 
 Each provider maps to one login account (psychologist, barber, etc.). Services define the bookable offerings with their prices and durations.
 
-### 4. Deploy on Coolify
+### 4. Configure auth calls
+
+Every frontend must send `X-Tenant-Slug` on **all three** auth calls, not just regular API requests:
+
+| Call | Why it matters |
+|------|---------------|
+| `POST /api/auth/login` | Covered automatically — tenant middleware runs for login and derives the cookie name from `request.tenant.slug`. |
+| `POST /api/auth/refresh` | Excluded from tenant middleware. The handler reads `X-Tenant-Slug` directly to pick the correct `refreshToken_${slug}` cookie. Without the header it falls back to the generic `refreshToken` and finds nothing. |
+| `POST /api/auth/logout` | Same — must send the header so the right cookie is cleared. |
+
+Use `web-bruno`'s `http-client.ts` as a reference. The `doFetch` helper adds `X-Tenant-Slug` to every request automatically. If you write your own fetch wrapper, ensure the header is included in the refresh and logout calls as well.
+
+### 5. Deploy on Coolify
 
 Each frontend is deployed as a separate static service on Coolify pointing to its own domain. All services share the same internal API URL via the Docker network.
 

@@ -14,7 +14,7 @@ import { NotFoundError, SlotTakenError, ValidationError } from '../../shared/err
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
   // All admin routes require authentication
-  app.addHook('onRequest', authGuard);
+  app.addHook('preHandler', authGuard);
 
   // Get the logged-in provider's profile
   app.get('/admin/me', async (request, reply) => {

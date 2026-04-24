@@ -17,7 +17,7 @@ const absenceSchema = z.object({
 });
 
 export async function scheduleRoutes(app: FastifyInstance): Promise<void> {
-  app.addHook('onRequest', authGuard);
+  app.addHook('preHandler', authGuard);
 
   // Get my shifts (all days)
   app.get('/admin/schedule/shifts', async (request) => {

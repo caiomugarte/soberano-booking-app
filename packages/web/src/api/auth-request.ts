@@ -5,7 +5,11 @@ export const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 async function tryRefresh(): Promise<string | null> {
   try {
-    const res = await fetch(`${API_BASE}/api/auth/refresh`, { method: 'POST', credentials: 'include' });
+    const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'X-Tenant-Slug': TENANT_SLUG },
+    });
     if (!res.ok) return null;
     const { accessToken } = await res.json();
     useAuthStore.getState().setAccessToken(accessToken);

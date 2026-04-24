@@ -419,6 +419,7 @@ fastify.post('/appointments', {
 - Returning `undefined` from async handlers
 - Skipping response schemas (security + performance risk)
 - Business logic in route handlers — routes are thin controllers
+- Registering `authGuard` (or any hook that reads `request.tenant`) with `onRequest` — the tenant middleware runs in `preHandler`, so `request.tenant` is not yet set in `onRequest`. Every request will get 401. Always use `app.addHook('preHandler', authGuard)` in route plugins.
 
 ---
 
