@@ -35,7 +35,11 @@ export function formatPhone(value: string): string {
 }
 
 export function stripPhone(value: string): string {
-  return value.replace(/\D/g, '');
+  const digits = value.replace(/\D/g, '');
+  if (digits.length === 11) {
+    return digits.slice(0, 2) + digits.slice(3);
+  }
+  return digits;
 }
 
 export function getWeekDates(weekOffset: number): Date[] {

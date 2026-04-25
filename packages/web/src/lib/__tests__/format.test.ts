@@ -44,12 +44,16 @@ describe('formatPhone', () => {
 });
 
 describe('stripPhone', () => {
-  it('removes all non-digit characters', () => {
-    expect(stripPhone('(11) 99999-8888')).toBe('11999998888');
+  it('removes non-digit characters and strips leading 9 from 11-digit number', () => {
+    expect(stripPhone('(11) 99999-8888')).toBe('1199998888');
   });
 
-  it('returns digits unchanged', () => {
-    expect(stripPhone('11999998888')).toBe('11999998888');
+  it('strips leading 9 after DDD from 11-digit raw input', () => {
+    expect(stripPhone('11999998888')).toBe('1199998888');
+  });
+
+  it('leaves 10-digit number unchanged', () => {
+    expect(stripPhone('1199998888')).toBe('1199998888');
   });
 
   it('returns empty string for empty input', () => {
