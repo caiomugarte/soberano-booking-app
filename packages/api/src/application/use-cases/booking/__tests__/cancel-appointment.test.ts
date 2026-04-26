@@ -6,10 +6,11 @@ import type { WhatsAppNotificationService } from '../../../../infrastructure/not
 
 const confirmedAppointment = {
   id: 'appt-1',
+  tenantId: 'test-tenant-id',
   status: 'confirmed',
-  customer: { id: 'cust-1', name: 'Maria', phone: '11999998888' },
-  barber: { id: 'barber-1', firstName: 'João', lastName: 'Silva', phone: null },
-  service: { name: 'Corte' },
+  customer: { id: 'cust-1', name: 'Maria', phone: '11999998888', tenantId: 'test-tenant-id' },
+  barber: { id: 'barber-1', firstName: 'João', lastName: 'Silva', phone: null, tenantId: 'test-tenant-id' },
+  service: { name: 'Corte', tenantId: 'test-tenant-id' },
 };
 
 function makeUseCase(appointment: unknown) {

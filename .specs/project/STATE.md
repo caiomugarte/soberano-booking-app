@@ -6,12 +6,17 @@
 
 | Feature | Status | Spec |
 |---|---|---|
+| web-bruno-api-migration | Tasks ready — ready to execute | `.specs/features/web-bruno-api-migration/tasks.md` |
+| psychology-api | Tasks draft — awaiting approval | `.specs/features/psychology-api/tasks.md` |
 | frontend-unit-tests | Tasks ready — ready to execute | `.specs/features/frontend-unit-tests/spec.md` |
 | whatsapp-human-jitter | Tasks ready — ready to execute | `.specs/features/whatsapp-human-jitter/spec.md` |
-| multi-tenant-saas | Tasks ready — ready to execute | `.specs/features/multi-tenant-saas/spec.md` |
+| multi-tenant-saas | Tasks approved — ready to execute | `.specs/features/multi-tenant-saas/tasks.md` |
 | whatsapp-ai-booking | Tasks ready — ready to execute | `.specs/features/whatsapp-ai-booking/spec.md` |
 | barber-admin-improvements | Tasks ready — ready to execute | `.specs/features/barber-admin-improvements/spec.md` |
+| mcp-booking-management | Tasks ready — ready to execute | `.specs/features/mcp-booking-management/spec.md` |
+| mcp-tenant-header | Tasks ready — ready to execute | `.specs/features/mcp-tenant-header/spec.md` |
 | admin-manual-booking | Specify — awaiting gray area clarification | `.specs/features/admin-manual-booking/spec.md` |
+| customer-packages | In progress — BT1-BT8 implemented; management section (BT9-BT10, MT1-MT3) tasks drafted, awaiting approval | `.specs/features/customer-packages/tasks.md` |
 | admin-barber-identity | Unknown | `.specs/features/admin-barber-identity/spec.md` |
 | barber-photos | Unknown | `.specs/features/barber-photos/spec.md` |
 
@@ -35,5 +40,7 @@ _None recorded yet._
 
 ## Deferred Ideas
 
-- Monthly plan renewal / auto-recurrence (deferred from admin-manual-booking scope)
-- Multi-barber plan (deferred from admin-manual-booking scope)
+- Monthly plan renewal / auto-recurrence (deferred from customer-packages scope)
+- Multi-barber plan (deferred from customer-packages scope)
+- Package expiry / time-based validity (deferred from customer-packages scope)
+- Manual credit adjustment / package cancellation (deferred from customer-packages scope)

@@ -1,5 +1,9 @@
 import cron from 'node-cron';
+import { prisma } from '../../config/database.js';
+import { createTenantPrisma } from '../../config/tenant-prisma.js';
+import { tenantConfigSchema } from '@soberano/shared';
 import { PrismaAppointmentRepository } from '../database/repositories/prisma-appointment.repository.js';
+import { ChatwootClient } from '../notifications/chatwoot.client.js';
 import { WhatsAppNotificationService } from '../notifications/whatsapp-notification.service.js';
 
 function gaussianDelay(meanMs: number, stdMs: number, minMs: number, maxMs: number): Promise<void> {
@@ -10,50 +14,61 @@ function gaussianDelay(meanMs: number, stdMs: number, minMs: number, maxMs: numb
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-const appointmentRepo = new PrismaAppointmentRepository();
-const notificationService = new WhatsAppNotificationService();
-
 export function startReminderJob(): void {
   // Run every 15 minutes
   cron.schedule('*/15 * * * *', async () => {
-    try {
-      const upcoming = await appointmentRepo.findUpcomingWithoutReminder(60);
+    const tenants = await prisma.tenant.findMany({ where: { isActive: true } });
 
-      for (let i = 0; i < upcoming.length; i++) {
-        const appointment = upcoming[i];
+    for (const tenant of tenants) {
+      try {
+        const config = tenantConfigSchema.parse(tenant.config);
+        const tenantPrisma = createTenantPrisma(tenant.id);
+        const appointmentRepo = new PrismaAppointmentRepository(tenantPrisma);
+        const chatwootClient = new ChatwootClient(config);
+        const notificationService = new WhatsAppNotificationService(config, chatwootClient);
+
         try {
-          await notificationService.sendReminder(appointment);
-          await appointmentRepo.markReminderSent(appointment.id);
-          console.log(`[Reminder] Sent reminder for appointment ${appointment.id}`);
+          const upcoming = await appointmentRepo.findUpcomingWithoutReminder(60);
+
+          for (let i = 0; i < upcoming.length; i++) {
+            const appointment = upcoming[i];
+            try {
+              await notificationService.sendReminder(appointment);
+              await appointmentRepo.markReminderSent(appointment.id);
+              console.log(`[Reminder] Sent reminder for appointment ${appointment.id} (tenant: ${tenant.id})`);
+            } catch (err) {
+              console.error(`[Reminder] Failed for appointment ${appointment.id}:`, err);
+            }
+            if (i < upcoming.length - 1) {
+              await gaussianDelay(8000, 3000, 3000, 20000);
+            }
+          }
         } catch (err) {
-          console.error(`[Reminder] Failed for appointment ${appointment.id}:`, err);
+          console.error(`[Reminder] Job failed for tenant ${tenant.id}:`, err);
         }
-        if (i < upcoming.length - 1) {
-          await gaussianDelay(8000, 3000, 3000, 20000);
-        }
-      }
-    } catch (err) {
-      console.error('[Reminder] Job failed:', err);
-    }
 
-    try {
-      const upcomingForBarbers = await appointmentRepo.findUpcomingWithoutBarberReminder(60);
-
-      for (let i = 0; i < upcomingForBarbers.length; i++) {
-        const appointment = upcomingForBarbers[i];
         try {
-          await notificationService.sendBarberReminder(appointment);
-          await appointmentRepo.markBarberReminderSent(appointment.id);
-          console.log(`[Reminder] Sent barber reminder for appointment ${appointment.id}`);
+          const upcomingForBarbers = await appointmentRepo.findUpcomingWithoutBarberReminder(60);
+
+          for (let i = 0; i < upcomingForBarbers.length; i++) {
+            const appointment = upcomingForBarbers[i];
+            try {
+              await notificationService.sendBarberReminder(appointment);
+              await appointmentRepo.markBarberReminderSent(appointment.id);
+              console.log(`[Reminder] Sent barber reminder for appointment ${appointment.id} (tenant: ${tenant.id})`);
+            } catch (err) {
+              console.error(`[Reminder] Failed barber reminder for appointment ${appointment.id}:`, err);
+            }
+            if (i < upcomingForBarbers.length - 1) {
+              await gaussianDelay(8000, 3000, 3000, 20000);
+            }
+          }
         } catch (err) {
-          console.error(`[Reminder] Failed barber reminder for appointment ${appointment.id}:`, err);
+          console.error(`[Reminder] Barber reminder job failed for tenant ${tenant.id}:`, err);
         }
-        if (i < upcomingForBarbers.length - 1) {
-          await gaussianDelay(8000, 3000, 3000, 20000);
-        }
+      } catch (err) {
+        console.error(`[Reminder] Failed to process tenant ${tenant.id}:`, err);
       }
-    } catch (err) {
-      console.error('[Reminder] Barber reminder job failed:', err);
     }
   });
 

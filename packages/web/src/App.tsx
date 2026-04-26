@@ -7,6 +7,7 @@ import NotFoundPage from './pages/NotFoundPage.tsx';
 import LoginPage from './pages/admin/LoginPage.tsx';
 import DashboardPage from './pages/admin/DashboardPage.tsx';
 import SchedulePage from './pages/admin/SchedulePage.tsx';
+import PackagesPage from './pages/admin/PackagesPage.tsx';
 import { ProtectedRoute } from './components/admin/ProtectedRoute.tsx';
 import { useAuthStore } from './stores/auth.store.ts';
 import { Spinner } from './components/ui/Spinner.tsx';
@@ -26,6 +27,11 @@ function AppRoutes() {
       <Route path="/admin/schedule" element={
         <ProtectedRoute>
           <SchedulePage />
+        </ProtectedRoute>
+      } />
+      <Route path="/admin/packages" element={
+        <ProtectedRoute>
+          <PackagesPage />
         </ProtectedRoute>
       } />
       <Route path="/admin/*" element={<Navigate to="/admin" replace />} />

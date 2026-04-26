@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppointment, useCancelAppointment, useChangeAppointment } from '../../api/use-appointment.ts';
 import { useSlots, type Slot } from '../../api/use-slots.ts';
@@ -10,7 +10,7 @@ import { MAX_WEEKS_AHEAD } from '@soberano/shared';
 
 type View = 'detail' | 'cancel' | 'change';
 
-export function AppointmentView({ token }: { token: string }) {
+export function     AppointmentView({ token }: { token: string }) {
   const navigate = useNavigate();
   const { data: appointment, isLoading, isError } = useAppointment(token);
   const cancelMutation = useCancelAppointment(token);
@@ -29,6 +29,26 @@ export function AppointmentView({ token }: { token: string }) {
     appointment?.barberId ?? null,
     newDate,
   );
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // When entering change view, start from the first work day >= today
+  useEffect(() => {
+    if (view !== 'change' || newDate || !appointment) return;
+    const workDays = appointment.barber.workDays;
+    let startDate = new Date(today);
+    if (workDays.length > 0) {
+      const maxDate = new Date(today);
+      maxDate.setDate(maxDate.getDate() + MAX_WEEKS_AHEAD * 7);
+      while (startDate <= maxDate && !workDays.includes(startDate.getDay())) {
+        startDate.setDate(startDate.getDate() + 1);
+      }
+    }
+    setNewDate(dateToString(startDate));
+    const diffDays = Math.floor((startDate.getTime() - today.getTime()) / 86400000);
+    setWeekOffset(Math.floor(diffDays / 7));
+  }, [view, appointment]);
 
   if (isLoading) {
     return (
@@ -95,7 +115,6 @@ export function AppointmentView({ token }: { token: string }) {
 
   // Change flow
   if (view === 'change') {
-    const today = new Date(); today.setHours(0, 0, 0, 0);
     const weekDates = getWeekDates(weekOffset);
 
     if (changeMutation.isSuccess) {
@@ -131,7 +150,8 @@ export function AppointmentView({ token }: { token: string }) {
             </div>
             <div className="grid grid-cols-7 gap-1.5 mb-6">
               {weekDates.map((d) => {
-                const disabled = d < today;
+                const noShift = appointment.barber.workDays.length > 0 && !appointment.barber.workDays.includes(d.getDay());
+                const disabled = d < today || noShift;
                 const ds = dateToString(d);
                 return (
                   <button key={ds} disabled={disabled} onClick={() => { setNewDate(ds); setNewSlot(null); }}

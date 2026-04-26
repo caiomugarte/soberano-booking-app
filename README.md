@@ -1,6 +1,8 @@
-s ss # Soberano Barbearia
+# Soberano — Barbershop Booking Platform
 
-Appointment booking system for Soberano Barbearia. Replaces a WhatsApp AI chatbot with a proper web app — faster, more reliable, and with a clean barber admin panel.
+Multi-tenant appointment booking platform for barbershops. Started as a replacement for the WhatsApp AI chatbot at Soberano Barbearia, now built to onboard multiple barbershop clients under a single deployment.
+
+**Scope:** This project is intentionally barbershop-specific. The domain model, terminology, and features are designed around barbershop workflows (barbers, cuts, shifts, walk-ins). Other service verticals (clinics, salons, etc.) would require a separate project.
 
 ## Stack
 

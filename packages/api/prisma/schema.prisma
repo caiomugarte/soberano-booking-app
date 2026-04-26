@@ -7,105 +7,213 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Barber {
-  id        String   @id @default(uuid()) @db.Uuid
-  slug      String   @unique @db.VarChar(50)
-  firstName String   @map("first_name") @db.VarChar(100)
-  lastName  String   @map("last_name") @db.VarChar(100)
-  email     String   @unique @db.VarChar(255)
-  password  String   @db.VarChar(255)
-  phone     String?  @db.VarChar(20)
-  avatarUrl String?  @map("avatar_url") @db.VarChar(500)
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
-
-  appointments Appointment[]
-  shifts       BarberShift[]
-  absences     BarberAbsence[]
-
-  @@map("barbers")
-}
-
-model BarberShift {
-  id        String @id @default(uuid()) @db.Uuid
-  barberId  String @map("barber_id") @db.Uuid
-  dayOfWeek Int    @map("day_of_week") // 0=Sun 1=Mon ... 6=Sat
-  startTime String @map("start_time") @db.VarChar(5) // "09:00"
-  endTime   String @map("end_time") @db.VarChar(5)   // "12:00"
-
-  barber Barber @relation(fields: [barberId], references: [id])
-
-  @@map("barber_shifts")
-}
-
-model BarberAbsence {
-  id        String    @id @default(uuid()) @db.Uuid
-  barberId  String    @map("barber_id") @db.Uuid
-  date      DateTime  @db.Date
-  startTime String?   @map("start_time") @db.VarChar(5) // null = full day off
-  endTime   String?   @map("end_time") @db.VarChar(5)
-  reason    String?   @db.VarChar(200)
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
-
-  barber Barber @relation(fields: [barberId], references: [id])
-
-  @@index([barberId, date])
-  @@map("barber_absences")
-}
-
-model Service {
+model Tenant {
   id        String   @id @default(uuid()) @db.Uuid
   slug      String   @unique @db.VarChar(50)
   name      String   @db.VarChar(200)
-  icon      String   @db.VarChar(10)
-  priceCents Int     @map("price_cents")
-  duration  Int      @default(30)
+  type      String   @default("barbershop") @db.VarChar(50)
+  config    Json     @default("{}")
   isActive  Boolean  @default(true) @map("is_active")
-  sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
+  providers        Provider[]
+  providerShifts   ProviderShift[]
+  providerAbsences ProviderAbsence[]
+  services         Service[]
+  customers        Customer[]
+  appointments     Appointment[]
+  sessionReports   SessionReport[]
+  documents        Document[]
+  customerPackages CustomerPackage[]
+
+  @@map("tenants")
+}
+
+model Provider {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  slug      String   @db.VarChar(50)
+  firstName String   @map("first_name") @db.VarChar(100)
+  lastName  String   @map("last_name") @db.VarChar(100)
+  email     String   @db.VarChar(255)
+  password  String   @db.VarChar(255)
+  phone     String?  @db.VarChar(20)
+  avatarUrl       String?  @map("avatar_url") @db.VarChar(500)
+  pixKey          String?  @map("pix_key") @db.VarChar(255)
+  messageTemplate String?  @map("message_template") @db.Text
+  isActive        Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant         Tenant            @relation(fields: [tenantId], references: [id])
+  appointments   Appointment[]
+  shifts         ProviderShift[]
+  absences       ProviderAbsence[]
+  sessionReports SessionReport[]
+
+  @@unique([tenantId, slug])
+  @@unique([tenantId, email])
+  @@map("providers")
+}
+
+model ProviderShift {
+  id         String @id @default(uuid()) @db.Uuid
+  tenantId   String @map("tenant_id") @db.Uuid
+  providerId String @map("provider_id") @db.Uuid
+  dayOfWeek  Int    @map("day_of_week") // 0=Sun 1=Mon ... 6=Sat
+  startTime  String @map("start_time") @db.VarChar(5) // "09:00"
+  endTime    String @map("end_time") @db.VarChar(5)   // "12:00"
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  provider Provider @relation(fields: [providerId], references: [id])
+
+  @@map("provider_shifts")
+}
+
+model ProviderAbsence {
+  id         String    @id @default(uuid()) @db.Uuid
+  tenantId   String    @map("tenant_id") @db.Uuid
+  providerId String    @map("provider_id") @db.Uuid
+  date       DateTime  @db.Date
+  startTime  String?   @map("start_time") @db.VarChar(5) // null = full day off
+  endTime    String?   @map("end_time") @db.VarChar(5)
+  reason     String?   @db.VarChar(200)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  provider Provider @relation(fields: [providerId], references: [id])
+
+  @@index([providerId, date])
+  @@map("provider_absences")
+}
+
+model Service {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  slug       String   @db.VarChar(50)
+  name       String   @db.VarChar(200)
+  icon       String   @db.VarChar(10)
+  priceCents Int      @map("price_cents")
+  duration   Int      @default(30)
+  isActive   Boolean  @default(true) @map("is_active")
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
   appointments Appointment[]
 
+  @@unique([tenantId, slug])
   @@map("services")
 }
 
 model Customer {
   id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
   name      String   @db.VarChar(200)
-  phone     String?  @unique @db.VarChar(20)
+  phone     String?  @db.VarChar(20)
+  cpf       String?  @db.VarChar(14)
+  email     String?  @db.VarChar(255)
+  notes     String?  @db.Text
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
   appointments Appointment[]
+  documents    Document[]
 
+  @@unique([tenantId, phone])
   @@map("customers")
 }
 
 model Appointment {
-  id           String   @id @default(uuid()) @db.Uuid
-  barberId     String   @map("barber_id") @db.Uuid
-  serviceId    String   @map("service_id") @db.Uuid
-  customerId   String   @map("customer_id") @db.Uuid
-  date         DateTime @db.Date
-  startTime    String   @map("start_time") @db.VarChar(5)
-  endTime      String   @map("end_time") @db.VarChar(5)
-  priceCents   Int      @map("price_cents")
-  status       String   @default("confirmed") @db.VarChar(20)
-  cancelToken  String   @unique @map("cancel_token") @db.VarChar(64)
-  reminderSent        Boolean  @default(false) @map("reminder_sent")
-  barberReminderSent  Boolean  @default(false) @map("barber_reminder_sent")
-  cancelledAt  DateTime? @map("cancelled_at") @db.Timestamptz
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id                 String    @id @default(uuid()) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  providerId         String    @map("provider_id") @db.Uuid
+  serviceId          String    @map("service_id") @db.Uuid
+  customerId         String    @map("customer_id") @db.Uuid
+  date               DateTime  @db.Date
+  startTime          String    @map("start_time") @db.VarChar(5)
+  endTime            String    @map("end_time") @db.VarChar(5)
+  priceCents         Int       @map("price_cents")
+  status             String    @default("confirmed") @db.VarChar(20)
+  cancelToken        String    @unique @map("cancel_token") @db.VarChar(64)
+  reminderSent       Boolean   @default(false) @map("reminder_sent")
+  barberReminderSent Boolean   @default(false) @map("barber_reminder_sent")
+  cancelledAt        DateTime? @map("cancelled_at") @db.Timestamptz
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  barber   Barber   @relation(fields: [barberId], references: [id])
-  service  Service  @relation(fields: [serviceId], references: [id])
-  customer Customer @relation(fields: [customerId], references: [id])
+  paymentStatus    String    @default("pending") @map("payment_status") @db.VarChar(20)
+  paidAt           DateTime? @map("paid_at") @db.Timestamptz
+  appointmentNotes String?   @map("appointment_notes") @db.Text
 
-  @@index([barberId, date, startTime])
-  @@index([date, barberId])
+  packageId      String?   @map("package_id") @db.Uuid
+
+  tenant         Tenant           @relation(fields: [tenantId], references: [id])
+  provider       Provider         @relation(fields: [providerId], references: [id])
+  service        Service          @relation(fields: [serviceId], references: [id])
+  customer       Customer         @relation(fields: [customerId], references: [id])
+  package        CustomerPackage? @relation(fields: [packageId], references: [id])
+  sessionReports SessionReport[]
+
+  @@index([providerId, date, startTime])
+  @@index([date, providerId])
   @@index([customerId])
   @@index([cancelToken])
   @@map("appointments")
+}
+
+model SessionReport {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  appointmentId String   @map("appointment_id") @db.Uuid
+  providerId    String   @map("provider_id") @db.Uuid
+  content       String   @db.Text
+  fileName      String?  @map("file_name") @db.VarChar(255)
+  fileType      String?  @map("file_type") @db.VarChar(100)
+  fileData      String?  @map("file_data") @db.Text
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+  provider    Provider    @relation(fields: [providerId], references: [id])
+
+  @@index([appointmentId])
+  @@map("session_reports")
+}
+
+model CustomerPackage {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  customerName     String   @map("customer_name") @db.VarChar(200)
+  customerPhone    String?  @map("customer_phone") @db.VarChar(20)
+  totalUses        Int      @map("total_uses")
+  usedCount        Int      @default(0) @map("used_count")
+  totalPriceCents  Int      @map("total_price_cents")
+  status           String   @default("active") @db.VarChar(20)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  appointments Appointment[]
+
+  @@index([tenantId, customerPhone, status])
+  @@map("customer_packages")
+}
+
+model Document {
+  id         String   @id @default(uuid()) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  customerId String   @map("customer_id") @db.Uuid
+  name       String   @db.VarChar(255)
+  type       String   @db.VarChar(100)
+  data       String   @db.Text
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+  customer Customer @relation(fields: [customerId], references: [id])
+
+  @@index([customerId])
+  @@map("documents")
 }

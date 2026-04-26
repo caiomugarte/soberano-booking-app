@@ -1,9 +1,19 @@
 import type { AppointmentWithDetails } from '../entities/appointment.js';
 
+export interface FinancialSummary {
+  totalSessions: number;
+  paidCount: number;
+  pendingCount: number;
+  revenueCents: number;
+  appointments: AppointmentWithDetails[];
+}
+
 export interface CreateAppointmentData {
+  tenantId: string;
   barberId: string;
   serviceId: string;
   customerId: string;
+  packageId?: string;
   date: Date;
   startTime: string;
   endTime: string;
@@ -32,8 +42,11 @@ export interface AppointmentRepository {
   markBarberReminderSent(id: string): Promise<void>;
   getStatsByDateRange(barberId: string, from: Date, to: Date): Promise<DayStat[]>;
   findByBarberAndDateRange(barberId: string, from: Date, to: Date): Promise<AppointmentWithDetails[]>;
+  findUpcomingByCustomerPhone(phone: string): Promise<AppointmentWithDetails | null>;
   deleteById(id: string): Promise<void>;
   updateCustomer(id: string, customerId: string): Promise<void>;
+  updatePaymentStatus(id: string, paidAt: Date): Promise<AppointmentWithDetails>;
+  getFinancialSummary(providerId: string, from: Date, to: Date): Promise<FinancialSummary>;
   updateSchedule(id: string, data: {
     serviceId?: string;
     priceCents?: number;

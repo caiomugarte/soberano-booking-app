@@ -11,7 +11,7 @@ export interface AppointmentView {
   priceCents: number;
   cancelToken?: string;
   service: { name: string; icon: string };
-  barber: { firstName: string; lastName: string };
+  barber: { firstName: string; lastName: string; workDays: number[] };
   customer: { name: string; phoneLast4: string };
 }
 
