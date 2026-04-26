@@ -33,12 +33,22 @@ export function     AppointmentView({ token }: { token: string }) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Initialize to today when entering change view
+  // When entering change view, start from the first work day >= today
   useEffect(() => {
-    if (view === 'change' && !newDate) {
-      setNewDate(dateToString(today));
+    if (view !== 'change' || newDate || !appointment) return;
+    const workDays = appointment.barber.workDays;
+    let startDate = new Date(today);
+    if (workDays.length > 0) {
+      const maxDate = new Date(today);
+      maxDate.setDate(maxDate.getDate() + MAX_WEEKS_AHEAD * 7);
+      while (startDate <= maxDate && !workDays.includes(startDate.getDay())) {
+        startDate.setDate(startDate.getDate() + 1);
+      }
     }
-  }, [view]);
+    setNewDate(dateToString(startDate));
+    const diffDays = Math.floor((startDate.getTime() - today.getTime()) / 86400000);
+    setWeekOffset(Math.floor(diffDays / 7));
+  }, [view, appointment]);
 
   if (isLoading) {
     return (
@@ -140,7 +150,8 @@ export function     AppointmentView({ token }: { token: string }) {
             </div>
             <div className="grid grid-cols-7 gap-1.5 mb-6">
               {weekDates.map((d) => {
-                const disabled = d < today;
+                const noShift = appointment.barber.workDays.length > 0 && !appointment.barber.workDays.includes(d.getDay());
+                const disabled = d < today || noShift;
                 const ds = dateToString(d);
                 return (
                   <button key={ds} disabled={disabled} onClick={() => { setNewDate(ds); setNewSlot(null); }}

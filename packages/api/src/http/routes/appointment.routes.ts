@@ -13,10 +13,14 @@ export async function appointmentRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { token: string } }>('/appointment/:token', async (request) => {
     const { token } = request.params;
     const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
+    const shiftRepo = new PrismaProviderShiftRepository(request.tenantPrisma);
     const appointment = await appointmentRepo.findByCancelToken(token);
     if (!appointment) {
       throw new NotFoundError('Agendamento');
     }
+
+    const shifts = await shiftRepo.findAllByProvider(appointment.barberId);
+    const workDays = [...new Set(shifts.map((s) => s.dayOfWeek))].sort();
 
     // Return without sensitive data — customer still needs to verify phone to take actions
     return {
@@ -35,6 +39,7 @@ export async function appointmentRoutes(app: FastifyInstance): Promise<void> {
         barber: {
           firstName: appointment.barber.firstName,
           lastName: appointment.barber.lastName,
+          workDays,
         },
         customer: {
           name: appointment.customer.name,
