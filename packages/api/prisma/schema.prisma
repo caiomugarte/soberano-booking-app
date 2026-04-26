@@ -24,6 +24,7 @@ model Tenant {
   appointments     Appointment[]
   sessionReports   SessionReport[]
   documents        Document[]
+  customerPackages CustomerPackage[]
 
   @@map("tenants")
 }
@@ -146,10 +147,13 @@ model Appointment {
   paidAt           DateTime? @map("paid_at") @db.Timestamptz
   appointmentNotes String?   @map("appointment_notes") @db.Text
 
-  tenant         Tenant          @relation(fields: [tenantId], references: [id])
-  provider       Provider        @relation(fields: [providerId], references: [id])
-  service        Service         @relation(fields: [serviceId], references: [id])
-  customer       Customer        @relation(fields: [customerId], references: [id])
+  packageId      String?   @map("package_id") @db.Uuid
+
+  tenant         Tenant           @relation(fields: [tenantId], references: [id])
+  provider       Provider         @relation(fields: [providerId], references: [id])
+  service        Service          @relation(fields: [serviceId], references: [id])
+  customer       Customer         @relation(fields: [customerId], references: [id])
+  package        CustomerPackage? @relation(fields: [packageId], references: [id])
   sessionReports SessionReport[]
 
   @@index([providerId, date, startTime])
@@ -177,6 +181,25 @@ model SessionReport {
 
   @@index([appointmentId])
   @@map("session_reports")
+}
+
+model CustomerPackage {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  customerName     String   @map("customer_name") @db.VarChar(200)
+  customerPhone    String?  @map("customer_phone") @db.VarChar(20)
+  totalUses        Int      @map("total_uses")
+  usedCount        Int      @default(0) @map("used_count")
+  totalPriceCents  Int      @map("total_price_cents")
+  status           String   @default("active") @db.VarChar(20)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  appointments Appointment[]
+
+  @@index([tenantId, customerPhone, status])
+  @@map("customer_packages")
 }
 
 model Document {

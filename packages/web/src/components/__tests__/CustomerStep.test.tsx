@@ -77,7 +77,7 @@ describe('CustomerStep', () => {
 
     await user.click(screen.getByRole('button', { name: 'Continuar' }));
 
-    expect(setCustomerSpy).toHaveBeenCalledWith('João', '11999998888');
+    expect(setCustomerSpy).toHaveBeenCalledWith('João', '1199998888');
     expect(nextStepSpy).toHaveBeenCalledOnce();
   });
 });

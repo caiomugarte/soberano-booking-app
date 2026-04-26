@@ -3,9 +3,11 @@ import type { AppointmentRepository } from '../../../domain/repositories/appoint
 import type { ServiceRepository } from '../../../domain/repositories/service.repository.js';
 import type { ProviderRepository } from '../../../domain/repositories/provider.repository.js';
 import type { CustomerRepository } from '../../../domain/repositories/customer.repository.js';
+import type { CustomerPackageRepository } from '../../../domain/repositories/customer-package.repository.js';
 import type { AppointmentWithDetails } from '../../../domain/entities/appointment.js';
-import { NotFoundError, SlotTakenError } from '../../../shared/errors.js';
+import { NotFoundError, SlotTakenError, ValidationError } from '../../../shared/errors.js';
 import { WhatsAppNotificationService } from '../../../infrastructure/notifications/whatsapp-notification.service.js';
+
 interface AdminCreateAppointmentInput {
   tenantId: string;
   serviceId: string;
@@ -16,6 +18,7 @@ interface AdminCreateAppointmentInput {
   customerPhone?: string;
   priceCents?: number;
   bookingUrl: string;
+  packageId?: string;
 }
 
 export class AdminCreateAppointment {
@@ -25,6 +28,7 @@ export class AdminCreateAppointment {
     private barberRepo: ProviderRepository,
     private customerRepo: CustomerRepository,
     private notificationService: WhatsAppNotificationService,
+    private packageRepo?: CustomerPackageRepository,
   ) {}
 
   async execute(input: AdminCreateAppointmentInput): Promise<{ appointment: AppointmentWithDetails; cancelUrl: string }> {
@@ -40,6 +44,13 @@ export class AdminCreateAppointment {
     const endMinutes = h * 60 + m + service.duration;
     const endTime = `${String(Math.floor(endMinutes / 60)).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`;
 
+    let packagePriceCents: number | undefined;
+    if (input.packageId && this.packageRepo) {
+      const pkg = await this.packageRepo.findByIdAndTenant(input.packageId, input.tenantId);
+      if (!pkg || pkg.status !== 'active') throw new ValidationError('Pacote inválido ou já utilizado.');
+      packagePriceCents = Math.floor(pkg.totalPriceCents / pkg.totalUses);
+    }
+
     const customer = input.customerPhone
       ? await this.customerRepo.upsertByPhone(input.customerPhone, input.customerName, input.tenantId)
       : await this.customerRepo.createWalkin(input.customerName, input.tenantId);
@@ -52,15 +63,20 @@ export class AdminCreateAppointment {
         barberId: input.barberId,
         serviceId: input.serviceId,
         customerId: customer.id,
+        ...(input.packageId ? { packageId: input.packageId } : {}),
         date,
         startTime: input.startTime,
         endTime,
-        priceCents: input.priceCents ?? service.priceCents,
+        priceCents: input.priceCents ?? packagePriceCents ?? service.priceCents,
         cancelToken,
       });
     } catch (error: unknown) {
       if (error && typeof error === 'object' && 'code' in error && error.code === 'P2002') throw new SlotTakenError();
       throw error;
+    }
+
+    if (input.packageId && this.packageRepo) {
+      await this.packageRepo.incrementUsedCount(input.packageId);
     }
 
     const today = new Date();
