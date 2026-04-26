@@ -19,6 +19,7 @@ import {useAuthStore} from '../../stores/auth.store.ts';
 import {queryClient} from '../../config/query-client.ts';
 import {Button} from '../../components/ui/Button.tsx';
 import {AdminBookingModal} from '../../components/admin/AdminBookingModal.tsx';
+import {AdminPackageModal} from '../../components/admin/AdminPackageModal.tsx';
 import {Spinner} from '../../components/ui/Spinner.tsx';
 import {
   dateToString,
@@ -50,10 +51,12 @@ function BarberProfile({
   barber,
   onLogout,
   onAgenda,
+  onPacotes,
 }: {
   barber: { firstName: string; lastName: string; avatarUrl: string | null };
   onLogout: () => void;
   onAgenda: () => void;
+  onPacotes: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
@@ -99,6 +102,12 @@ function BarberProfile({
           >
             Agenda
           </button>
+          <button
+            onClick={() => { setOpen(false); onPacotes(); }}
+            className="w-full text-left px-4 py-2 text-xs text-muted hover:text-[#F0EDE8] hover:bg-dark-surface2 transition-colors cursor-pointer bg-transparent border-none"
+          >
+            Pacotes
+          </button>
           <div className="mx-3 border-t border-dark-border" />
           <button
             onClick={() => { setOpen(false); onLogout(); }}
@@ -143,6 +152,11 @@ function AppointmentCard({
               {STATUS_LABEL[appointment.status] ?? appointment.status}
             </span>
           </div>
+          {appointment.package && (
+            <p className="text-xs text-gold/70 mt-0.5">
+              Pacote · {appointment.package.appointmentNumber}/{appointment.package.totalUses} · {formatCurrency(appointment.package.totalPriceCents)}
+            </p>
+          )}
           <p className="text-muted text-sm">{appointment.customer.name}</p>
           {appointment.customer.phone && <p className="text-muted text-xs">+55 {appointment.customer.phone}</p>}
         </div>
@@ -859,6 +873,40 @@ function YearView({ onSelectMonth }: { onSelectMonth: (offset: number) => void }
   );
 }
 
+function ActionFab({ onPackage, onBooking }: { onPackage: () => void; onBooking: () => void }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      {open && <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+        {open && (
+          <>
+            <button
+              onClick={() => { setOpen(false); onPackage(); }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-dark-surface border border-gold text-gold text-sm font-medium shadow-lg cursor-pointer whitespace-nowrap hover:bg-gold/10 transition-colors"
+            >
+              + Pacote
+            </button>
+            <button
+              onClick={() => { setOpen(false); onBooking(); }}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-dark-surface border border-gold text-gold text-sm font-medium shadow-lg cursor-pointer whitespace-nowrap hover:bg-gold/10 transition-colors"
+            >
+              + Agendamento
+            </button>
+          </>
+        )}
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="w-14 h-14 rounded-full bg-gold text-dark font-bold text-2xl shadow-lg cursor-pointer flex items-center justify-center transition-transform hover:scale-105 border-none"
+        >
+          {open ? '×' : '+'}
+        </button>
+      </div>
+    </>
+  );
+}
+
 function DeleteModal({ onConfirm, onClose, isPending }: { onConfirm: () => void; onClose: () => void; isPending: boolean }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -923,6 +971,7 @@ export default function DashboardPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [editAppointment, setEditAppointment] = useState<AdminAppointment | null>(null);
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [showPackageModal, setShowPackageModal] = useState(false);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
   const { data: me } = useAdminMe();
@@ -1011,20 +1060,15 @@ export default function DashboardPage() {
       )}
       {editAppointment && <EditAppointmentModal appointment={editAppointment} barberId={me?.id ?? null} onClose={() => setEditAppointment(null)} />}
       {showBookingModal && <AdminBookingModal barberId={me?.id ?? null} onClose={() => setShowBookingModal(false)} />}
+      {showPackageModal && <AdminPackageModal barberId={me?.id ?? null} onClose={() => setShowPackageModal(false)} />}
+      <ActionFab onPackage={() => setShowPackageModal(true)} onBooking={() => setShowBookingModal(true)} />
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <a href="/" className="flex items-center gap-2.5 no-underline">
           <img src="/logo.png" alt="Soberano Barbearia" className="w-12 h-12 object-contain"/>
         </a>
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => setShowBookingModal(true)}
-            className="text-xs px-3 py-1.5 rounded-lg border border-gold text-gold hover:bg-gold/10 transition-colors cursor-pointer bg-transparent whitespace-nowrap"
-          >
-            <span className="sm:hidden">+ Agendar</span>
-            <span className="hidden sm:inline">+ Agendamento</span>
-          </button>
-          {me && <BarberProfile barber={me} onLogout={handleLogout} onAgenda={() => navigate('/admin/schedule')} />}
+          {me && <BarberProfile barber={me} onLogout={handleLogout} onAgenda={() => navigate('/admin/schedule')} onPacotes={() => navigate('/admin/packages')} />}
         </div>
       </div>
 

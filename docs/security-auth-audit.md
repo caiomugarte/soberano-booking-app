@@ -1,7 +1,7 @@
 # Auth Security Audit
 
-> Last reviewed: 2026-04-04
-> Scope: Authentication and authorization across `packages/api` and `packages/web`
+> Last reviewed: 2026-04-24
+> Scope: Authentication and authorization across `packages/api`, `packages/web`, and `packages/web-bruno`
 
 ---
 
@@ -13,7 +13,7 @@
 | 2 | JWT secret strength | Issue | Critical |
 | 3 | Refresh token rotation | Secure | — |
 | 4 | Account lockout | Issue | High |
-| 5 | Auth middleware consistency | Issue | High |
+| 5 | Auth middleware consistency | Fixed | — |
 | 6 | Login error messages | Secure | — |
 | 7 | Password reset token expiry | N/A | — |
 | 8 | OAuth redirect_uri validation | N/A | — |
@@ -90,7 +90,19 @@ Run twice, assign one to `JWT_SECRET` and one to `JWT_REFRESH_SECRET`. Rotate se
 
 ---
 
-### [HIGH] #5 — Authorization Bypass on Appointment Delete
+### ~~[HIGH] #5 — Auth Middleware Consistency~~ — FIXED (2026-04-24)
+
+**What was wrong:** `authGuard` was registered as an `onRequest` hook in several route plugins. Because the tenant middleware runs in `preHandler`, `request.tenant` was not yet populated when `authGuard` executed — making the cross-tenant JWT check impossible.
+
+**Fix applied:**
+- All route plugins (`adminRoutes`, `psychologyRoutes`, `scheduleRoutes`) now register `authGuard` as `preHandler`.
+- `authGuard` now checks `payload.tenantId !== request.tenant.id` and returns 401 if they differ. A JWT issued by tenant A cannot be used on tenant B's routes.
+
+**Rule:** any new route plugin that uses `authGuard` must use `app.addHook('preHandler', authGuard)`, never `onRequest`.
+
+---
+
+### [HIGH] #5b — Authorization Bypass on Appointment Delete
 
 **Problem:** Any authenticated barber can delete another barber's appointment. The delete endpoint verifies the appointment exists but not that it belongs to the requesting barber.
 
@@ -169,6 +181,30 @@ There is no self-service password recovery. Passwords can only be changed by re-
 `packages/api/src/infrastructure/database/seed.ts` line 81 logs generated passwords to stdout. This is not a production vulnerability but credentials appearing in server logs is poor practice.
 
 **Recommendation:** Display credentials only on first-time creation, or use a one-time secure link instead.
+
+---
+
+## Cross-Tenant Session Isolation — FIXED (2026-04-24)
+
+These issues were introduced when a second tenant (`bruno`) was added to the shared API and both frontends ran against the same `localhost:3000`.
+
+### Refresh token accepted cross-tenant cookies
+
+**Problem:** The `/api/auth/refresh` endpoint was excluded from the tenant middleware and performed no tenant validation. A browser with a `soberano` refresh cookie visiting the `bruno` frontend would receive a valid `soberano` access token, which then failed on every `bruno` route with a generic 401.
+
+**Fix:** The refresh handler reads `X-Tenant-Slug` directly (no middleware needed). If the header is present, it looks up that tenant and rejects any cookie whose `payload.tenantId` doesn't match. If the header is absent, the check is skipped (backward compat for frontends that predate this convention).
+
+### Shared refresh token cookie name
+
+**Problem:** All frontends wrote a `refreshToken` cookie to the same domain (`localhost:3000`). Logging out of one frontend cleared the other's session.
+
+**Fix:** Cookie name is now `refreshToken_${tenant.slug}`. Each frontend gets its own isolated cookie. Frontends that don't send `X-Tenant-Slug` on refresh/logout still get the generic `refreshToken` fallback.
+
+### Frontends calling refresh/logout without the tenant header
+
+**Problem:** `tryRefresh()`, `initialize()`, and `logout()` in both `packages/web` and `packages/web-bruno` used raw `fetch` without `X-Tenant-Slug`. After the cookie rename, they looked for `refreshToken` and found nothing.
+
+**Fix:** All three calls in both frontends now include `X-Tenant-Slug`. New frontends must do the same — see `docs/multi-client-frontend.md`.
 
 ---
 

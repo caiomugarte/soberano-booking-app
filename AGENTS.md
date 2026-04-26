@@ -164,6 +164,41 @@ Brazilian phone numbers are stored without `+55`. Chatwoot contacts are searched
 
 ---
 
+## Skills
+
+These skills are available in this environment. **Use them proactively** — don't wait for the user to ask.
+
+| Skill | Invoke with | When to use |
+|-------|-------------|-------------|
+| `tlc-spec-driven` | `/tlc-spec-driven` | Feature planning, project initialization, brownfield codebase mapping, and creating tasks from a `spec.md`. Runs 4 adaptive phases — **Specify → Design → Tasks → Execute** — auto-sized by scope. Design and Tasks are skipped when not needed. Use **Quick Mode** (within the skill) for fixes ≤3 files. **Never create tasks from a spec.md manually — always invoke this skill.** |
+| `codenavi` | `/codenavi` | Exploring unfamiliar parts of the codebase, tracing a flow, brownfield mapping, or before implementing anything in an area you haven't read. Prefer over the `Explore` subagent when the area will be revisited across sessions — findings persist in `.notebook/`. Use `Explore` only for one-off mapping that won't be needed again. |
+| `coding-guidelines` | `/coding-guidelines` | When writing or modifying any code — enforces SOLID, Clean Architecture, Clean Code, and unit testing rules specific to this stack. |
+| `best-practices` | `/best-practices` | Security audits, modernizing code, checking for vulnerabilities, applying web best practices. |
+| `security-best-practices` | `/security-best-practices` | Explicit security review of new endpoints, auth flows, or any code handling user input, tokens, or external data. |
+| `react-best-practices` | `/react-best-practices` | Writing or reviewing React/Vite components — performance patterns, hooks rules, TanStack Query usage. |
+| `frontend-design` | `/frontend-design` | Building new UI pages or components where visual quality matters — avoids generic AI-looking output. |
+| `docs-writer` | `/docs-writer` | Writing or updating `AGENTS.md`, `prd.md`, `README`, or any file in `docs/`. |
+| `commit` | `/commit` | Generating a conventional commit message from the current diff. Use before every commit. |
+
+### Decision guide
+
+**When to use `/tlc-spec-driven`:**
+- Feature touches multiple packages, requires DB migrations, or has architectural decisions → full pipeline (Specify → Design → Tasks → Execute)
+- Feature scope is unclear or has ambiguous gray areas → full pipeline (the skill handles clarification internally)
+- Creating tasks from an existing `spec.md` → always invoke this skill, never `TaskCreate` directly
+- Initializing a new project or mapping an existing codebase → use the project-init or brownfield-mapping commands within the skill
+- Bug fix or small change ≤3 files with known cause → use **Quick Mode** within the skill (`/tlc-spec-driven` then say "quick fix")
+- Straightforward feature, <10 tasks, no architectural decisions → Medium scope: Specify + Execute only (Design/Tasks auto-skipped)
+
+**Other skill decisions:**
+- **Navigating unfamiliar code?** → `/codenavi` before touching anything (persists to `.notebook/`). Use `Explore` subagent only for one-off research you won't need again.
+- **Writing backend code?** → `/coding-guidelines` + `/security-best-practices` for any endpoint handling auth or user input.
+- **Writing frontend code?** → `/coding-guidelines` + `/react-best-practices`.
+- **Building a new UI page?** → `/frontend-design` + `/react-best-practices`.
+- **Ready to commit?** → `/commit`.
+
+---
+
 ## What NOT to do
 
 - Do not put business logic in Fastify routes — routes are thin controllers only.

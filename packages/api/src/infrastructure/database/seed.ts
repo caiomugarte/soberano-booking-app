@@ -65,15 +65,18 @@ async function seed() {
   console.log('');
   console.log('======= BARBER CREDENTIALS =======');
 
-  // Upsert barbers + shifts
+  // Resolve Soberano tenant (must exist after migration)
+  const tenant = await prisma.tenant.findUniqueOrThrow({ where: { slug: 'soberano' } });
+
+  // Upsert providers + shifts
   for (const barber of BARBERS) {
     const plainPassword = generatePassword();
     const hashedPassword = await hashPassword(plainPassword);
 
-    const record = await prisma.barber.upsert({
-      where: { slug: barber.slug },
+    const record = await prisma.provider.upsert({
+      where: { tenantId_slug: { tenantId: tenant.id, slug: barber.slug } },
       update: { firstName: barber.firstName, lastName: barber.lastName, phone: barber.phone, avatarUrl: barber.avatarUrl },
-      create: { ...barber, password: hashedPassword },
+      create: { ...barber, password: hashedPassword, tenantId: tenant.id },
     });
 
     const isNew = record.createdAt.getTime() === record.updatedAt.getTime();
@@ -84,10 +87,10 @@ async function seed() {
     }
 
     // Replace shifts: delete existing and recreate
-    await prisma.barberShift.deleteMany({ where: { barberId: record.id } });
+    await prisma.providerShift.deleteMany({ where: { providerId: record.id } });
     const shifts = BARBER_SHIFTS[barber.slug] ?? [];
-    await prisma.barberShift.createMany({
-      data: shifts.map((s) => ({ ...s, barberId: record.id })),
+    await prisma.providerShift.createMany({
+      data: shifts.map((s) => ({ ...s, providerId: record.id, tenantId: tenant.id })),
     });
     console.log(`    ${shifts.length} shifts seeded`);
   }
@@ -95,9 +98,9 @@ async function seed() {
   // Upsert services
   for (const service of SERVICES) {
     await prisma.service.upsert({
-      where: { slug: service.slug },
+      where: { tenantId_slug: { tenantId: tenant.id, slug: service.slug } },
       update: { name: service.name, icon: service.icon, priceCents: service.priceCents, sortOrder: service.sortOrder },
-      create: { ...service, duration: 30 },
+      create: { ...service, duration: 30, tenantId: tenant.id },
     });
     console.log(`  Service: ${service.name}`);
   }

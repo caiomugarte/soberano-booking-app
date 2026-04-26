@@ -1,4 +1,9 @@
-import { env } from '../../config/env.js';
+interface ChatwootConfig {
+  chatwootBaseUrl?: string;
+  chatwootApiToken?: string;
+  chatwootAccountId?: number;
+  chatwootInboxId?: number;
+}
 
 interface ChatwootContact {
   id: number;
@@ -58,11 +63,11 @@ export class ChatwootClient {
   private inboxId: number;
   private enabled: boolean;
 
-  constructor() {
-    this.baseUrl = env.CHATWOOT_BASE_URL ?? '';
-    this.token = env.CHATWOOT_API_TOKEN ?? '';
-    this.accountId = env.CHATWOOT_ACCOUNT_ID ?? 0;
-    this.inboxId = env.CHATWOOT_INBOX_ID ?? 0;
+  constructor(config: ChatwootConfig = {}) {
+    this.baseUrl = (config.chatwootBaseUrl ?? '').replace(/\/+$/, '');
+    this.token = config.chatwootApiToken ?? '';
+    this.accountId = config.chatwootAccountId ?? 0;
+    this.inboxId = config.chatwootInboxId ?? 0;
     this.enabled = !!(this.baseUrl && this.token && this.accountId && this.inboxId);
   }
 

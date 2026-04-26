@@ -1,8 +1,8 @@
-import { useEffect, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { Button } from '../ui/Button.tsx';
 import { Input } from '../ui/Input.tsx';
 import { formatPhone, stripPhone } from '../../lib/format.ts';
-import { useAdminCreateBooking, useAdminCustomerLookup } from '../../api/use-admin.ts';
+import { useAdminCreateBooking, useAdminCustomerLookup, useAdminCustomerPackages } from '../../api/use-admin.ts';
 import { useServices } from '../../api/use-services.ts';
 import { useSlots } from '../../api/use-slots.ts';
 
@@ -17,13 +17,17 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [serviceId, setServiceId] = useState('');
+  const [priceDisplay, setPriceDisplay] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [timeError, setTimeError] = useState('');
   const [lookupPhone, setLookupPhone] = useState('');
+  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const { data: services } = useServices();
   const customerLookup = useAdminCustomerLookup(lookupPhone);
+  const { data: packages } = useAdminCustomerPackages(lookupPhone);
   const createBooking = useAdminCreateBooking();
   const { data: slots } = useSlots(barberId, date || null);
 
@@ -44,6 +48,16 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
     }
   }, [customerLookup.data]);
 
+  // Auto-select package when exactly 1 active; reset on customer change
+  useEffect(() => {
+    setSelectedPackageId(null);
+  }, [lookupPhone]);
+
+  useEffect(() => {
+    const active = (packages ?? []).filter((p) => p.status === 'active');
+    if (active.length === 1) setSelectedPackageId(active[0].id);
+  }, [packages]);
+
   // Close on success
   useEffect(() => {
     if (createBooking.isSuccess) {
@@ -53,11 +67,15 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
 
   const strippedPhone = stripPhone(phone);
 
+  const parsedPriceCents = Math.round(parseFloat(priceDisplay.replace(',', '.')) * 100);
+  const isPriceValid = priceDisplay === '' || (!isNaN(parsedPriceCents) && parsedPriceCents > 0);
+
   const isValid =
     name.trim().length >= 2 &&
     serviceId.length > 0 &&
     date.length > 0 &&
-    TIME_REGEX.test(time);
+    TIME_REGEX.test(time) &&
+    isPriceValid;
 
   function handleTimeChange(e: ChangeEvent<HTMLInputElement>) {
     const digits = e.target.value.replace(/\D/g, '').slice(0, 4);
@@ -76,12 +94,17 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
 
   function handleSubmit() {
     if (!isValid) return;
+    const selectedService = services?.find((s) => s.id === serviceId);
+    const customPrice = priceDisplay !== '' ? parsedPriceCents : undefined;
+    const defaultPrice = selectedService?.priceCents;
     createBooking.mutate({
       serviceId,
       date,
       startTime: time,
       customerName: name.trim(),
       ...(strippedPhone.length >= 10 ? { customerPhone: strippedPhone } : {}),
+      ...(customPrice !== undefined && customPrice !== defaultPrice ? { priceCents: customPrice } : {}),
+      ...(selectedPackageId ? { packageId: selectedPackageId } : {}),
     });
   }
 
@@ -114,13 +137,42 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
           onChange={(e) => setName(e.target.value)}
         />
 
+        {(packages ?? []).filter((p) => p.status === 'active').length > 0 && (
+          <div className="mb-5">
+            <label className="block text-[11px] tracking-[0.12em] uppercase text-muted mb-2">
+              Pacote
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {(packages ?? []).filter((p) => p.status === 'active').map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setSelectedPackageId(selectedPackageId === p.id ? null : p.id)}
+                  className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors cursor-pointer
+                    ${selectedPackageId === p.id
+                      ? 'border-gold bg-gold/20 text-gold'
+                      : 'border-dark-border bg-dark text-muted hover:border-gold/40'
+                    }`}
+                >
+                  {p.usedCount}/{p.totalUses} usos — R$ {(p.totalPriceCents / 100).toFixed(2).replace('.', ',')}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="mb-5">
           <label className="block text-[11px] tracking-[0.12em] uppercase text-muted mb-2">
             Serviço
           </label>
           <select
             value={serviceId}
-            onChange={(e) => setServiceId(e.target.value)}
+            onChange={(e) => {
+              const id = e.target.value;
+              setServiceId(id);
+              const svc = services?.find((s) => s.id === id);
+              setPriceDisplay(svc ? (svc.priceCents / 100).toFixed(2).replace('.', ',') : '');
+            }}
             className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-[#F0EDE8] outline-none focus:border-gold appearance-none"
           >
             <option value="">Selecione um serviço</option>
@@ -132,22 +184,32 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
           </select>
         </div>
 
+        <Input
+          label="Preço (R$)"
+          inputMode="decimal"
+          placeholder="0,00"
+          value={priceDisplay}
+          onChange={(e) => setPriceDisplay(e.target.value)}
+        />
+
         <div className="mb-5">
           <label className="block text-[11px] tracking-[0.12em] uppercase text-muted mb-2">
             Data
           </label>
-          <div className="relative">
-            {!date && (
-              <span className="absolute inset-0 flex items-center px-4 text-sm text-[#F0EDE8] pointer-events-none">
-                Selecione uma data
+          <div className="relative w-full bg-dark border border-dark-border rounded-xl min-h-[50px] focus-within:border-gold">
+            <div className="absolute inset-0 px-4 text-sm flex items-center pointer-events-none select-none">
+              <span className={date ? 'text-[#F0EDE8]' : 'text-muted'}>
+                {date ? date.split('-').reverse().join('/') : 'Selecione uma data'}
               </span>
-            )}
+            </div>
             <input
+              ref={dateInputRef}
               type="date"
               value={date}
               max="2099-12-31"
               onChange={(e) => setDate(e.target.value)}
-              className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-[#F0EDE8] outline-none focus:border-gold appearance-none min-h-[50px]"
+              onClick={() => dateInputRef.current?.showPicker?.()}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             />
           </div>
         </div>

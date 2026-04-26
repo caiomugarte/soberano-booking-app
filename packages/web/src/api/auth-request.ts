@@ -1,10 +1,15 @@
 import { useAuthStore } from '../stores/auth.store.ts';
+import { TENANT_SLUG } from '../config/env.js';
 
 export const API_BASE = import.meta.env.VITE_API_URL ?? '';
 
 async function tryRefresh(): Promise<string | null> {
   try {
-    const res = await fetch(`${API_BASE}/api/auth/refresh`, { method: 'POST', credentials: 'include' });
+    const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'X-Tenant-Slug': TENANT_SLUG },
+    });
     if (!res.ok) return null;
     const { accessToken } = await res.json();
     useAuthStore.getState().setAccessToken(accessToken);
@@ -20,6 +25,7 @@ export async function authRequest<T>(path: string, options?: RequestInit): Promi
       credentials: 'include',
       ...options,
       headers: {
+        'X-Tenant-Slug': TENANT_SLUG,
         ...(options?.body ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options?.headers,

@@ -1,18 +1,19 @@
 import jwt from 'jsonwebtoken';
 import { env } from '../../config/env.js';
 
-interface TokenPayload {
-  barberId: string;
+export interface TokenPayload {
+  providerId: string;
+  tenantId: string;
 }
 
-export function generateAccessToken(barberId: string): string {
-  return jwt.sign({ barberId } satisfies TokenPayload, env.JWT_SECRET, {
+export function generateAccessToken(providerId: string, tenantId: string): string {
+  return jwt.sign({ providerId, tenantId } satisfies TokenPayload, env.JWT_SECRET, {
     expiresIn: '18h',
   });
 }
 
-export function generateRefreshToken(barberId: string): string {
-  return jwt.sign({ barberId } satisfies TokenPayload, env.JWT_REFRESH_SECRET, {
+export function generateRefreshToken(providerId: string, tenantId: string): string {
+  return jwt.sign({ providerId, tenantId } satisfies TokenPayload, env.JWT_REFRESH_SECRET, {
     expiresIn: '7d',
   });
 }

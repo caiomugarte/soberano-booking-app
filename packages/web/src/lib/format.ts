@@ -26,7 +26,8 @@ export function formatDateLong(dateStr: string): string {
 }
 
 export function formatPhone(value: string): string {
-  const v = value.replace(/\D/g, '').substring(0, 11);
+  const raw = value.replace(/\D/g, '');
+  const v = (raw.startsWith('55') && raw.length > 11 ? raw.slice(2) : raw).substring(0, 11);
   if (v.length > 7) return `(${v.slice(0,2)}) ${v.slice(2,7)}-${v.slice(7)}`;
   if (v.length > 2) return `(${v.slice(0,2)}) ${v.slice(2)}`;
   if (v.length) return `(${v}`;
@@ -34,7 +35,12 @@ export function formatPhone(value: string): string {
 }
 
 export function stripPhone(value: string): string {
-  return value.replace(/\D/g, '');
+  const digits = value.replace(/\D/g, '');
+  const normalized = digits.startsWith('55') && digits.length > 11 ? digits.slice(2) : digits;
+  if (normalized.length === 11) {
+    return normalized.slice(0, 2) + normalized.slice(3);
+  }
+  return normalized;
 }
 
 export function getWeekDates(weekOffset: number): Date[] {

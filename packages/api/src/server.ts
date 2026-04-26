@@ -2,10 +2,13 @@ import Fastify, { type FastifyError } from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import rateLimit from '@fastify/rate-limit';
+import swagger from '@fastify/swagger';
+import swaggerUI from '@fastify/swagger-ui';
 import { ZodError } from 'zod';
 import { env } from './config/env.js';
 import { prisma } from './config/database.js';
 import { AppError } from './shared/errors.js';
+import { tenantMiddleware } from './http/middleware/tenant.middleware.js';
 import { bookingRoutes } from './http/routes/booking.routes.js';
 import { appointmentRoutes } from './http/routes/appointment.routes.js';
 import { serviceRoutes } from './http/routes/service.routes.js';
@@ -13,6 +16,9 @@ import { barberRoutes } from './http/routes/barber.routes.js';
 import { authRoutes } from './http/routes/auth.routes.js';
 import { adminRoutes } from './http/routes/admin.routes.js';
 import { scheduleRoutes } from './http/routes/schedule.routes.js';
+import { platformRoutes } from './http/routes/platform.routes.js';
+import { internalRoutes } from './http/routes/internal.routes.js';
+import { psychologyRoutes } from './http/routes/psychology.routes.js';
 import { startReminderJob } from './infrastructure/jobs/reminder.job.js';
 
 const app = Fastify({
@@ -22,7 +28,7 @@ const app = Fastify({
 });
 
 await app.register(cors, {
-  origin: env.NODE_ENV === 'development' ? true : env.BASE_URL,
+  origin: env.NODE_ENV === 'development' ? true : env.ALLOWED_ORIGINS,
   credentials: true,
 });
 
@@ -31,6 +37,28 @@ await app.register(cookie);
 await app.register(rateLimit, {
   max: 100,
   timeWindow: '1 minute',
+});
+
+if (env.NODE_ENV === 'development') {
+  await app.register(swagger, {
+    openapi: {
+      info: { title: 'Soberano API', version: '1.0.0' },
+    },
+  });
+
+  await app.register(swaggerUI, {
+    routePrefix: '/docs',
+  });
+}
+
+// Tenant middleware — runs for all routes except platform routes
+app.addHook('preHandler', async (request, reply) => {
+  if (request.url.startsWith('/api/platform/')) return;
+  if (request.url.startsWith('/api/internal/')) return;
+  if (request.url === '/api/auth/refresh') return;
+  if (request.url === '/api/auth/logout') return;
+  if (request.url.startsWith('/docs')) return;
+  return tenantMiddleware(request, reply);
 });
 
 // Error handler
@@ -74,6 +102,9 @@ await app.register(appointmentRoutes, { prefix: '/api' });
 await app.register(authRoutes, { prefix: '/api' });
 await app.register(adminRoutes, { prefix: '/api' });
 await app.register(scheduleRoutes, { prefix: '/api' });
+await app.register(platformRoutes, { prefix: '/api/platform' });
+await app.register(internalRoutes, { prefix: '/api' });
+await app.register(psychologyRoutes, { prefix: '/api' });
 
 // Start
 try {

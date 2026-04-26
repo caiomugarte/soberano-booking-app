@@ -17,23 +17,42 @@ export function TimeStep() {
   today.setHours(0, 0, 0, 0);
   const weekDates = getWeekDates(weekOffset);
 
-  // On mount, start from today and align the week view
+  // On mount, start from the first work day >= today. If date is already set (reschedule), disable auto-advance and align the week view.
   useEffect(() => {
     if (!date) {
-      setDate(dateToString(today));
+      let startDate = new Date(today);
+      if (barber?.workDays) {
+        const maxDate = new Date(today);
+        maxDate.setDate(maxDate.getDate() + MAX_WEEKS_AHEAD * 7);
+        while (startDate <= maxDate && !barber.workDays.includes(startDate.getDay())) {
+          startDate.setDate(startDate.getDate() + 1);
+        }
+      }
+      setDate(dateToString(startDate));
+      const diffDays = Math.floor((startDate.getTime() - today.getTime()) / 86400000);
+      setWeekOffset(Math.floor(diffDays / 7));
+    } else {
+      initializing.current = false;
+      const storedDate = new Date(date + 'T00:00:00');
+      const diffDays = Math.floor((storedDate.getTime() - today.getTime()) / 86400000);
+      if (diffDays > 0) setWeekOffset(Math.floor(diffDays / 7));
     }
   }, []);
 
-  // If the selected day has no slots (barber doesn't work), auto-advance to the next day — only during initial mount
+  // If a work day is fully booked, advance to the next work day — only during initial mount of a new booking
   useEffect(() => {
     if (!initializing.current || !date || loadingSlots || !slots || slots.length > 0) return;
-    const next = new Date(date + 'T00:00:00');
+    let next = new Date(date + 'T00:00:00');
     next.setDate(next.getDate() + 1);
     const maxDate = new Date(today);
     maxDate.setDate(maxDate.getDate() + MAX_WEEKS_AHEAD * 7);
+    if (barber?.workDays) {
+      while (next <= maxDate && !barber.workDays.includes(next.getDay())) {
+        next.setDate(next.getDate() + 1);
+      }
+    }
     if (next > maxDate) { initializing.current = false; return; }
     setDate(dateToString(next));
-    // Advance week view if needed: compute offset from today (matches getWeekDates which is today-anchored)
     const diffDays = Math.floor((next.getTime() - today.getTime()) / 86400000);
     setWeekOffset(Math.floor(diffDays / 7));
   }, [slots, loadingSlots]);
