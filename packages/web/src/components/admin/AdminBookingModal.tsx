@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { Button } from '../ui/Button.tsx';
 import { Input } from '../ui/Input.tsx';
 import { formatPhone, stripPhone } from '../../lib/format.ts';
-import { useAdminCreateBooking, useAdminCustomerLookup } from '../../api/use-admin.ts';
+import { useAdminCreateBooking, useAdminCustomerLookup, useAdminCustomerPackages } from '../../api/use-admin.ts';
 import { useServices } from '../../api/use-services.ts';
 import { useSlots } from '../../api/use-slots.ts';
 
@@ -22,10 +22,12 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
   const [time, setTime] = useState('');
   const [timeError, setTimeError] = useState('');
   const [lookupPhone, setLookupPhone] = useState('');
+  const [selectedPackageId, setSelectedPackageId] = useState<string | null>(null);
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   const { data: services } = useServices();
   const customerLookup = useAdminCustomerLookup(lookupPhone);
+  const { data: packages } = useAdminCustomerPackages(lookupPhone);
   const createBooking = useAdminCreateBooking();
   const { data: slots } = useSlots(barberId, date || null);
 
@@ -45,6 +47,16 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
       setName(customerLookup.data.name);
     }
   }, [customerLookup.data]);
+
+  // Auto-select package when exactly 1 active; reset on customer change
+  useEffect(() => {
+    setSelectedPackageId(null);
+  }, [lookupPhone]);
+
+  useEffect(() => {
+    const active = (packages ?? []).filter((p) => p.status === 'active');
+    if (active.length === 1) setSelectedPackageId(active[0].id);
+  }, [packages]);
 
   // Close on success
   useEffect(() => {
@@ -92,6 +104,7 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
       customerName: name.trim(),
       ...(strippedPhone.length >= 10 ? { customerPhone: strippedPhone } : {}),
       ...(customPrice !== undefined && customPrice !== defaultPrice ? { priceCents: customPrice } : {}),
+      ...(selectedPackageId ? { packageId: selectedPackageId } : {}),
     });
   }
 
@@ -123,6 +136,30 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
+
+        {(packages ?? []).filter((p) => p.status === 'active').length > 0 && (
+          <div className="mb-5">
+            <label className="block text-[11px] tracking-[0.12em] uppercase text-muted mb-2">
+              Pacote
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {(packages ?? []).filter((p) => p.status === 'active').map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setSelectedPackageId(selectedPackageId === p.id ? null : p.id)}
+                  className={`px-4 py-2 rounded-lg border text-sm font-medium transition-colors cursor-pointer
+                    ${selectedPackageId === p.id
+                      ? 'border-gold bg-gold/20 text-gold'
+                      : 'border-dark-border bg-dark text-muted hover:border-gold/40'
+                    }`}
+                >
+                  {p.usedCount}/{p.totalUses} usos — R$ {(p.totalPriceCents / 100).toFixed(2).replace('.', ',')}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="mb-5">
           <label className="block text-[11px] tracking-[0.12em] uppercase text-muted mb-2">

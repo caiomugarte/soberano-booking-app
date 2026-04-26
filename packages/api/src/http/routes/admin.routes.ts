@@ -6,10 +6,11 @@ import { PrismaAppointmentRepository } from '../../infrastructure/database/repos
 import { PrismaProviderRepository } from '../../infrastructure/database/repositories/prisma-provider.repository.js';
 import { PrismaServiceRepository } from '../../infrastructure/database/repositories/prisma-service.repository.js';
 import { PrismaCustomerRepository } from '../../infrastructure/database/repositories/prisma-customer.repository.js';
+import { PrismaCustomerPackageRepository } from '../../infrastructure/database/repositories/prisma-customer-package.repository.js';
 import { WhatsAppNotificationService } from '../../infrastructure/notifications/whatsapp-notification.service.js';
 import { ChatwootClient } from '../../infrastructure/notifications/chatwoot.client.js';
 import { AdminCreateAppointment } from '../../application/use-cases/booking/admin-create-appointment.js';
-import { APPOINTMENT_STATUS, bookingSchema, tenantConfigSchema } from '@soberano/shared';
+import { APPOINTMENT_STATUS, bookingSchema, createPackageSchema, tenantConfigSchema } from '@soberano/shared';
 import { NotFoundError, SlotTakenError, ValidationError } from '../../shared/errors.js';
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
@@ -132,6 +133,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const adminBookingSchema = bookingSchema.omit({ barberId: true }).extend({
       customerPhone: z.string().regex(/^\d{10,11}$/, 'Telefone deve ter 10 ou 11 dígitos').optional(),
       priceCents: z.number().int().positive().optional(),
+      packageId: z.string().uuid().optional(),
     });
     const parsed = adminBookingSchema.safeParse(request.body);
     if (!parsed.success) {
@@ -142,6 +144,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const serviceRepo = new PrismaServiceRepository(request.tenantPrisma);
     const providerRepo = new PrismaProviderRepository(request.tenantPrisma);
     const customerRepo = new PrismaCustomerRepository(request.tenantPrisma);
+    const packageRepo = new PrismaCustomerPackageRepository(request.tenantPrisma);
     const config = tenantConfigSchema.parse(request.tenant.config);
     const chatwootClient = new ChatwootClient(config);
     const notificationService = new WhatsAppNotificationService(config, chatwootClient);
@@ -152,6 +155,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       providerRepo,
       customerRepo,
       notificationService,
+      packageRepo,
     );
 
     try {
@@ -322,6 +326,57 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     if (fromDate > toDate) return reply.status(400).send({ error: 'BAD_REQUEST', message: 'from não pode ser maior que to.' });
     const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
     return appointmentRepo.getFinancialSummary(request.providerId!, fromDate, toDate);
+  });
+
+  // Create a customer package
+  app.post('/admin/packages', async (request, reply) => {
+    const parsed = createPackageSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    }
+    const packageRepo = new PrismaCustomerPackageRepository(request.tenantPrisma);
+    const pkg = await packageRepo.create({ ...parsed.data, tenantId: request.tenant.id });
+    return reply.status(201).send(pkg);
+  });
+
+  // List packages — by phone (active only) or all with optional status filter
+  app.get('/admin/packages', async (request, reply) => {
+    const { phone, status } = request.query as { phone?: string; status?: string };
+    const packageRepo = new PrismaCustomerPackageRepository(request.tenantPrisma);
+    if (phone) {
+      const packages = await packageRepo.findActiveByPhone(request.tenant.id, phone);
+      return { packages };
+    }
+    const packages = await packageRepo.findAllByTenant(request.tenant.id, status ? { status } : undefined);
+    return { packages };
+  });
+
+  // Deactivate a package
+  app.patch<{ Params: { id: string } }>('/admin/packages/:id/deactivate', async (request, reply) => {
+    const { id } = request.params;
+    const packageRepo = new PrismaCustomerPackageRepository(request.tenantPrisma);
+    try {
+      const pkg = await packageRepo.deactivate(id, request.tenant.id);
+      return { package: pkg };
+    } catch (err) {
+      if ((err as Error).message === 'NOT_FOUND') return reply.status(404).send({ error: 'NOT_FOUND' });
+      if ((err as Error).message === 'NOT_ACTIVE') return reply.status(400).send({ error: 'BAD_REQUEST', message: 'Pacote não está ativo.' });
+      throw err;
+    }
+  });
+
+  // Delete a cancelled package
+  app.delete<{ Params: { id: string } }>('/admin/packages/:id', async (request, reply) => {
+    const { id } = request.params;
+    const packageRepo = new PrismaCustomerPackageRepository(request.tenantPrisma);
+    try {
+      await packageRepo.deleteById(id, request.tenant.id);
+      return reply.status(204).send();
+    } catch (err) {
+      if ((err as Error).message === 'NOT_FOUND') return reply.status(404).send({ error: 'NOT_FOUND' });
+      if ((err as Error).message === 'NOT_CANCELLED') return reply.status(400).send({ error: 'BAD_REQUEST', message: 'Apenas pacotes cancelados podem ser apagados.' });
+      throw err;
+    }
   });
 
   // Provider cancels an appointment and notifies the customer

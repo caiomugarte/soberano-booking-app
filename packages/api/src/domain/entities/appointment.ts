@@ -8,6 +8,7 @@ export interface AppointmentEntity {
   barberId: string;
   serviceId: string;
   customerId: string;
+  packageId: string | null;
   date: Date;
   startTime: string;
   endTime: string;
@@ -27,4 +28,5 @@ export interface AppointmentWithDetails extends AppointmentEntity {
   barber: BarberEntity;
   service: ServiceEntity;
   customer: CustomerEntity;
+  package: { appointmentNumber: number; totalUses: number; totalPriceCents: number } | null;
 }

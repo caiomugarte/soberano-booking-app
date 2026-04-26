@@ -22,12 +22,27 @@ const includeRelations = {
   },
   service: true,
   customer: true,
+  package: {
+    select: {
+      totalUses: true,
+      totalPriceCents: true,
+      appointments: {
+        select: { id: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
+      },
+    },
+  },
 } as const;
 
 // Maps Prisma result (provider/providerId) → domain entity (barber/barberId)
 function mapAppointment(raw: any): AppointmentWithDetails {
-  const { provider, providerId, ...rest } = raw;
-  return { ...rest, barberId: providerId, barber: provider } as AppointmentWithDetails;
+  const { provider, providerId, package: pkg, ...rest } = raw;
+  let mappedPackage = null;
+  if (pkg) {
+    const rank = (pkg.appointments as { id: string }[]).findIndex((a) => a.id === raw.id) + 1;
+    mappedPackage = { appointmentNumber: rank, totalUses: pkg.totalUses, totalPriceCents: pkg.totalPriceCents };
+  }
+  return { ...rest, barberId: providerId, barber: provider, package: mappedPackage } as AppointmentWithDetails;
 }
 
 export class PrismaAppointmentRepository implements AppointmentRepository {

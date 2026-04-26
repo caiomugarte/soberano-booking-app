@@ -36,10 +36,11 @@ export function formatPhone(value: string): string {
 
 export function stripPhone(value: string): string {
   const digits = value.replace(/\D/g, '');
-  if (digits.length === 11) {
-    return digits.slice(0, 2) + digits.slice(3);
+  const normalized = digits.startsWith('55') && digits.length > 11 ? digits.slice(2) : digits;
+  if (normalized.length === 11) {
+    return normalized.slice(0, 2) + normalized.slice(3);
   }
-  return digits;
+  return normalized;
 }
 
 export function getWeekDates(weekOffset: number): Date[] {

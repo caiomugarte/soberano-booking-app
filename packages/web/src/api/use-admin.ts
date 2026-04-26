@@ -11,9 +11,11 @@ export interface AdminAppointment {
   endTime: string;
   status: string;
   priceCents: number;
+  packageId: string | null;
   service: { id: string; name: string; icon: string };
   customer: { name: string; phone: string };
   barber: { firstName: string; lastName: string; avatarUrl: string | null };
+  package: { appointmentNumber: number; totalUses: number; totalPriceCents: number } | null;
 }
 
 export interface AdminMe {
@@ -136,6 +138,25 @@ export interface AdminBookingInput {
   customerName: string;
   customerPhone?: string;
   priceCents?: number;
+  packageId?: string;
+}
+
+export interface CustomerPackage {
+  id: string;
+  customerName: string;
+  customerPhone: string | null;
+  totalUses: number;
+  usedCount: number;
+  totalPriceCents: number;
+  status: 'active' | 'completed' | 'cancelled';
+  createdAt: string;
+}
+
+export interface AdminCreatePackageInput {
+  customerName: string;
+  customerPhone?: string;
+  totalUses: number;
+  totalPriceCents: number;
 }
 
 export function useAdminCreateBooking() {
@@ -186,5 +207,62 @@ export function useAdminCustomerLookup(phone: string) {
     queryFn: () => api.get<{ name: string | null }>('/customer/name?phone=' + phone),
     enabled: phone.length >= 10,
     staleTime: 30_000,
+  });
+}
+
+export function useAdminCreatePackage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AdminCreatePackageInput) =>
+      authRequest<CustomerPackage>('/admin/packages', {
+        method: 'POST',
+        body: JSON.stringify(input),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-packages'] });
+    },
+  });
+}
+
+export function useAdminCustomerPackages(phone: string) {
+  return useQuery({
+    queryKey: ['admin-packages', phone],
+    queryFn: () => authRequest<{ packages: CustomerPackage[] }>('/admin/packages?phone=' + phone).then((r) => r.packages),
+    enabled: phone.length >= 10,
+    staleTime: 30_000,
+  });
+}
+
+export function useAdminPackages(status?: string) {
+  return useQuery({
+    queryKey: ['admin-packages-all', status ?? 'all'],
+    queryFn: () =>
+      authRequest<{ packages: CustomerPackage[] }>(
+        '/admin/packages' + (status ? `?status=${status}` : ''),
+      ).then((r) => r.packages),
+    staleTime: 30_000,
+  });
+}
+
+export function useAdminDeactivatePackage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authRequest(`/admin/packages/${id}/deactivate`, { method: 'PATCH' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-packages-all'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-packages'] });
+    },
+  });
+}
+
+export function useAdminDeletePackage() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) =>
+      authRequest(`/admin/packages/${id}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-packages-all'] });
+    },
   });
 }

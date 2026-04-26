@@ -13,6 +13,7 @@ export interface CreateAppointmentData {
   barberId: string;
   serviceId: string;
   customerId: string;
+  packageId?: string;
   date: Date;
   startTime: string;
   endTime: string;

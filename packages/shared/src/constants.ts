@@ -7,6 +7,6 @@ export const APPOINTMENT_STATUS = {
 
 export type AppointmentStatus = (typeof APPOINTMENT_STATUS)[keyof typeof APPOINTMENT_STATUS];
 
-export const MAX_WEEKS_AHEAD = 4;
+export const MAX_WEEKS_AHEAD = 8;
 
 export const PHONE_COUNTRY_CODE = '55';

@@ -33,8 +33,16 @@ export const barberLoginSchema = z.object({
   password: z.string().min(6, 'Senha deve ter pelo menos 6 caracteres'),
 });
 
+export const createPackageSchema = z.object({
+  customerName: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres').max(200),
+  customerPhone: z.string().regex(/^\d{10,11}$/, 'Telefone deve ter 10 ou 11 dígitos').optional(),
+  totalUses: z.number().int().min(1, 'Número de usos deve ser pelo menos 1'),
+  totalPriceCents: z.number().int().positive('Preço deve ser maior que zero'),
+});
+
 export type BookingInput = z.infer<typeof bookingSchema>;
 export type CancelAppointmentInput = z.infer<typeof cancelAppointmentSchema>;
 export type ChangeAppointmentInput = z.infer<typeof changeAppointmentSchema>;
 export type SlotsQueryInput = z.infer<typeof slotsQuerySchema>;
 export type BarberLoginInput = z.infer<typeof barberLoginSchema>;
+export type CreatePackageInput = z.infer<typeof createPackageSchema>;
