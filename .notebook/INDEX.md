@@ -3,7 +3,8 @@
 ## Entries
 
 | File | Tags | Summary |
-|------|------|---------|
+|---|---|---|
+| [booking-time-step-week-navigation.md](booking-time-step-week-navigation.md) | booking, week-nav, gotcha | getWeekDates is today-anchored; weekOffset must use today as reference, not Monday |
 | [architecture-overview.md](architecture-overview.md) | architecture, packages, overview | All 6 packages, API layer structure, key entry points, stack |
 | [booking-flow.md](booking-flow.md) | booking, flow, use-case | Full customer booking request flow from HTTP to DB |
 | [multi-tenancy-implementation.md](multi-tenancy-implementation.md) | multi-tenancy, architecture, prisma | How tenant isolation works: middleware, Prisma extension, TenantConfig |

@@ -87,4 +87,16 @@ describe('GetAvailableSlots', () => {
     expect(slots.find((s) => s.time === '10:30')).toEqual({ time: '10:30', available: true });
     expect(slots.find((s) => s.time === '11:00')).toEqual({ time: '11:00', available: true });
   });
+
+  it('marks slots that overlap an unaligned absence window as unavailable', async () => {
+    // Absence starts at 09:15 (not on a 30-min boundary) — slot 09:00–09:30 overlaps it
+    const { shiftRepo, appointmentRepo } = makeRepos({
+      absences: [{ startTime: '09:15', endTime: '10:30' }],
+    });
+    const useCase = new GetAvailableSlots(appointmentRepo, shiftRepo);
+    const slots = await useCase.execute('barber-1', FUTURE_MONDAY);
+    expect(slots.find((s) => s.time === '09:00')).toEqual({ time: '09:00', available: false });
+    expect(slots.find((s) => s.time === '09:30')).toEqual({ time: '09:30', available: false });
+    expect(slots.find((s) => s.time === '10:30')).toEqual({ time: '10:30', available: true });
+  });
 });
