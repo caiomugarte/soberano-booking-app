@@ -19,6 +19,15 @@ export async function authRequest<T>(path: string, options?: RequestInit): Promi
     });
 
   let token = useAuthStore.getState().accessToken;
+  if (!token) {
+    token = await refreshAccessToken();
+  }
+
+  if (!token) {
+    await useAuthStore.getState().logout();
+    throw new Error('Sessão expirada. Faça login novamente.');
+  }
+
   let res = await makeRequest(token);
 
   // Token expired — try to refresh once and retry

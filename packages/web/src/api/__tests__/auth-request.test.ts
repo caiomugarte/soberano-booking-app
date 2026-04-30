@@ -49,4 +49,30 @@ describe('authRequest', () => {
     expect(refreshCalls).toHaveLength(1);
     expect(useAuthStore.getState().accessToken).toBe('fresh-token');
   });
+
+  it('refreshes before the first protected request when no access token is in memory', async () => {
+    useAuthStore.setState({ accessToken: null, isInitialized: true });
+
+    vi.mocked(fetch)
+      .mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => ({ accessToken: 'fresh-token' }),
+      } as Response)
+      .mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => ({ id: 'provider-1', firstName: 'Matheus', lastName: 'Silva', avatarUrl: null }),
+      } as Response);
+
+    await authRequest('/admin/me');
+
+    expect(vi.mocked(fetch).mock.calls[0]?.[0]).toBe('/api/auth/refresh');
+    expect(vi.mocked(fetch).mock.calls[1]?.[0]).toBe('/api/admin/me');
+    expect(vi.mocked(fetch).mock.calls[1]?.[1]).toMatchObject({
+      headers: expect.objectContaining({
+        Authorization: 'Bearer fresh-token',
+      }),
+    });
+  });
 });
