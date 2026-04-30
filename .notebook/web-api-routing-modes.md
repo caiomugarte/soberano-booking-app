@@ -9,6 +9,7 @@ Entry: `packages/web/src/config/api.ts`, `packages/web/src/api/auth-request.ts`,
 - `vite.config.ts` still proxies `/api` to `http://localhost:3000` in local dev
 - `nginx.conf` now proxies `/api/*` to `${API_INTERNAL_URL}` before the SPA fallback
 - `Dockerfile` and `docker-compose.web.yaml` no longer require build-time `VITE_API_URL`; runtime proxying uses `API_INTERNAL_URL`
+- Root `docker-compose.yaml` must also pass `API_INTERNAL_URL` into the `web` container. Leaving the old `VITE_API_URL` build arg in the Coolify stack causes confusion because production should no longer depend on a public API hostname
 - `packages/web/.env` should not define `VITE_API_URL`, otherwise production builds will bake the local override into the bundle
 
 `packages/web-admin`:
