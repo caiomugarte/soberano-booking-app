@@ -55,6 +55,7 @@ if (env.NODE_ENV === 'development') {
 app.addHook('preHandler', async (request, reply) => {
   if (request.url.startsWith('/api/platform/')) return;
   if (request.url.startsWith('/api/internal/')) return;
+  if (request.url === '/api/health') return;
   if (request.url === '/api/auth/refresh') return;
   if (request.url === '/api/auth/logout') return;
   if (request.url.startsWith('/docs')) return;

@@ -10,7 +10,7 @@
 | Database | PostgreSQL (Coolify service — shared across all tenants) |
 | API | Coolify Application — `https://api.altion.com.br` (shared) |
 | Super-admin | Coolify Application — `https://admin.altion.com.br` |
-| Soberano web | Coolify Application — `https://soberano.altion.com.br` |
+| Soberano web | Coolify Application — `https://soberano.altion.com.br` (SPA + same-origin `/api` proxy) |
 | _New client web_ | Coolify Application — `https://[slug].altion.com.br` or custom domain |
 
 **Three docker-compose files:**
@@ -135,9 +135,16 @@ packages/shared/**
 **Build Variables:**
 
 ```
-VITE_API_URL=https://api.altion.com.br
 VITE_TENANT_SLUG=soberano
 ```
+
+**Runtime Variables:**
+
+```
+API_INTERNAL_URL=http://api:3000
+```
+
+`API_INTERNAL_URL` is the nginx upstream target on the shared Coolify Docker network. Keep it as the internal API service URL, not a public hostname.
 
 Deploy and verify the container is **Running**.
 
@@ -159,11 +166,11 @@ Credentials are printed to the console — **copy them immediately**.
 ### Step 6 — Verify
 
 ```bash
-# API health
-curl https://api.altion.com.br/api/health
+# Browser-to-API traffic now goes through the tenant domain
+curl https://soberano.altion.com.br/api/health
 
 # Soberano services (must include X-Tenant-Slug)
-curl https://api.altion.com.br/api/services -H "X-Tenant-Slug: soberano"
+curl https://soberano.altion.com.br/api/services -H "X-Tenant-Slug: soberano"
 ```
 
 Open `https://soberano.altion.com.br` — the booking flow should load normally.
@@ -224,11 +231,12 @@ In the existing Soberano web Coolify resource:
 Add:
 ```
 VITE_TENANT_SLUG=soberano
+API_INTERNAL_URL=http://api:3000
 ```
 
-Update:
+Remove if still present:
 ```
-VITE_API_URL=https://api.altion.com.br
+VITE_API_URL
 ```
 
 Trigger a redeploy.
@@ -250,11 +258,11 @@ Follow [Step 3](#step-3--super-admin-panel-docker-composeadminyaml) above to cre
 # Existing booking flow still works
 curl https://soberano.altion.com.br
 
-# API requires tenant header now
-curl https://api.altion.com.br/api/services -H "X-Tenant-Slug: soberano"
+# Same-origin API path works through the tenant domain
+curl https://soberano.altion.com.br/api/services -H "X-Tenant-Slug: soberano"
 
 # Without header → 404
-curl https://api.altion.com.br/api/services  # → {"error":"TENANT_NOT_FOUND"}
+curl https://soberano.altion.com.br/api/services  # → {"error":"TENANT_NOT_FOUND"}
 ```
 
 Ask a barber to log in and confirm the admin dashboard works.
@@ -326,9 +334,16 @@ This creates providers and services for the new tenant. Adjust the seed script o
 **Build Variables:**
 
 ```
-VITE_API_URL=https://api.altion.com.br
 VITE_TENANT_SLUG=marques
 ```
+
+**Runtime Variables:**
+
+```
+API_INTERNAL_URL=http://api:3000
+```
+
+The customer-facing frontend should call `https://marques.altion.com.br/api/...`; nginx proxies those requests to `API_INTERNAL_URL` on the shared Coolify network.
 
 **Watch Paths:**
 ```

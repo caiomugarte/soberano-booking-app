@@ -12,10 +12,11 @@ RUN npm ci --include=dev
 # Copy source
 COPY packages/web-bruno ./packages/web-bruno
 
+# Prevent local env overrides from being baked into the production bundle
+RUN find packages/web-bruno -maxdepth 1 -type f \( -name '.env' -o -name '.env.*' \) ! -name '.env.example' -delete
+
 # Build-time env vars
-ARG VITE_API_URL
 ARG VITE_TENANT_SLUG
-ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_TENANT_SLUG=$VITE_TENANT_SLUG
 
 # Build the React app

@@ -1,9 +1,13 @@
 import { TENANT_SLUG } from './env.js';
 
-const BASE = `${import.meta.env.VITE_API_URL ?? ''}/api`;
+export function resolveApiBaseUrl(apiUrl = import.meta.env.VITE_API_URL): string {
+  return apiUrl ? `${apiUrl}/api` : '/api';
+}
+
+export const API_BASE = resolveApiBaseUrl();
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     headers: { 'Content-Type': 'application/json', 'X-Tenant-Slug': TENANT_SLUG },
     ...options,
   });

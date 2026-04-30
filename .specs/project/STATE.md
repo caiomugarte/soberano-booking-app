@@ -6,6 +6,9 @@
 
 | Feature | Status | Spec |
 |---|---|---|
+| web-admin-internal-api-proxy | Tasks draft — awaiting approval | `.specs/features/web-admin-internal-api-proxy/tasks.md` |
+| web-bruno-internal-api-proxy | Tasks draft — awaiting approval | `.specs/features/web-bruno-internal-api-proxy/tasks.md` |
+| web-internal-api-proxy | Tasks draft — awaiting approval | `.specs/features/web-internal-api-proxy/tasks.md` |
 | web-bruno-api-migration | Tasks ready — ready to execute | `.specs/features/web-bruno-api-migration/tasks.md` |
 | psychology-api | Tasks draft — awaiting approval | `.specs/features/psychology-api/tasks.md` |
 | frontend-unit-tests | Tasks ready — ready to execute | `.specs/features/frontend-unit-tests/spec.md` |

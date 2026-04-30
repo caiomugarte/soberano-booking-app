@@ -37,7 +37,7 @@ export function useLogin() {
   const setAccessToken = useAuthStore((s) => s.setAccessToken);
   return useMutation({
     mutationFn: (data: { email: string; password: string }) =>
-      fetch(`${API_BASE}/api/auth/login`, {
+      fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-Tenant-Slug': TENANT_SLUG },

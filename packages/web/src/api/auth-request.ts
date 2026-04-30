@@ -1,11 +1,12 @@
 import { useAuthStore } from '../stores/auth.store.ts';
 import { TENANT_SLUG } from '../config/env.js';
+import { API_BASE } from '../config/api.ts';
 
-export const API_BASE = import.meta.env.VITE_API_URL ?? '';
+export { API_BASE };
 
 async function tryRefresh(): Promise<string | null> {
   try {
-    const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'X-Tenant-Slug': TENANT_SLUG },
@@ -21,7 +22,7 @@ async function tryRefresh(): Promise<string | null> {
 
 export async function authRequest<T>(path: string, options?: RequestInit): Promise<T> {
   const makeRequest = (token: string | null) =>
-    fetch(`${API_BASE}/api${path}`, {
+    fetch(`${API_BASE}${path}`, {
       credentials: 'include',
       ...options,
       headers: {

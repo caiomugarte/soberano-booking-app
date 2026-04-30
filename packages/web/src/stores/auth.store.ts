@@ -18,7 +18,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
 
   logout: async () => {
     try {
-      await fetch(`${API_BASE}/api/auth/logout`, {
+      await fetch(`${API_BASE}/auth/logout`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'X-Tenant-Slug': TENANT_SLUG },
@@ -29,7 +29,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
 
   initialize: async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+      const res = await fetch(`${API_BASE}/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'X-Tenant-Slug': TENANT_SLUG },

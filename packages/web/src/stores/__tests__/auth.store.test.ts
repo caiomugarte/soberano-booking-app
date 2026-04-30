@@ -1,5 +1,7 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { useAuthStore } from '../auth.store.ts';
+import { API_BASE } from '../../api/auth-request.ts';
+import { TENANT_SLUG } from '../../config/env.ts';
 
 beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn());
@@ -36,6 +38,12 @@ describe('auth store — initialize', () => {
 
     await useAuthStore.getState().initialize();
 
+    expect(fetch).toHaveBeenCalledWith(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'X-Tenant-Slug': TENANT_SLUG },
+    });
+
     const s = useAuthStore.getState();
     expect(s.accessToken).toBe('abc');
     expect(s.isInitialized).toBe(true);
@@ -70,6 +78,12 @@ describe('auth store — logout', () => {
     useAuthStore.getState().setAccessToken('tok');
 
     await useAuthStore.getState().logout();
+
+    expect(fetch).toHaveBeenCalledWith(`${API_BASE}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'X-Tenant-Slug': TENANT_SLUG },
+    });
 
     const s = useAuthStore.getState();
     expect(s.accessToken).toBeNull();

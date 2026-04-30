@@ -4,6 +4,7 @@
 
 | File | Tags | Summary |
 |---|---|---|
+| [api-runtime-deploy-gotchas.md](api-runtime-deploy-gotchas.md) | deploy, api, cron, coolify, traefik | Shared API deploy model; every API instance also starts reminder cron |
 | [booking-time-step-week-navigation.md](booking-time-step-week-navigation.md) | booking, week-nav, gotcha | getWeekDates is today-anchored; weekOffset must use today as reference, not Monday |
 | [architecture-overview.md](architecture-overview.md) | architecture, packages, overview | All 6 packages, API layer structure, key entry points, stack |
 | [booking-flow.md](booking-flow.md) | booking, flow, use-case | Full customer booking request flow from HTTP to DB |
@@ -12,6 +13,7 @@
 | [platform-layer.md](platform-layer.md) | platform, super-admin, tenant-management | Super-admin platform: `/api/platform/` routes + `web-admin` UI |
 | [repository-singleton-pattern.md](repository-singleton-pattern.md) | repositories, architecture, pattern | Repos instantiated per-request with request.tenantPrisma |
 | [notification-hardcoded-brand.md](notification-hardcoded-brand.md) | notifications, whatsapp, tenant-config | WhatsAppNotificationService takes TenantConfig — brand from Tenant.config JSON |
+| [web-api-routing-modes.md](web-api-routing-modes.md) | web, deploy, nginx, proxy, coolify | packages/web uses dev proxy locally but still bakes a public API origin in production |
 | [mcp-tool-registration-pattern.md](mcp-tool-registration-pattern.md) | mcp, tools, pattern, architecture | Tool file structure, public vs provider distinction, server.ts registration flow |
 | [mcp-internal-route-pattern.md](mcp-internal-route-pattern.md) | mcp, internal-routes, api, pattern, auth | Internal route auth, tenant resolution via barberId, validation patterns, route inventory |
 | [mcp-repository-methods.md](mcp-repository-methods.md) | mcp, repositories, appointment, provider-shift, reference | Appointment and shift repo methods available for provider MCP tools |
