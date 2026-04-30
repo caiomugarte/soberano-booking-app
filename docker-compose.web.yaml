@@ -16,3 +16,4 @@ services:
 networks:
   coolify:
     external: true
+    name: ${COOLIFY_SHARED_NETWORK}

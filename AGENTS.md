@@ -156,7 +156,7 @@ Brazilian phone numbers are stored without `+55`. Chatwoot contacts are searched
 - **App**: deployed as a single `docker-compose.yaml` resource in Coolify — `api` and `web` services in the same stack.
 - **Database**: PostgreSQL runs as a separate Coolify service (not inside the compose stack). Connected via `DATABASE_URL`.
 - **Routing**: the `web` container runs nginx (`packages/web/nginx.conf`). All `/api` requests are proxied internally to the `api` service via `API_INTERNAL_URL`. There is **no separate public domain for the API** — the single public domain (`soberano.altion.com.br`) serves both the SPA and API through this nginx proxy.
-- Both services share the `coolify` external Docker network so nginx can reach the `api` container by service name.
+- Each environment must use its own external Docker network (for example `coolify-prod` and `coolify-dev`) so nginx can reach the correct `api` container by service name without cross-environment alias collisions.
 - `git push master` triggers auto-redeploy of the compose stack.
 - Migrations run automatically on deploy via `prisma migrate deploy` (no prompts, no data loss).
 - `VITE_API_URL` is only used in local development. In production the web build uses relative `/api` paths, proxied internally by nginx.

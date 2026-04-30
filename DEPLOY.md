@@ -13,6 +13,12 @@
 | Soberano web | Coolify Application — `https://soberano.altion.com.br` (SPA + same-origin `/api` proxy) |
 | _New client web_ | Coolify Application — `https://[slug].altion.com.br` or custom domain |
 
+**Environment network rule:**
+
+- Production stacks join `coolify-prod`
+- Development stacks join `coolify-dev`
+- Do not attach prod and dev application stacks to the same external Docker network, or shared aliases like `api` will collide
+
 **Three docker-compose files:**
 
 | File | Purpose | Deployed |
@@ -24,6 +30,17 @@
 ---
 
 ## Initial setup (first time only)
+
+### Step 0 — Create one shared Docker network per environment
+
+On the VPS, create the external networks once:
+
+```bash
+docker network create coolify-prod
+docker network create coolify-dev
+```
+
+Every Coolify application based on these compose files must set `COOLIFY_SHARED_NETWORK` to the correct environment network. Inside each environment network, `http://api:3000` remains safe because only that environment's API container is reachable via the `api` alias.
 
 ### Step 1 — PostgreSQL (Coolify Service)
 
@@ -70,6 +87,7 @@ ALLOWED_ORIGINS=https://soberano.altion.com.br,https://admin.altion.com.br
 SUPER_ADMIN_JWT_SECRET=<random 64-char string>
 SUPER_ADMIN_EMAIL=your@email.com
 SUPER_ADMIN_PASSWORD_HASH=<bcrypt hash>
+COOLIFY_SHARED_NETWORK=coolify-prod
 ```
 
 > To generate secrets: `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
@@ -108,6 +126,12 @@ packages/shared/**
 VITE_API_URL=https://api.altion.com.br
 ```
 
+**Compose / Environment Variables:**
+
+```
+COOLIFY_SHARED_NETWORK=coolify-prod
+```
+
 Deploy and verify the container is **Running**.
 
 ---
@@ -142,6 +166,7 @@ VITE_TENANT_SLUG=soberano
 
 ```
 API_INTERNAL_URL=http://api:3000
+COOLIFY_SHARED_NETWORK=coolify-prod
 ```
 
 `API_INTERNAL_URL` is the nginx upstream target on the shared Coolify Docker network. Keep it as the internal API service URL, not a public hostname.
@@ -232,6 +257,7 @@ Add:
 ```
 VITE_TENANT_SLUG=soberano
 API_INTERNAL_URL=http://api:3000
+COOLIFY_SHARED_NETWORK=coolify-prod
 ```
 
 Remove if still present:
@@ -341,6 +367,7 @@ VITE_TENANT_SLUG=marques
 
 ```
 API_INTERNAL_URL=http://api:3000
+COOLIFY_SHARED_NETWORK=coolify-prod
 ```
 
 The customer-facing frontend should call `https://marques.altion.com.br/api/...`; nginx proxies those requests to `API_INTERNAL_URL` on the shared Coolify network.
