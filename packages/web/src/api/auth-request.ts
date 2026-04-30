@@ -1,24 +1,9 @@
 import { useAuthStore } from '../stores/auth.store.ts';
-import { TENANT_SLUG } from '../config/env.js';
 import { API_BASE } from '../config/api.ts';
+import { TENANT_SLUG } from '../config/env.js';
+import { refreshAccessToken } from './auth-session.ts';
 
 export { API_BASE };
-
-async function tryRefresh(): Promise<string | null> {
-  try {
-    const res = await fetch(`${API_BASE}/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'X-Tenant-Slug': TENANT_SLUG },
-    });
-    if (!res.ok) return null;
-    const { accessToken } = await res.json();
-    useAuthStore.getState().setAccessToken(accessToken);
-    return accessToken;
-  } catch {
-    return null;
-  }
-}
 
 export async function authRequest<T>(path: string, options?: RequestInit): Promise<T> {
   const makeRequest = (token: string | null) =>
@@ -38,7 +23,7 @@ export async function authRequest<T>(path: string, options?: RequestInit): Promi
 
   // Token expired — try to refresh once and retry
   if (res.status === 401) {
-    const newToken = await tryRefresh();
+    const newToken = await refreshAccessToken();
     if (newToken) {
       res = await makeRequest(newToken);
     } else {
