@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { API_BASE } from '../api/auth-request.ts';
+import { API_BASE } from '../config/api.ts';
 import { TENANT_SLUG } from '../config/env.js';
+import { refreshAccessToken } from '../api/auth-session.ts';
 
 interface AuthState {
   accessToken: string | null;
@@ -28,20 +29,7 @@ export const useAuthStore = create<AuthState>()((set) => ({
   },
 
   initialize: async () => {
-    try {
-      const res = await fetch(`${API_BASE}/auth/refresh`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'X-Tenant-Slug': TENANT_SLUG },
-      });
-      if (res.ok) {
-        const { accessToken } = await res.json();
-        set({ accessToken, isInitialized: true });
-      } else {
-        set({ isInitialized: true });
-      }
-    } catch {
-      set({ isInitialized: true });
-    }
+    const accessToken = await refreshAccessToken();
+    set({ accessToken, isInitialized: true });
   },
 }));
