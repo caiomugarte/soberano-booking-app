@@ -34,6 +34,10 @@ export function formatPhone(value: string): string {
   return v;
 }
 
+export function todayInCampoGrande(): string {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Campo_Grande' }).format(new Date());
+}
+
 export function stripPhone(value: string): string {
   const digits = value.replace(/\D/g, '');
   const normalized = digits.startsWith('55') && digits.length > 11 ? digits.slice(2) : digits;

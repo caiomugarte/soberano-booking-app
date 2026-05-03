@@ -159,7 +159,7 @@ Brazilian phone numbers are stored without `+55`. Chatwoot contacts are searched
 - Each environment must use its own external Docker network (for example `coolify-prod` and `coolify-dev`) so nginx can reach the correct `api` container by service name without cross-environment alias collisions.
 - `git push master` triggers auto-redeploy of the compose stack.
 - Migrations run automatically on deploy via `prisma migrate deploy` (no prompts, no data loss).
-- `VITE_API_URL` is only used in local development. In production the web build uses relative `/api` paths, proxied internally by nginx.
+- Frontend packages should call same-origin `/api` paths. In local development, Vite proxies `/api` to the backend; in production nginx proxies `/api` internally via `API_INTERNAL_URL`.
 - See `DEPLOY.md` for full infrastructure setup.
 
 ---

@@ -1,10 +1,6 @@
 import { TENANT_SLUG } from './env.js';
 
-export function resolveApiBaseUrl(apiUrl = import.meta.env.VITE_API_URL): string {
-  return apiUrl ? `${apiUrl}/api` : '/api';
-}
-
-export const API_BASE = resolveApiBaseUrl();
+export const API_BASE = '/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {

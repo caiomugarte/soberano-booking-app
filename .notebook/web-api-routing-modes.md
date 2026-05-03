@@ -1,35 +1,33 @@
 # Web API Routing Modes
-> Frontend packages are inconsistent about same-origin API proxying vs build-time API origins
+> Frontend packages now standardize on same-origin `/api` browser requests with proxying handled by Vite in local dev and nginx in production
 
-Entry: `packages/web/src/config/api.ts`, `packages/web/src/api/auth-request.ts`, `packages/web/vite.config.ts`, `packages/web/nginx.conf`, `packages/web/Dockerfile`, `docker-compose.web.yaml`, `packages/web-admin/src/api/platform.ts`, `packages/web-admin/nginx.conf`, `packages/web-admin/Dockerfile`, `docker-compose.admin.yaml`, `packages/web-bruno/src/api/http-client.ts`, `packages/web-bruno/nginx.conf`, `packages/web-bruno/Dockerfile`, `packages/web-bruno/README.md`, `AGENTS.md`, `prd.md`, `DEPLOY.md`
+Entry: `packages/web/src/config/api.ts`, `packages/web/src/api/auth-request.ts`, `packages/web/vite.config.ts`, `packages/web/nginx.conf`, `packages/web/Dockerfile`, `docker-compose.web.yaml`, `packages/web-admin/src/api/platform.ts`, `packages/web-admin/nginx.conf`, `packages/web-admin/Dockerfile`, `docker-compose.admin.yaml`, `packages/web-bruno/src/api/http-client.ts`, `packages/web-bruno/nginx.conf`, `packages/web-bruno/Dockerfile`, `packages/web-bruno/README.md`, `packages/web-marques/src/config/api.js`, `packages/web-marques/nginx.conf`, `packages/web-marques/Dockerfile`, `docker-compose.yaml`, `AGENTS.md`, `DEPLOY.md`
+
+Shared pattern:
+- Browser code uses relative `/api/...` paths only; no frontend package relies on `VITE_API_URL`
+- Local development keeps the Vite `/api` proxy to `http://localhost:3000`
+- Production nginx config proxies `/api/*` to `${API_INTERNAL_URL}` before SPA fallback
+- Dockerfiles only need `VITE_TENANT_SLUG` at build time; `API_INTERNAL_URL` is a runtime env for nginx templating
 
 `packages/web`:
-- `src/config/api.ts` resolves browser requests to same-origin `/api` by default and still supports an explicit `VITE_API_URL` override when provided
-- `src/api/auth-request.ts`, `src/stores/auth.store.ts`, and admin login reuse that shared `/api` base for auth, refresh, and logout flows
-- `vite.config.ts` still proxies `/api` to `http://localhost:3000` in local dev
-- `nginx.conf` now proxies `/api/*` to `${API_INTERNAL_URL}` before the SPA fallback
-- `Dockerfile` and `docker-compose.web.yaml` no longer require build-time `VITE_API_URL`; runtime proxying uses `API_INTERNAL_URL`
-- Root `docker-compose.yaml` must also pass `API_INTERNAL_URL` into the `web` container. Leaving the old `VITE_API_URL` build arg in the Coolify stack causes confusion because production should no longer depend on a public API hostname
-- `packages/web/.env` should not define `VITE_API_URL`, otherwise production builds will bake the local override into the bundle
+- `src/config/api.ts` hardcodes `API_BASE = '/api'`
+- Auth refresh, logout, and admin login continue to use that shared base
+- Tests cover the fixed `/api` base directly
 
 `packages/web-admin`:
-- `src/api/platform.ts` still builds requests from `import.meta.env.VITE_API_URL`
-- `nginx.conf` already proxies `/api` to `${API_INTERNAL_URL}` and forwards headers
-- `Dockerfile` and `docker-compose.admin.yaml` still expect build-time `VITE_API_URL`
-- This means the runtime proxy exists, but the browser bundle is still coupled to a public API origin
+- `src/api/platform.ts` now calls `/api/platform/...` directly
+- `Dockerfile`, `docker-compose.admin.yaml`, and root `docker-compose.yaml` no longer use a build-time API origin; they pass `API_INTERNAL_URL` at runtime instead
 
 `packages/web-bruno`:
-- `src/api/http-client.ts` prepends `import.meta.env.VITE_API_URL` to all requests
-- `nginx.conf` only serves the SPA; it does not proxy `/api`
-- `Dockerfile` still bakes `VITE_API_URL` into the build
-- `README.md` already says the API should be proxied at `/api`, so docs and runtime behavior are out of sync
+- `src/api/http-client.ts` now fetches the relative request path directly and still injects `x-tenant-slug`, cookies, and auth headers
+- `README.md` and package AGENTS docs now describe the same-origin `/api` model only
 
-Shared mismatch:
-- `AGENTS.md` and root `prd.md` describe the target production model: tenant traffic hits the frontend domain, and nginx proxies `/api` internally via `API_INTERNAL_URL`
-- `DEPLOY.md` still documents the older public-API-domain model (`https://api.altion.com.br`)
+`packages/web-marques`:
+- `src/config/api.js` now uses `/api`
+- `nginx.conf` was missing an API proxy; it now forwards `/api/*` to `${API_INTERNAL_URL}`, which is required after removing the browser-side override
+- `Dockerfile` no longer bakes `VITE_API_URL` into the build
 
-Implication:
-- `packages/web` is now aligned with the same-origin proxy model described in the deploy docs
-- `web-admin` and `web-bruno` are still partway through the broader migration, so frontend packages remain inconsistent until their own proxy tasks land
+Gotcha:
+- If a frontend package serves through nginx, `API_INTERNAL_URL` must be configured at runtime or nginx templating will produce a broken upstream even though the bundle itself is correct
 
 Updated: 2026-04-30

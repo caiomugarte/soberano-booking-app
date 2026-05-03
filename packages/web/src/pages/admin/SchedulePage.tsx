@@ -6,6 +6,7 @@ import {
 } from '../../api/use-schedule.ts';
 import { Button } from '../../components/ui/Button.tsx';
 import { Spinner } from '../../components/ui/Spinner.tsx';
+import { todayInCampoGrande } from '../../lib/format.ts';
 
 const DAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const WORK_DAYS = [1, 2, 3, 4, 5, 6];
@@ -38,7 +39,7 @@ function ShiftRow({
 }
 
 export default function SchedulePage() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInCampoGrande();
   const navigate = useNavigate();
   const { data: savedShifts, isLoading: loadingShifts } = useShifts();
   const { data: absences, isLoading: loadingAbsences } = useAbsences();
@@ -198,9 +199,9 @@ export default function SchedulePage() {
 
         {loadingAbsences ? (
           <div className="flex items-center gap-2 text-muted py-4"><Spinner /> Carregando...</div>
-        ) : absences?.filter((a) => a.date.slice(0, 10) >= today).length ? (
+        ) : absences?.length ? (
           <div className="mb-5 space-y-2">
-            {absences.filter((a) => a.date.slice(0, 10) >= today).map((a) => (
+            {absences.map((a) => (
               <div key={a.id} className="flex items-center justify-between gap-3 py-2.5 border-b border-dark-border last:border-0">
                 <div>
                   <p className="text-sm font-medium">

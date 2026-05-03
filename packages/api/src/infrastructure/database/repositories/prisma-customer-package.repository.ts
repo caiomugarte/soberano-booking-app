@@ -1,24 +1,48 @@
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type PrismaClientOrExtended = any;
+import type { CustomerPackage as PrismaCustomerPackage } from '@prisma/client';
+import type { TenantPrismaClient } from '../../../config/tenant-prisma.js';
 import type { CustomerPackageEntity } from '../../../domain/entities/customer-package.js';
 import type { CustomerPackageRepository } from '../../../domain/repositories/customer-package.repository.js';
 
+function mapCustomerPackage(pkg: PrismaCustomerPackage): CustomerPackageEntity {
+  if (pkg.status !== 'active' && pkg.status !== 'completed' && pkg.status !== 'cancelled') {
+    throw new Error(`INVALID_PACKAGE_STATUS:${pkg.status}`);
+  }
+
+  const status: CustomerPackageEntity['status'] = pkg.status;
+
+  return {
+    id: pkg.id,
+    tenantId: pkg.tenantId,
+    customerName: pkg.customerName,
+    customerPhone: pkg.customerPhone ?? null,
+    totalUses: pkg.totalUses,
+    usedCount: pkg.usedCount,
+    totalPriceCents: pkg.totalPriceCents,
+    status,
+    createdAt: pkg.createdAt,
+    updatedAt: pkg.updatedAt,
+  };
+}
+
 export class PrismaCustomerPackageRepository implements CustomerPackageRepository {
-  constructor(private db: PrismaClientOrExtended) {}
+  constructor(private db: TenantPrismaClient) {}
 
   async create(data: { tenantId: string; customerName: string; customerPhone?: string; totalUses: number; totalPriceCents: number }): Promise<CustomerPackageEntity> {
-    return this.db.customerPackage.create({ data });
+    const created = await this.db.customerPackage.create({ data });
+    return mapCustomerPackage(created);
   }
 
   async findActiveByPhone(tenantId: string, phone: string): Promise<CustomerPackageEntity[]> {
-    return this.db.customerPackage.findMany({
+    const packages = await this.db.customerPackage.findMany({
       where: { tenantId, customerPhone: phone, status: 'active' },
       orderBy: { createdAt: 'asc' },
     });
+    return packages.map(mapCustomerPackage);
   }
 
   async findByIdAndTenant(id: string, tenantId: string): Promise<CustomerPackageEntity | null> {
-    return this.db.customerPackage.findFirst({ where: { id, tenantId } });
+    const pkg = await this.db.customerPackage.findFirst({ where: { id, tenantId } });
+    return pkg ? mapCustomerPackage(pkg) : null;
   }
 
   async incrementUsedCount(id: string): Promise<CustomerPackageEntity> {
@@ -27,26 +51,29 @@ export class PrismaCustomerPackageRepository implements CustomerPackageRepositor
       data: { usedCount: { increment: 1 } },
     });
     if (updated.usedCount >= updated.totalUses) {
-      return this.db.customerPackage.update({
+      const completed = await this.db.customerPackage.update({
         where: { id },
         data: { status: 'completed' },
       });
+      return mapCustomerPackage(completed);
     }
-    return updated;
+    return mapCustomerPackage(updated);
   }
 
   async findAllByTenant(tenantId: string, options?: { status?: string }): Promise<CustomerPackageEntity[]> {
-    return this.db.customerPackage.findMany({
+    const packages = await this.db.customerPackage.findMany({
       where: { tenantId, ...(options?.status ? { status: options.status } : {}) },
       orderBy: { createdAt: 'desc' },
     });
+    return packages.map(mapCustomerPackage);
   }
 
   async deactivate(id: string, tenantId: string): Promise<CustomerPackageEntity> {
     const pkg = await this.db.customerPackage.findFirst({ where: { id, tenantId } });
     if (!pkg) throw new Error('NOT_FOUND');
     if (pkg.status !== 'active') throw new Error('NOT_ACTIVE');
-    return this.db.customerPackage.update({ where: { id }, data: { status: 'cancelled' } });
+    const updated = await this.db.customerPackage.update({ where: { id }, data: { status: 'cancelled' } });
+    return mapCustomerPackage(updated);
   }
 
   async deleteById(id: string, tenantId: string): Promise<void> {
