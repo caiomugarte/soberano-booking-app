@@ -16,6 +16,10 @@ const absenceSchema = z.object({
   reason: z.string().max(200).optional(),
 });
 
+function todayInCampoGrande(): string {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'America/Campo_Grande' }).format(new Date());
+}
+
 export async function scheduleRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', authGuard);
 
@@ -38,7 +42,9 @@ export async function scheduleRoutes(app: FastifyInstance): Promise<void> {
   // Get my absences
   app.get('/admin/schedule/absences', async (request) => {
     const shiftRepo = new PrismaProviderShiftRepository(request.tenantPrisma);
-    const absences = await shiftRepo.findAbsencesByProvider(request.providerId!);
+    const today = todayInCampoGrande();
+    const allAbsences = await shiftRepo.findAbsencesByProvider(request.providerId!);
+    const absences = allAbsences.filter((absence) => absence.date.toISOString().slice(0, 10) >= today);
     return { absences };
   });
 

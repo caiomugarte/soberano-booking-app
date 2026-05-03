@@ -48,6 +48,7 @@ No new pages, no routing changes. Both flows are modal-based.
 | `POST /admin/appointments` | Add optional `packageId` field to existing `AdminBookingInput` type |
 | `POST /admin/packages` | New mutation; returns `CustomerPackage` |
 | `GET /admin/packages?phone=` | New query; returns `CustomerPackage[]` (active packages only) |
+| `WhatsAppNotificationService.sendBookingConfirmation` | Package-linked admin bookings omit the self-service cancel/change link; non-package admin bookings keep the existing template |
 
 ---
 
@@ -150,6 +151,17 @@ export interface AdminBookingInput {
      - Clicking a selected pill deselects it (sets `selectedPackageId` to `null`)
   5. In `handleSubmit`, spread `packageId` only when `selectedPackageId` is set
 - **Zero behavior change** when customer has no packages
+
+### Package-linked booking confirmation rule
+
+- **Purpose**: Keep package-linked admin bookings provider-managed by omitting self-service cancel/change links from the customer WhatsApp confirmation
+- **Scope**:
+  - Applies when `POST /admin/appointments` is called with `packageId`
+  - Applies to both `AdminBookingModal` and `BookFromPackageModal`, because both submit the same route with `packageId`
+  - Does **not** apply when `packageId` is absent
+- **Implementation direction**:
+  - `AdminCreateAppointment` uses the presence of `packageId` to choose the notification variant
+  - `WhatsAppNotificationService.sendBookingConfirmation` accepts an option or variant to omit the final "Para cancelar ou alterar" block when the booking is package-linked
 
 ### `DashboardPage` (modified)
 
@@ -374,6 +386,7 @@ export type CreatePackageInput = z.infer<typeof createPackageSchema>
 1. Call `packageRepo.findByIdAndTenant(packageId, tenantId)` — if not found or `status ≠ 'active'`, throw `ValidationError('Pacote inválido ou já utilizado.')`
 2. Create the appointment
 3. Call `packageRepo.incrementUsedCount(packageId)` — fire-and-forget safe (appointment is the source of truth; log if increment fails but don't roll back)
+4. When `packageId` is present, send the customer confirmation without the self-service cancel/change block; when absent, keep the existing template
 
 **Constructor change**: add `packageRepo: CustomerPackageRepository` as a new optional dependency (passed only when `packageId` is present in the route handler — or always passed and the use case ignores it when not needed).
 
@@ -397,7 +410,8 @@ export type CreatePackageInput = z.infer<typeof createPackageSchema>
 | `packages/api/prisma/schema.prisma` | Add `CustomerPackage` model + FK on `Appointment` + relation on `Tenant` |
 | `packages/shared/src/validation.ts` | Add `createPackageSchema` |
 | `packages/api/src/http/routes/admin.routes.ts` | Add `POST /admin/packages`, `GET /admin/packages`, extend `POST /admin/appointments` |
-| `packages/api/src/application/use-cases/booking/admin-create-appointment.ts` | Accept `packageId` + call `packageRepo` |
+| `packages/api/src/application/use-cases/booking/admin-create-appointment.ts` | Accept `packageId`, call `packageRepo`, and switch confirmation mode for package-linked bookings |
+| `packages/api/src/infrastructure/notifications/whatsapp-notification.service.ts` | Add confirmation variant that omits the self-service cancel/change link |
 
 ---
 

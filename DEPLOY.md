@@ -120,15 +120,10 @@ packages/web-admin/**
 packages/shared/**
 ```
 
-**Build Variables** (toggle to "Build Variable"):
-
-```
-VITE_API_URL=https://api.altion.com.br
-```
-
 **Compose / Environment Variables:**
 
 ```
+API_INTERNAL_URL=http://api:3000
 COOLIFY_SHARED_NETWORK=coolify-prod
 ```
 
@@ -258,11 +253,6 @@ Add:
 VITE_TENANT_SLUG=soberano
 API_INTERNAL_URL=http://api:3000
 COOLIFY_SHARED_NETWORK=coolify-prod
-```
-
-Remove if still present:
-```
-VITE_API_URL
 ```
 
 Trigger a redeploy.

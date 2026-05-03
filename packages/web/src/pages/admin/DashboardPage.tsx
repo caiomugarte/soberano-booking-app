@@ -1060,7 +1060,7 @@ export default function DashboardPage() {
       )}
       {editAppointment && <EditAppointmentModal appointment={editAppointment} barberId={me?.id ?? null} onClose={() => setEditAppointment(null)} />}
       {showBookingModal && <AdminBookingModal barberId={me?.id ?? null} onClose={() => setShowBookingModal(false)} />}
-      {showPackageModal && <AdminPackageModal barberId={me?.id ?? null} onClose={() => setShowPackageModal(false)} />}
+      {showPackageModal && <AdminPackageModal onClose={() => setShowPackageModal(false)} />}
       <ActionFab onPackage={() => setShowPackageModal(true)} onBooking={() => setShowBookingModal(true)} />
       {/* Header */}
       <div className="flex items-center justify-between mb-8">

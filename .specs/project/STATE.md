@@ -32,6 +32,7 @@
 | 2026-04-05 | Frontend: monorepo + shared design system (`packages/ui` + `apps/[slug]`) | Enables rapid rollout with themes; supports premium custom builds per client |
 | 2026-04-05 | Tenant resolution: subdomain (`[slug].altion.com.br`) + custom domain via `Host` header | Matches existing `soberano.altion.com.br` pattern; custom domain supported via DB lookup |
 | 2026-04-05 | Feature flags: explicit `enabledFeatures: string[]` per client + central registry in code | More granular than plan-only; supports custom add-on deals per client |
+| 2026-05-02 | Package-linked admin bookings omit self-service cancel/change links in customer confirmations | Package bookings remain provider-managed even though they reuse the admin manual booking flow |
 
 ## Blockers
 
@@ -40,6 +41,13 @@ _None recorded yet._
 ## Lessons
 
 _None recorded yet._
+
+## Quick Tasks Completed
+
+| # | Description | Date | Commit | Status |
+|---|---|---|---|---|
+| 001 | Hide past absences from the admin schedule page without deleting DB records | 2026-05-02 | not committed | ✅ Done |
+| 002 | Make the admin absence date input use the Campo Grande business day instead of UTC | 2026-05-02 | not committed | ✅ Done |
 
 ## Deferred Ideas
 

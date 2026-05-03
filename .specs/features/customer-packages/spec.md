@@ -58,6 +58,8 @@ Barbers currently create prepaid packages informally: they manually book N separ
 4. WHEN the barber deselects / clears the package selector THEN system SHALL submit the booking without `packageId`
 5. WHEN the customer has no active packages THEN system SHALL show nothing (no UI change from current behavior)
 6. WHEN the package lookup is loading THEN system SHALL show nothing (no blocking UI)
+7. WHEN an admin booking is created with `packageId` THEN the customer WhatsApp confirmation SHALL omit the self-service cancel/change link and send only the confirmation details
+8. WHEN an admin booking is created without `packageId` THEN the existing admin manual booking WhatsApp behavior SHALL remain unchanged
 
 **Independent Test**: Look up a customer with 2 active packages → both appear in the selector → select one → submit → request body includes the correct `packageId`.
 
@@ -85,6 +87,7 @@ Barbers currently create prepaid packages informally: they manually book N separ
 - WHEN the last credit of a selected package is consumed via a booking THEN the package status becomes `completed` — it SHALL disappear from the selector on the next lookup
 - WHEN `useAdminCustomerPackages` is called with a phone shorter than 10 digits THEN the query SHALL be disabled (same guard as `useAdminCustomerLookup`)
 - WHEN the customer has one active package and the barber does not want to link it THEN they SHALL be able to deselect it and book without a `packageId`
+- WHEN a package-linked booking is created from `BookFromPackageModal` instead of `AdminBookingModal` THEN the same no-link WhatsApp rule SHALL apply because the booking is still linked by `packageId`
 
 ---
 
@@ -137,6 +140,8 @@ Barbers currently create prepaid packages informally: they manually book N separ
 3. WHEN `used_count + 1 >= total_uses` after increment THEN system SHALL set `status = 'completed'` on the package
 4. WHEN `packageId` refers to a package that does not exist OR has `status ≠ 'active'` THEN system SHALL return `400 VALIDATION_ERROR` and NOT create the appointment
 5. WHEN `packageId` is absent THEN appointment creation SHALL behave identically to the current implementation
+6. WHEN `packageId` is present AND the booking has a customer phone THEN the confirmation WhatsApp message SHALL omit the self-service cancel/change link
+7. WHEN `packageId` is absent THEN the existing confirmation WhatsApp template SHALL remain unchanged
 
 ---
 
@@ -173,6 +178,8 @@ Barbers currently create prepaid packages informally: they manually book N separ
 | PKG-06 | P1: Package selector — multiple packages, none pre-selected | Design | Pending |
 | PKG-07 | P1: Pass packageId on booking submit | Design | Pending |
 | PKG-08 | P1: Allow booking without packageId (deselect) | Design | Pending |
+| PKG-10 | P1: Package-linked admin booking omits self-service link in customer confirmation | Design | Pending |
+| PKG-11 | P1: Non-package admin booking keeps current confirmation template | Design | Pending |
 | PKG-09 | P2: Dashboard entry point | Design | Pending |
 | BKD-01 | B1: Create package — DB record + tenant scope | Design | Pending |
 | BKD-02 | B1: Create package — null phone | Design | Pending |
@@ -185,6 +192,8 @@ Barbers currently create prepaid packages informally: they manually book N separ
 | BKD-09 | B3: Status transitions to completed | Design | Pending |
 | BKD-10 | B3: Invalid/inactive packageId → 400, no appointment created | Design | Pending |
 | BKD-11 | B3: Absent packageId → no regression | Design | Pending |
+| BKD-18 | B3: packageId present → confirmation omits self-service link | Design | Pending |
+| BKD-19 | B3: packageId absent → confirmation template unchanged | Design | Pending |
 | MGT-01 | P2: Packages page — list all packages | Design | Pending |
 | MGT-02 | P2: Packages page — filter by status | Design | Pending |
 | MGT-03 | P2: Packages page — search by name/phone | Design | Pending |
@@ -205,6 +214,7 @@ Barbers currently create prepaid packages informally: they manually book N separ
 - [ ] All active packages for a customer are visible before confirming a booking
 - [ ] `packageId` is included in the booking request only when the barber explicitly selects a package
 - [ ] Zero regressions in the existing `AdminBookingModal` booking flow (no package = identical behavior)
+- [ ] Package-linked admin bookings send a confirmation WhatsApp without self-service cancel/change links
 - [ ] Barber can see all packages (any status) from a dedicated page
 - [ ] Barber can deactivate an active package; it immediately disappears from the booking selector
 - [ ] `cancelled` packages are visible in the management page but cannot be re-activated

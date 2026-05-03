@@ -228,6 +228,7 @@ export function useAdminCreatePackage() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-packages'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-packages-all'] });
     },
   });
 }

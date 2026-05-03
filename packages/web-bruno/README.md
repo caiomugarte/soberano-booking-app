@@ -15,9 +15,6 @@ Psychology frontend for Bruno Morghetti. This package is a Vite + React SPA that
 | Variable | Required | Purpose |
 |---|---|---|
 | `VITE_TENANT_SLUG` | Yes | Sends the tenant slug header expected by the API |
-| `VITE_API_URL` | No | Optional local override for calling an API origin directly |
-
-`VITE_API_URL` is meant for explicit local development overrides only. When it is not set, the app uses same-origin `/api/...` requests by default.
 
 ### Production runtime
 
@@ -40,13 +37,6 @@ npm -w psicologo run dev
 ```
 
 By default, the Vite dev server proxies `/api/*` to `http://localhost:3000`, so browser requests still use relative `/api` paths during local development.
-
-If you need to bypass the Vite proxy and hit an API origin directly, set `VITE_API_URL` explicitly in the package env file before starting the dev server:
-
-```env
-VITE_API_URL=http://localhost:3000
-VITE_TENANT_SLUG=bruno
-```
 
 Build the package locally with:
 

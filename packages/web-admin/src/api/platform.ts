@@ -1,4 +1,4 @@
-const BASE = `${import.meta.env.VITE_API_URL ?? ''}/api/platform`;
+const BASE = '/api/platform';
 
 let _token: string | null = null;
 

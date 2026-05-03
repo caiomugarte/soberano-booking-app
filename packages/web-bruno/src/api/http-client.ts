@@ -1,3 +1,5 @@
+import { TENANT_SLUG } from '@/config/env.ts'
+
 export class ApiError extends Error {
   constructor(
     public code: string,
@@ -23,13 +25,6 @@ export function configureHttpClient(opts: {
   _logout = opts.logout
 }
 
-const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? ''
-const TENANT_SLUG = (import.meta.env.VITE_TENANT_SLUG as string | undefined) ?? ''
-
-function resolveRequestUrl(path: string): string {
-  return API_URL ? `${API_URL}${path}` : path
-}
-
 async function doFetch(path: string, token: string | null, options?: RequestInit): Promise<Response> {
   const headers: Record<string, string> = {
     ...(options?.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
@@ -37,7 +32,7 @@ async function doFetch(path: string, token: string | null, options?: RequestInit
   }
   if (token) headers['Authorization'] = `Bearer ${token}`
   if (TENANT_SLUG) headers['x-tenant-slug'] = TENANT_SLUG
-  return fetch(resolveRequestUrl(path), { ...options, headers, credentials: 'include' })
+  return fetch(path, { ...options, headers, credentials: 'include' })
 }
 
 export async function tryRefreshToken(): Promise<string | null> {
