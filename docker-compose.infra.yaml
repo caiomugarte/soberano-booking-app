@@ -16,9 +16,6 @@ services:
       SUPER_ADMIN_PASSWORD_HASH: ${SUPER_ADMIN_PASSWORD_HASH}
       INTERNAL_API_SECRET: ${INTERNAL_API_SECRET}
     restart: unless-stopped
-    networks:
-      - internal
-      - coolify
 
   mcp:
     build:
@@ -32,12 +29,3 @@ services:
     restart: unless-stopped
     depends_on:
       - api
-    networks:
-      - internal
-      - coolify
-
-networks:
-  internal:
-    driver: bridge
-  coolify:
-    external: true

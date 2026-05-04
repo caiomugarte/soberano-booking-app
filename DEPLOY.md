@@ -19,12 +19,14 @@
 - Development stacks join `coolify-dev`
 - Do not attach prod and dev application stacks to the same external Docker network, or shared aliases like `api` will collide
 
-**Three docker-compose files:**
+**Docker Compose files:**
 
 | File | Purpose | Deployed |
 |---|---|---|
 | `docker-compose.infra.yaml` | API + MCP — shared platform | Once |
-| `docker-compose.web.yaml` | Per-client frontend | Once per client |
+| `docker-compose.web.yaml` | Soberano frontend | Once |
+| `docker-compose.web-bruno.yaml` | Bruno frontend | Once |
+| `docker-compose.web-marques.yaml` | Marques frontend | Once |
 | `docker-compose.admin.yaml` | Super-admin panel | Once |
 
 ---
@@ -41,6 +43,10 @@ docker network create coolify-dev
 ```
 
 Every Coolify application based on these compose files must set `COOLIFY_SHARED_NETWORK` to the correct environment network. Inside each environment network, `http://api:3000` remains safe because only that environment's API container is reachable via the `api` alias.
+
+The API compose file also declares an explicit `api` alias on the shared
+network so tenant frontends can proxy to `http://api:3000` without depending
+on Coolify-generated container names.
 
 ### Step 1 — PostgreSQL (Coolify Service)
 
@@ -67,6 +73,11 @@ Every Coolify application based on these compose files must set `COOLIFY_SHARED_
 | Ports Exposes | `3000` |
 | Domain | `https://api.altion.com.br` |
 
+**Coolify stack setting:**
+
+- Enable **Connect to Predefined Networks** so the `api` container can reach
+  the PostgreSQL internal hostname on the selected destination network.
+
 **Watch Paths** (avoids rebuilding when only frontend changes):
 ```
 packages/api/**
@@ -87,7 +98,6 @@ ALLOWED_ORIGINS=https://soberano.altion.com.br,https://admin.altion.com.br
 SUPER_ADMIN_JWT_SECRET=<random 64-char string>
 SUPER_ADMIN_EMAIL=your@email.com
 SUPER_ADMIN_PASSWORD_HASH=<bcrypt hash>
-COOLIFY_SHARED_NETWORK=coolify-prod
 ```
 
 > To generate secrets: `node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"`
@@ -95,6 +105,10 @@ COOLIFY_SHARED_NETWORK=coolify-prod
 > To generate the password hash: `node -e "const b=require('bcryptjs');b.hash('yourpassword',12).then(console.log)"`
 
 > **Note:** Chatwoot credentials are **not** set here. They live in each tenant's config in the database, managed via the super-admin panel.
+
+Do not define custom Docker networks for this stack inside
+`docker-compose.infra.yaml`. Let Coolify attach the stack to the selected
+destination network.
 
 Deploy and verify the container is **Running**.
 
@@ -194,6 +208,26 @@ curl https://soberano.altion.com.br/api/services -H "X-Tenant-Slug: soberano"
 ```
 
 Open `https://soberano.altion.com.br` — the booking flow should load normally.
+
+### Step 4b — Additional tenant frontends
+
+Deploy each tenant frontend as its own Coolify application using the matching
+compose file:
+
+| Tenant | Compose file | Dockerfile | Build variable |
+|---|---|---|---|
+| Bruno | `docker-compose.web-bruno.yaml` | `packages/web-bruno/Dockerfile` | `VITE_TENANT_SLUG=bruno` |
+| Marques | `docker-compose.web-marques.yaml` | `packages/web-marques/Dockerfile` | `VITE_TENANT_SLUG=marques` |
+
+Each tenant frontend also needs:
+
+```env
+API_INTERNAL_URL=http://api:3000
+COOLIFY_SHARED_NETWORK=coolify-prod
+```
+
+If you deploy a tenant frontend to development, switch
+`COOLIFY_SHARED_NETWORK` to `coolify-dev`.
 
 ---
 
