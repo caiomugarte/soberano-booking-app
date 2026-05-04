@@ -21,6 +21,7 @@ Psychology frontend for Bruno Morghetti. This package is a Vite + React SPA that
 | Variable | Required | Purpose |
 |---|---|---|
 | `API_INTERNAL_URL` | Yes | nginx upstream target for `/api/*` proxying inside the Docker network |
+| `COOLIFY_SHARED_NETWORK` | Yes | Shared external Docker network that lets nginx resolve the `api` hostname |
 
 ## Development
 
@@ -56,11 +57,18 @@ docker build \
   -f packages/web-bruno/Dockerfile .
 ```
 
-At runtime, configure nginx with the internal API target:
+At runtime, configure nginx with the internal API target and the shared
+Coolify network:
 
 ```env
 API_INTERNAL_URL=http://api:3000
+COOLIFY_SHARED_NETWORK=coolify-prod
 ```
+
+`API_INTERNAL_URL=http://api:3000` only works when the `web-bruno`
+container and the shared API container both join the same external Docker
+network. If Coolify does not attach this app to `COOLIFY_SHARED_NETWORK`,
+nginx starts with `host not found in upstream "api"`.
 
 Routing behavior in production:
 

@@ -8,6 +8,7 @@ Shared pattern:
 - Local development keeps the Vite `/api` proxy to `http://localhost:3000`
 - Production nginx config proxies `/api/*` to `${API_INTERNAL_URL}` before SPA fallback
 - Dockerfiles only need `VITE_TENANT_SLUG` at build time; `API_INTERNAL_URL` is a runtime env for nginx templating
+- Tenant frontends now have dedicated compose files (`docker-compose.web*.yaml`) instead of relying on Dockerfile-only Coolify app setup
 
 `packages/web`:
 - `src/config/api.ts` hardcodes `API_BASE = '/api'`
@@ -20,7 +21,7 @@ Shared pattern:
 
 `packages/web-bruno`:
 - `src/api/http-client.ts` now fetches the relative request path directly and still injects `x-tenant-slug`, cookies, and auth headers
-- `README.md` and package AGENTS docs now describe the same-origin `/api` model only
+- `README.md` and package AGENTS docs now describe the same-origin `/api` model and the required shared Coolify network for resolving `http://api:3000`
 
 `packages/web-marques`:
 - `src/config/api.js` now uses `/api`
@@ -29,5 +30,7 @@ Shared pattern:
 
 Gotcha:
 - If a frontend package serves through nginx, `API_INTERNAL_URL` must be configured at runtime or nginx templating will produce a broken upstream even though the bundle itself is correct
+- `API_INTERNAL_URL=http://api:3000` also depends on Coolify attaching the frontend container to the same external Docker network as the API via `COOLIFY_SHARED_NETWORK`; otherwise nginx fails at startup with `host not found in upstream "api"`
+- The infra compose file now declares an explicit `api` alias on the shared `coolify` network so separate tenant frontend apps can resolve a stable hostname without depending on Coolify-generated container names
 
-Updated: 2026-04-30
+Updated: 2026-05-03
