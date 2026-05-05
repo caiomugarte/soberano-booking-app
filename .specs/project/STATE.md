@@ -9,7 +9,11 @@
 | web-admin-internal-api-proxy | Tasks draft — awaiting approval | `.specs/features/web-admin-internal-api-proxy/tasks.md` |
 | web-bruno-internal-api-proxy | Tasks draft — awaiting approval | `.specs/features/web-bruno-internal-api-proxy/tasks.md` |
 | web-internal-api-proxy | Tasks draft — awaiting approval | `.specs/features/web-internal-api-proxy/tasks.md` |
+| portal-mobile-responsiveness | Tasks draft — awaiting approval | `.specs/features/portal-mobile-responsiveness/tasks.md` |
 | web-bruno-api-migration | Tasks ready — ready to execute | `.specs/features/web-bruno-api-migration/tasks.md` |
+| web-bruno-recurring-session-series | Tasks draft — awaiting approval | `.specs/features/web-bruno-recurring-session-series/tasks.md` |
+| web-bruno-agenda-event-management | Tasks draft — payment-date control added, awaiting approval | `.specs/features/web-bruno-agenda-event-management/tasks.md` |
+| psychology-patient-dedup | Tasks draft — awaiting approval | `.specs/features/psychology-patient-dedup/tasks.md` |
 | psychology-api | Tasks draft — awaiting approval | `.specs/features/psychology-api/tasks.md` |
 | frontend-unit-tests | Tasks ready — ready to execute | `.specs/features/frontend-unit-tests/spec.md` |
 | whatsapp-human-jitter | Tasks ready — ready to execute | `.specs/features/whatsapp-human-jitter/spec.md` |
@@ -33,6 +37,8 @@
 | 2026-04-05 | Tenant resolution: subdomain (`[slug].altion.com.br`) + custom domain via `Host` header | Matches existing `soberano.altion.com.br` pattern; custom domain supported via DB lookup |
 | 2026-04-05 | Feature flags: explicit `enabledFeatures: string[]` per client + central registry in code | More granular than plan-only; supports custom add-on deals per client |
 | 2026-05-02 | Package-linked admin bookings omit self-service cancel/change links in customer confirmations | Package bookings remain provider-managed even though they reuse the admin manual booking flow |
+| 2026-05-04 | Psychology session payment-method capture stays inside `web-bruno-agenda-event-management` | It extends the same paid-state workflow across agenda, financial, and patient-history surfaces instead of introducing a separate feature track |
+| 2026-05-05 | Psychology payment-date control stays inside `web-bruno-agenda-event-management` | It extends the same paid-state workflow and requires financial attribution by `paidAt`, not only by the session date |
 
 ## Blockers
 
@@ -48,6 +54,8 @@ _None recorded yet._
 |---|---|---|---|---|
 | 001 | Hide past absences from the admin schedule page without deleting DB records | 2026-05-02 | not committed | ✅ Done |
 | 002 | Make the admin absence date input use the Campo Grande business day instead of UTC | 2026-05-02 | not committed | ✅ Done |
+| 003 | Reset the web-bruno patient modal fields on open so new patient creation does not reuse the previous values | 2026-05-04 | not committed | ✅ Done |
+| 004 | Make the web-bruno patient form treat blank email as optional on create and clearable on edit | 2026-05-04 | not committed | ✅ Done |
 
 ## Deferred Ideas
 

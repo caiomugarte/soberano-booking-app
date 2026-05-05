@@ -143,7 +143,7 @@ export function TenantFormPage() {
   return (
     <AppShell breadcrumb={breadcrumb}>
       <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3 lg:gap-6">
           {/* Left: Main fields */}
           <div className="lg:col-span-2">
             <Card title="Informações Gerais">
@@ -210,7 +210,7 @@ export function TenantFormPage() {
               <button
                 type="button"
                 onClick={() => setChatwootExpanded((v) => !v)}
-                className="w-full flex items-center justify-between px-6 py-4 text-left"
+                className="flex w-full items-center justify-between gap-3 px-6 py-4 text-left"
               >
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-white">Chatwoot</span>
@@ -242,20 +242,22 @@ export function TenantFormPage() {
         </div>
 
         {/* Footer actions */}
-        <div className="mt-6 flex items-center justify-between">
-          <Toggle
-            label="Tenant Ativo"
-            checked={form.isActive ?? true}
-            onChange={(v) => setForm((f) => ({ ...f, isActive: v }))}
-          />
-          <div className="flex items-center gap-3">
-            {error && <p className="text-sm text-red-400">{error}</p>}
-            <Button type="button" variant="outline" size="md" onClick={() => navigate('/')}>
-              Cancelar
-            </Button>
-            <Button type="submit" variant="primary" size="md" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Salvando...' : 'Salvar'}
-            </Button>
+        <div className="mt-6 rounded-xl border border-dark-border bg-dark-surface/60 p-4 sm:p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <Toggle
+              label="Tenant Ativo"
+              checked={form.isActive ?? true}
+              onChange={(v) => setForm((f) => ({ ...f, isActive: v }))}
+            />
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+              {error && <p className="text-sm text-red-400 sm:mr-auto lg:mr-0 lg:max-w-xs">{error}</p>}
+              <Button type="button" variant="outline" size="md" className="w-full sm:w-auto" onClick={() => navigate('/')}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="primary" size="md" className="w-full sm:w-auto" disabled={mutation.isPending}>
+                {mutation.isPending ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </div>
           </div>
         </div>
       </form>

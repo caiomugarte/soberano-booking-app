@@ -26,6 +26,7 @@ import {
 import { ptBR } from 'date-fns/locale'
 import { Panel } from '@/components/ui/Panel'
 import { formatCurrency } from '@/lib/format'
+import { toDateInputValue } from '@/lib/format'
 import type { Appointment } from '@/schemas/appointment.schema'
 
 type ChartPeriod = 'weekly' | 'monthly' | 'annual'
@@ -57,7 +58,10 @@ function CustomTooltip({
 
 function sumRevenue(appointments: Appointment[], from: string, to: string) {
   return appointments
-    .filter((a) => a.date >= from && a.date <= to)
+    .filter((a) => {
+      const revenueDate = toDateInputValue(a.paidAt) || a.date
+      return revenueDate >= from && revenueDate <= to
+    })
     .reduce((sum, a) => sum + a.value, 0)
 }
 
@@ -124,11 +128,11 @@ export function RevenueChart({ paidAppointments }: RevenueChartProps) {
 
   return (
     <Panel>
-      <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+      <div className="flex flex-col gap-3 border-b border-gray-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-sm font-semibold text-gray-700">
           Receita {PERIOD_LABELS[period]}
         </h3>
-        <div className="flex gap-1 rounded-lg bg-gray-100 p-1">
+        <div className="flex flex-wrap gap-1 rounded-lg bg-gray-100 p-1">
           {(Object.keys(PERIOD_LABELS) as ChartPeriod[]).map((p) => (
             <button
               key={p}
@@ -146,7 +150,7 @@ export function RevenueChart({ paidAppointments }: RevenueChartProps) {
       </div>
 
       {/* Navigation */}
-      <div className="flex items-center justify-center gap-4 px-4 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 sm:justify-center sm:gap-4">
         <button
           onClick={() => navigate(-1)}
           className="rounded-md px-2 py-1 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
@@ -162,19 +166,21 @@ export function RevenueChart({ paidAppointments }: RevenueChartProps) {
         </button>
       </div>
 
-      <Panel.Body className="h-64">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
-            <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#718096' }} />
-            <YAxis
-              tick={{ fontSize: 12, fill: '#718096' }}
-              tickFormatter={(v: number) => `R$${(v / 100).toFixed(0)}`}
-            />
-            <Tooltip content={<CustomTooltip />} />
-            <Bar dataKey="revenue" fill="#4A90A4" radius={[4, 4, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
+      <Panel.Body className="h-64 overflow-x-auto">
+        <div className="h-full min-w-[560px] sm:min-w-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#718096' }} />
+              <YAxis
+                tick={{ fontSize: 12, fill: '#718096' }}
+                tickFormatter={(v: number) => `R$${(v / 100).toFixed(0)}`}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="revenue" fill="#4A90A4" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
       </Panel.Body>
     </Panel>
   )

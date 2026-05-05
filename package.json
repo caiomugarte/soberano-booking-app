@@ -14,12 +14,16 @@
     "build:web": "npm -w @soberano/web run build",
     "dev:admin": "npm -w @soberano/web-admin run dev",
     "build:admin": "npm -w @soberano/web-admin run build",
+    "reset-password": "npm -w @soberano/api run reset-password",
     "db:migrate": "npm -w @soberano/api run db:migrate",
+    "db:create-tenant": "npm -w @soberano/api run db:create-tenant --",
     "db:seed": "npm -w @soberano/api run db:seed",
     "db:seed:marques": "npm -w @soberano/api run db:seed:marques",
     "db:studio": "npm -w @soberano/api run db:studio",
     "test": "npm -w @soberano/shared run test && npm -w @soberano/api run test && npm -w @soberano/web run test",
-    "gen:secret": "node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
+    "gen:secret": "node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"",
+    "gen:password-hash": "npm -w @soberano/api run gen:password-hash --",
+    "check:password-hash": "npm -w @soberano/api run check:password-hash --"
   },
   "devDependencies": {
     "concurrently": "^9.1.2",

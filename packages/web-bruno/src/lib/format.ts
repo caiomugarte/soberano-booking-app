@@ -16,6 +16,18 @@ export function formatDate(dateStr: string): string {
   return format(parseISO(dateStr), "dd/MM/yyyy", { locale: ptBR })
 }
 
+export function toDateInputValue(dateTime: string | null | undefined): string {
+  return dateTime ? dateTime.slice(0, 10) : ''
+}
+
+export function getTodayDateInputValue(): string {
+  return new Intl.DateTimeFormat('en-CA').format(new Date())
+}
+
+export function dateInputToIso(dateStr: string): string {
+  return new Date(`${dateStr}T12:00:00`).toISOString()
+}
+
 export function formatDateFull(dateStr: string): string {
   return format(parseISO(dateStr), "EEEE, dd 'de' MMMM", { locale: ptBR })
 }

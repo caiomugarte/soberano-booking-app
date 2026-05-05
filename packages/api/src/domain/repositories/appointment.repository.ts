@@ -14,11 +14,17 @@ export interface CreateAppointmentData {
   serviceId: string;
   customerId: string;
   packageId?: string;
+  recurringSeriesId?: string;
   date: Date;
   startTime: string;
   endTime: string;
   priceCents: number;
   cancelToken: string;
+  status?: string;
+  paymentStatus?: string;
+  paymentMethod?: string | null;
+  paidAt?: Date | null;
+  appointmentNotes?: string | null;
 }
 
 export interface DayStat {
@@ -42,7 +48,9 @@ export interface AppointmentRepository {
   markBarberReminderSent(id: string): Promise<void>;
   getStatsByDateRange(barberId: string, from: Date, to: Date): Promise<DayStat[]>;
   findByBarberAndDateRange(barberId: string, from: Date, to: Date): Promise<AppointmentWithDetails[]>;
+  findByRecurringSeriesId(recurringSeriesId: string, from: Date, to?: Date): Promise<AppointmentWithDetails[]>;
   findUpcomingByCustomerPhone(phone: string): Promise<AppointmentWithDetails | null>;
+  deleteFutureByRecurringSeriesId(recurringSeriesId: string, from: Date): Promise<number>;
   deleteById(id: string): Promise<void>;
   updateCustomer(id: string, customerId: string): Promise<void>;
   updatePaymentStatus(id: string, paidAt: Date): Promise<AppointmentWithDetails>;

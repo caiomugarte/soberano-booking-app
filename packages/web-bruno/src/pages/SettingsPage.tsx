@@ -110,7 +110,9 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-xl font-bold text-gray-800">Configurações</h1>
+      <div className="mb-6">
+        <h1 className="text-xl font-bold text-gray-800">Configurações</h1>
+      </div>
 
       <div className="space-y-6">
         {/* Profile */}
@@ -139,8 +141,8 @@ export default function SettingsPage() {
               <p className="text-xs text-gray-400">
                 Use as variáveis: {'{nome}'}, {'{data}'}, {'{valor}'}, {'{pix}'}
               </p>
-              <div className="flex items-center gap-3">
-                <Button type="submit" disabled={updateProfile.isPending}>
+              <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
+                <Button type="submit" className="w-full sm:w-auto" disabled={updateProfile.isPending}>
                   Salvar Perfil
                 </Button>
                 {profileSaved && <span className="text-sm text-sage-600">Salvo!</span>}
@@ -153,18 +155,18 @@ export default function SettingsPage() {
         {servicesData && (
           <Panel>
             <Panel.Header>Valores por Tipo de Sessão</Panel.Header>
-            <Panel.Body className="divide-y divide-gray-100">
-              {servicesData.services.map((s) => (
-                <div key={s.id} className="flex items-center justify-between py-2">
-                  <span className="text-sm text-gray-700">
-                    {s.icon} {s.name}
-                  </span>
-                  <span className="text-sm font-medium text-gray-800">
-                    {formatCurrency(s.priceCents)}
-                  </span>
-                </div>
-              ))}
-            </Panel.Body>
+              <Panel.Body className="divide-y divide-gray-100">
+                {servicesData.services.map((s) => (
+                  <div key={s.id} className="flex flex-col gap-1 py-2 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="text-sm text-gray-700">
+                      {s.icon} {s.name}
+                    </span>
+                    <span className="text-sm font-medium text-gray-800">
+                      {formatCurrency(s.priceCents)}
+                    </span>
+                  </div>
+                ))}
+              </Panel.Body>
           </Panel>
         )}
 
@@ -184,15 +186,17 @@ export default function SettingsPage() {
                       .map((s, i) => ({ shift: s, index: i }))
                       .filter(({ shift }) => shift.dayOfWeek === key)
                       .map(({ shift, index }) => (
-                        <div key={index} className="flex items-center gap-3 py-2 text-sm">
-                          <span className="w-16 text-gray-500">{label}</span>
-                          <span className="font-mono text-gray-800">{shift.startTime}</span>
-                          <span className="text-gray-400">até</span>
-                          <span className="font-mono text-gray-800">{shift.endTime}</span>
+                        <div key={index} className="flex flex-col gap-2 py-2 text-sm sm:flex-row sm:items-center">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="w-16 text-gray-500">{label}</span>
+                            <span className="font-mono text-gray-800">{shift.startTime}</span>
+                            <span className="text-gray-400">até</span>
+                            <span className="font-mono text-gray-800">{shift.endTime}</span>
+                          </div>
                           <button
                             type="button"
                             onClick={() => removeShift(index)}
-                            className="ml-auto text-red-400 hover:text-red-600 text-xs"
+                            className="text-left text-xs text-red-400 hover:text-red-600 sm:ml-auto"
                           >
                             Remover
                           </button>
@@ -204,7 +208,7 @@ export default function SettingsPage() {
                 <p className="text-xs text-gray-400">Nenhum horário cadastrado.</p>
               )}
               <div className="space-y-3 rounded-lg border border-gray-200 p-3">
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <Select
                     label="Dia"
                     value={String(newDay)}
@@ -227,6 +231,7 @@ export default function SettingsPage() {
                 <Button
                   type="button"
                   variant="secondary"
+                  className="w-full sm:w-auto"
                   onClick={addShift}
                   disabled={newStart >= newEnd}
                 >
@@ -239,7 +244,7 @@ export default function SettingsPage() {
               {updateShifts.isSuccess && (
                 <p className="text-sm text-sage-600">Salvo!</p>
               )}
-              <Button type="button" disabled={updateShifts.isPending} onClick={saveShifts}>
+              <Button type="button" className="w-full sm:w-auto" disabled={updateShifts.isPending} onClick={saveShifts}>
                 Salvar Horários
               </Button>
             </Panel.Body>
@@ -262,7 +267,7 @@ export default function SettingsPage() {
                     .map((absence) => (
                       <div
                         key={absence.id}
-                        className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm"
+                        className="flex flex-col gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
                       >
                         <span>
                           {new Date(absence.date.substring(0, 10) + 'T12:00:00').toLocaleDateString('pt-BR')}
@@ -283,7 +288,7 @@ export default function SettingsPage() {
                 </div>
               )}
               <div className="space-y-3 rounded-lg border border-gray-200 p-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Input
                     label="Data"
                     type="date"
@@ -301,7 +306,7 @@ export default function SettingsPage() {
                   />
                 </div>
                 {!newAbsentAllDay && (
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Input
                       label="Ausente de"
                       type="time"
@@ -319,6 +324,7 @@ export default function SettingsPage() {
                 <Button
                   type="button"
                   variant="secondary"
+                  className="w-full sm:w-auto"
                   onClick={handleAddAbsence}
                   disabled={
                     !newAbsentDate ||

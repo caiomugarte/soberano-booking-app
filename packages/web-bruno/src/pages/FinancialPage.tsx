@@ -13,6 +13,8 @@ import { useUpdateAppointment } from '@/api/appointments'
 import { RevenueSummary } from '@/components/financial/RevenueSummary'
 import { RevenueChart } from '@/components/financial/RevenueChart'
 import { PendingPayments } from '@/components/financial/PendingPayments'
+import { toDateInputValue } from '@/lib/format'
+import type { PaymentMethod } from '@/schemas/appointment.schema'
 
 export default function FinancialPage() {
   const now = new Date()
@@ -37,6 +39,8 @@ export default function FinancialPage() {
     const pending = mapped.filter(
       (a) => a.paymentStatus === 'pending' && a.status !== 'cancelled',
     )
+    const getRevenueDate = (appointment: typeof paid[number]) =>
+      toDateInputValue(appointment.paidAt) || appointment.date
 
     return {
       appointments: mapped,
@@ -44,10 +48,16 @@ export default function FinancialPage() {
       paidAppointments: paid,
       summaryStats: {
         weeklyRevenue: paid
-          .filter((a) => a.date >= weekStart && a.date <= weekEnd)
+          .filter((a) => {
+            const revenueDate = getRevenueDate(a)
+            return revenueDate >= weekStart && revenueDate <= weekEnd
+          })
           .reduce((sum, a) => sum + a.value, 0),
         monthlyRevenue: paid
-          .filter((a) => a.date >= monthStart && a.date <= monthEnd)
+          .filter((a) => {
+            const revenueDate = getRevenueDate(a)
+            return revenueDate >= monthStart && revenueDate <= monthEnd
+          })
           .reduce((sum, a) => sum + a.value, 0),
         annualRevenue: paid.reduce((sum, a) => sum + a.value, 0),
         pendingCount: pending.length,
@@ -56,16 +66,22 @@ export default function FinancialPage() {
     }
   }, [summary, now])
 
-  function handleMarkPaid(id: string) {
+  function handleMarkPaid(id: string, paymentMethod: PaymentMethod, paidAt: string) {
     updateAppointment.mutate({
       id,
-      data: { paymentStatus: 'paid', paidAt: new Date().toISOString() },
+      data: {
+        paymentStatus: 'paid',
+        paymentMethod,
+        paidAt,
+      },
     })
   }
 
   return (
     <div>
-      <h1 className="mb-6 text-xl font-bold text-gray-800">Financeiro</h1>
+      <div className="mb-6">
+        <h1 className="text-xl font-bold text-gray-800">Financeiro</h1>
+      </div>
 
       <div className="space-y-6">
         <RevenueSummary {...summaryStats} />

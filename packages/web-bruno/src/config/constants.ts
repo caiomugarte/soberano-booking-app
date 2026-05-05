@@ -16,14 +16,20 @@ export const DAYS_OF_WEEK = [
 export const STATUS_LABELS: Record<string, string> = {
   scheduled: 'Agendado',
   confirmed: 'Confirmado',
-  completed: 'Concluído',
-  cancelled: 'Cancelado',
-  no_show: 'Não compareceu',
+  completed: 'Realizado',
+  cancelled: 'Desmarcado',
+  no_show: 'Falta',
 }
 
 export const PAYMENT_STATUS_LABELS: Record<string, string> = {
   pending: 'Pendente',
   paid: 'Pago',
+}
+
+export const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  card: 'Cartão',
+  pix: 'PIX',
+  cash: 'Dinheiro',
 }
 
 export const SESSION_TYPE_LABELS: Record<string, string> = {
