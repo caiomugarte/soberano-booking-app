@@ -7,7 +7,6 @@ import {
   useAbsences,
   useCreateAbsence,
   useDeleteAbsence,
-  useServices,
   type Shift,
 } from '@/api/settings'
 import { Panel } from '@/components/ui/Panel'
@@ -17,7 +16,6 @@ import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { Spinner } from '@/components/ui/Spinner'
 import { DAYS_OF_WEEK } from '@/config/constants'
-import { formatCurrency } from '@/lib/format'
 
 export default function SettingsPage() {
   const { data: profile, isLoading: profileLoading } = useProviderProfile()
@@ -27,7 +25,6 @@ export default function SettingsPage() {
   const { data: absencesData, isLoading: absencesLoading } = useAbsences()
   const createAbsence = useCreateAbsence()
   const deleteAbsence = useDeleteAbsence()
-  const { data: servicesData } = useServices()
 
   // Profile state
   const [phone, setPhone] = useState('')
@@ -150,25 +147,6 @@ export default function SettingsPage() {
             </Panel.Body>
           </Panel>
         </form>
-
-        {/* Services (read-only) */}
-        {servicesData && (
-          <Panel>
-            <Panel.Header>Valores por Tipo de Sessão</Panel.Header>
-              <Panel.Body className="divide-y divide-gray-100">
-                {servicesData.services.map((s) => (
-                  <div key={s.id} className="flex flex-col gap-1 py-2 sm:flex-row sm:items-center sm:justify-between">
-                    <span className="text-sm text-gray-700">
-                      {s.icon} {s.name}
-                    </span>
-                    <span className="text-sm font-medium text-gray-800">
-                      {formatCurrency(s.priceCents)}
-                    </span>
-                  </div>
-                ))}
-              </Panel.Body>
-          </Panel>
-        )}
 
         {/* Working hours */}
         <Panel>
