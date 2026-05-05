@@ -4,6 +4,7 @@
 
 | File | Tags | Summary |
 |---|---|---|
+| [password-service-stale-js-gotcha.md](password-service-stale-js-gotcha.md) | api, auth, tests, vitest, gotcha | Stale JS artifact in `src/` can shadow the TS password service and break bcrypt imports |
 | [api-runtime-deploy-gotchas.md](api-runtime-deploy-gotchas.md) | deploy, api, cron, coolify, traefik | Shared API deploy model; every API instance also starts reminder cron |
 | [booking-time-step-week-navigation.md](booking-time-step-week-navigation.md) | booking, week-nav, gotcha | getWeekDates is today-anchored; weekOffset must use today as reference, not Monday |
 | [architecture-overview.md](architecture-overview.md) | architecture, packages, overview | All 6 packages, API layer structure, key entry points, stack |
