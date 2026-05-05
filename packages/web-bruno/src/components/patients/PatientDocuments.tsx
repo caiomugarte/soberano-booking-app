@@ -70,7 +70,7 @@ export function PatientDocuments({ patientId }: PatientDocumentsProps) {
 
   return (
     <Panel>
-      <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
+      <div className="flex flex-col gap-3 border-b border-gray-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-sm font-semibold text-gray-700">Documentos</h3>
         <div>
           <input
@@ -83,6 +83,7 @@ export function PatientDocuments({ patientId }: PatientDocumentsProps) {
           <Button
             variant="secondary"
             size="sm"
+            className="w-full sm:w-auto"
             onClick={() => inputRef.current?.click()}
             disabled={createDocument.isPending}
           >
@@ -98,7 +99,7 @@ export function PatientDocuments({ patientId }: PatientDocumentsProps) {
             {documents.map((doc) => (
               <div
                 key={doc.id}
-                className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-2"
+                className="flex flex-col gap-3 rounded-lg border border-gray-100 px-3 py-2 sm:flex-row sm:items-center"
               >
                 <span className="text-lg">{fileIcon(doc.fileType)}</span>
                 <div className="flex-1 min-w-0">
@@ -107,20 +108,22 @@ export function PatientDocuments({ patientId }: PatientDocumentsProps) {
                     {formatFileSize(doc.fileData)} · {new Date(doc.createdAt).toLocaleDateString('pt-BR')}
                   </div>
                 </div>
-                <button
-                  onClick={() => handleDownload(doc)}
-                  className="text-xs text-primary-500 hover:text-primary-700"
-                  title="Baixar"
-                >
-                  ↓
-                </button>
-                <button
-                  onClick={() => handleDelete(doc.id)}
-                  className="text-xs text-red-400 hover:text-red-600"
-                  title="Excluir"
-                >
-                  ✕
-                </button>
+                <div className="flex items-center gap-4 sm:ml-auto">
+                  <button
+                    onClick={() => handleDownload(doc)}
+                    className="text-xs text-primary-500 hover:text-primary-700"
+                    title="Baixar"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    onClick={() => handleDelete(doc.id)}
+                    className="text-xs text-red-400 hover:text-red-600"
+                    title="Excluir"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
             ))}
           </div>

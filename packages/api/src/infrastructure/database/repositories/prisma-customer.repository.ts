@@ -11,6 +11,14 @@ export class PrismaCustomerRepository implements CustomerRepository {
     return this.db.customer.findFirst({ where: { phone } });
   }
 
+  async findByCpf(cpf: string): Promise<CustomerEntity | null> {
+    return this.db.customer.findFirst({ where: { cpf } });
+  }
+
+  async findByEmail(email: string): Promise<CustomerEntity | null> {
+    return this.db.customer.findFirst({ where: { email } });
+  }
+
   async findById(id: string): Promise<CustomerEntity | null> {
     return this.db.customer.findUnique({ where: { id } });
   }

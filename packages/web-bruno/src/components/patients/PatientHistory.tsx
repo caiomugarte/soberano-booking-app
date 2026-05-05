@@ -1,15 +1,23 @@
 import { useState, useRef } from 'react'
-import { usePatientAppointments, useUpdateAppointment } from '@/api/appointments'
+import {
+  useDeleteAppointment,
+  usePatientAppointments,
+  useStopRecurringSeries,
+  useUpdateAppointment,
+} from '@/api/appointments'
 import { usePatientReports, useCreateSessionReport, useUpdateSessionReport, useDeleteSessionReport } from '@/api/session-reports'
+import { PaymentMethodDialog } from '@/components/appointments/PaymentMethodDialog'
+import { Button } from '@/components/ui/Button'
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
+import { EmptyState } from '@/components/ui/EmptyState'
 import { Modal } from '@/components/ui/Modal'
 import { Panel } from '@/components/ui/Panel'
-import { Button } from '@/components/ui/Button'
-import { Textarea } from '@/components/ui/Textarea'
 import { AppointmentStatusBadge, PaymentStatusBadge } from '@/components/ui/StatusBadge'
+import { Textarea } from '@/components/ui/Textarea'
 import { WhatsAppButton } from '@/components/whatsapp/WhatsAppButton'
-import { EmptyState } from '@/components/ui/EmptyState'
-import { formatDate, formatCurrency } from '@/lib/format'
-import { SESSION_TYPE_LABELS } from '@/config/constants'
+import { PAYMENT_METHOD_LABELS, SESSION_TYPE_LABELS } from '@/config/constants'
+import { formatDate, formatCurrency, getTodayDateInputValue, toDateInputValue } from '@/lib/format'
+import type { Appointment, PaymentMethod } from '@/schemas/appointment.schema'
 import type { Patient } from '@/schemas/patient.schema'
 
 interface PatientHistoryProps {
@@ -29,21 +37,31 @@ export function PatientHistory({ patient }: PatientHistoryProps) {
   const { data: appointments = [] } = usePatientAppointments(patient.id)
   const { data: reports = [] } = usePatientReports(patient.id)
   const updateAppointment = useUpdateAppointment()
+  const deleteAppointment = useDeleteAppointment()
+  const stopRecurringSeries = useStopRecurringSeries()
   const createReport = useCreateSessionReport()
   const updateReport = useUpdateSessionReport()
   const deleteReport = useDeleteSessionReport()
+  const today = getTodayDateInputValue()
 
   const [reportModal, setReportModal] = useState<{ appointmentId: string; mode: 'view' | 'edit' } | null>(null)
   const [reportText, setReportText] = useState('')
   const [reportFileName, setReportFileName] = useState<string | undefined>()
   const [reportFileType, setReportFileType] = useState<string | undefined>()
   const [reportFileData, setReportFileData] = useState<string | undefined>()
+  const [selectedPaymentAppointmentId, setSelectedPaymentAppointmentId] = useState<string | null>(null)
+  const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null)
+  const [appointmentToStopRecurring, setAppointmentToStopRecurring] = useState<Appointment | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  function handleMarkPaid(id: string) {
+  function handleMarkPaid(id: string, paymentMethod: PaymentMethod, paidAt: string) {
     updateAppointment.mutate({
       id,
-      data: { paymentStatus: 'paid', paidAt: new Date().toISOString() },
+      data: {
+        paymentStatus: 'paid',
+        paymentMethod,
+        paidAt,
+      },
     })
   }
 
@@ -120,6 +138,28 @@ export function PatientHistory({ patient }: PatientHistoryProps) {
     link.click()
   }
 
+  function handleDeleteSession() {
+    if (!appointmentToDelete) return
+
+    deleteAppointment.mutate(appointmentToDelete.id, {
+      onSuccess: () => setAppointmentToDelete(null),
+    })
+  }
+
+  function handleStopRecurring() {
+    if (!appointmentToStopRecurring?.recurringSeriesId) return
+
+    stopRecurringSeries.mutate(
+      {
+        recurringSeriesId: appointmentToStopRecurring.recurringSeriesId,
+        stopDate: appointmentToStopRecurring.date,
+      },
+      {
+        onSuccess: () => setAppointmentToStopRecurring(null),
+      },
+    )
+  }
+
   if (appointments.length === 0) {
     return <EmptyState title="Nenhuma sessão registrada" />
   }
@@ -129,34 +169,57 @@ export function PatientHistory({ patient }: PatientHistoryProps) {
       <div className="space-y-2">
         {appointments.map((apt) => {
           const hasReport = !!getReport(apt.id)
+          const isRecurring = Boolean(apt.recurringSeriesId)
+          const canStopRecurring =
+            isRecurring &&
+            apt.recurrenceStatus === 'active' &&
+            apt.date >= today &&
+            (apt.status === 'scheduled' || apt.status === 'confirmed')
+
           return (
             <Panel key={apt.id}>
-              <Panel.Body className="flex items-center justify-between">
+              <Panel.Body className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="space-y-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium">{formatDate(apt.date)}</span>
                     <span className="text-xs text-gray-400">
                       {apt.startTime} - {apt.endTime}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-xs text-gray-500">
                       {SESSION_TYPE_LABELS[apt.type]}
                     </span>
                     <span className="text-xs font-medium">{formatCurrency(apt.value)}</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <AppointmentStatusBadge status={apt.status} />
                     <PaymentStatusBadge status={apt.paymentStatus} />
+                    {apt.paymentStatus === 'paid' && apt.paymentMethod && (
+                      <span className="text-xs text-gray-500">
+                        {PAYMENT_METHOD_LABELS[apt.paymentMethod]}
+                      </span>
+                    )}
+                    {apt.paymentStatus === 'paid' && apt.paidAt && (
+                      <span className="text-xs text-gray-500">
+                        Pago em {formatDate(toDateInputValue(apt.paidAt))}
+                      </span>
+                    )}
                     {hasReport && (
                       <span className="inline-flex items-center rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-600">
                         Relatório
                       </span>
                     )}
+                    {isRecurring && (
+                      <span className="inline-flex items-center rounded-full bg-primary-50 px-2 py-0.5 text-xs font-medium text-primary-700">
+                        {apt.recurrenceStatus === 'active' ? 'Recorrente ativa' : 'Recorrência encerrada'}
+                      </span>
+                    )}
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 lg:justify-end">
                   <Button
+                    className="w-full sm:w-auto"
                     variant={hasReport ? 'ghost' : 'secondary'}
                     size="sm"
                     onClick={() => openReport(apt.id)}
@@ -165,7 +228,12 @@ export function PatientHistory({ patient }: PatientHistoryProps) {
                   </Button>
                   {apt.paymentStatus === 'pending' && apt.status !== 'cancelled' && (
                     <>
-                      <Button variant="secondary" size="sm" onClick={() => handleMarkPaid(apt.id)}>
+                      <Button
+                        className="w-full sm:w-auto"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setSelectedPaymentAppointmentId(apt.id)}
+                      >
                         Marcar Pago
                       </Button>
                       {patient.phone && (
@@ -173,12 +241,86 @@ export function PatientHistory({ patient }: PatientHistoryProps) {
                       )}
                     </>
                   )}
+                  {canStopRecurring && (
+                    <Button
+                      className="w-full sm:w-auto"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        stopRecurringSeries.reset()
+                        setAppointmentToStopRecurring(apt)
+                      }}
+                    >
+                      Encerrar recorrência
+                    </Button>
+                  )}
+                  <Button
+                    className="w-full sm:w-auto"
+                    variant="danger"
+                    size="sm"
+                    onClick={() => {
+                      deleteAppointment.reset()
+                      setAppointmentToDelete(apt)
+                    }}
+                  >
+                    Excluir sessão
+                  </Button>
                 </div>
               </Panel.Body>
             </Panel>
           )
         })}
       </div>
+
+      <PaymentMethodDialog
+        open={selectedPaymentAppointmentId !== null}
+        onClose={() => setSelectedPaymentAppointmentId(null)}
+        onConfirm={(paymentMethod, paidAt) => {
+          if (!selectedPaymentAppointmentId) return
+          handleMarkPaid(selectedPaymentAppointmentId, paymentMethod, paidAt)
+          setSelectedPaymentAppointmentId(null)
+        }}
+        title="Registrar pagamento"
+        confirmLabel="Marcar pago"
+      />
+
+      <ConfirmationDialog
+        open={appointmentToDelete !== null}
+        onClose={() => {
+          if (deleteAppointment.isPending) return
+          deleteAppointment.reset()
+          setAppointmentToDelete(null)
+        }}
+        onConfirm={handleDeleteSession}
+        title="Excluir sessão"
+        description={
+          appointmentToDelete
+            ? `Tem certeza que deseja excluir a sessão de ${formatDate(appointmentToDelete.date)} às ${appointmentToDelete.startTime}? O relatório vinculado também será removido.`
+            : ''
+        }
+        confirmLabel="Excluir sessão"
+        isPending={deleteAppointment.isPending}
+        error={deleteAppointment.error instanceof Error ? deleteAppointment.error.message : null}
+      />
+
+      <ConfirmationDialog
+        open={appointmentToStopRecurring !== null}
+        onClose={() => {
+          if (stopRecurringSeries.isPending) return
+          stopRecurringSeries.reset()
+          setAppointmentToStopRecurring(null)
+        }}
+        onConfirm={handleStopRecurring}
+        title="Encerrar recorrência"
+        description={
+          appointmentToStopRecurring
+            ? `Encerrar a recorrência vai remover as próximas sessões a partir de ${formatDate(appointmentToStopRecurring.date)}. A sessão atual e as futuras ocorrências recorrentes serão excluídas.`
+            : ''
+        }
+        confirmLabel="Encerrar recorrência"
+        isPending={stopRecurringSeries.isPending}
+        error={stopRecurringSeries.error instanceof Error ? stopRecurringSeries.error.message : null}
+      />
 
       {/* Report Modal */}
       {reportModal && (
@@ -193,8 +335,8 @@ export function PatientHistory({ patient }: PatientHistoryProps) {
                   {reportText || <span className="italic text-gray-400">Sem texto</span>}
                 </div>
                 {reportFileName && (
-                  <div className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2">
-                    <span className="text-sm">📎 {reportFileName}</span>
+                  <div className="flex flex-col gap-2 rounded-lg border border-gray-200 px-3 py-2 sm:flex-row sm:items-center">
+                    <span className="break-all text-sm">📎 {reportFileName}</span>
                     <button
                       onClick={handleDownloadAttachment}
                       className="text-xs text-primary-500 hover:text-primary-700"
@@ -221,8 +363,8 @@ export function PatientHistory({ patient }: PatientHistoryProps) {
                     className="hidden"
                   />
                   {reportFileName ? (
-                    <div className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2">
-                      <span className="flex-1 text-sm">📎 {reportFileName}</span>
+                    <div className="flex flex-col gap-2 rounded-lg border border-gray-200 px-3 py-2 sm:flex-row sm:items-center">
+                      <span className="flex-1 break-all text-sm">📎 {reportFileName}</span>
                       <button
                         type="button"
                         onClick={() => {

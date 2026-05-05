@@ -1,4 +1,5 @@
 export const APPOINTMENT_STATUS = {
+  SCHEDULED: 'scheduled',
   CONFIRMED: 'confirmed',
   CANCELLED: 'cancelled',
   COMPLETED: 'completed',

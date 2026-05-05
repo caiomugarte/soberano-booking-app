@@ -12,6 +12,7 @@ interface FinancialAppointment {
   priceCents: number
   status: string
   paymentStatus: string
+  paymentMethod: Appointment['paymentMethod']
   paidAt: string | null
   appointmentNotes: string | null
   service: { slug: string }
@@ -42,6 +43,7 @@ export function mapToAppointment(a: FinancialAppointment): Appointment {
     status: (a.status ?? 'confirmed') as Appointment['status'],
     value: a.priceCents,
     paymentStatus: (a.paymentStatus ?? 'pending') as Appointment['paymentStatus'],
+    paymentMethod: a.paymentMethod ?? undefined,
     paidAt: a.paidAt ?? undefined,
     notes: a.appointmentNotes ?? undefined,
   }
