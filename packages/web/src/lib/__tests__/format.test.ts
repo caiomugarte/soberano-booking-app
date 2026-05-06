@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import {
   formatPhone, stripPhone, formatCurrency, dateToString,
   formatDateShort, formatDateLong,
@@ -170,6 +170,15 @@ describe('getMonthCalendarDays', () => {
 });
 
 describe('getMonthLabel', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-07T12:00:00'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('returns "Abril 2026" for offset 0 (today is 2026-04-07)', () => {
     expect(getMonthLabel(0)).toBe('Abril 2026');
   });
@@ -180,6 +189,15 @@ describe('getMonthLabel', () => {
 });
 
 describe('getYearLabel', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-07T12:00:00'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('returns 2026 for offset 0 (today is 2026-04-07)', () => {
     expect(getYearLabel(0)).toBe(2026);
   });
