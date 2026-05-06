@@ -42,11 +42,16 @@ docker network create coolify-prod
 docker network create coolify-dev
 ```
 
-Every Coolify application based on these compose files must set `COOLIFY_SHARED_NETWORK` to the correct environment network. Inside each environment network, `http://api:3000` remains safe because only that environment's API container is reachable via the `api` alias.
+Every Coolify application based on these compose files must set `COOLIFY_SHARED_NETWORK` to the correct environment network. The compose files bind their shared `shared` network to that Docker network name at deploy time. Inside each environment network, `http://api:3000` remains safe because only that environment's API container is reachable via the `api` alias.
 
 The API compose file also declares an explicit `api` alias on the shared
 network so tenant frontends can proxy to `http://api:3000` without depending
 on Coolify-generated container names.
+
+If you prefer a custom internal hostname such as `api-dev-internal`, set
+`API_INTERNAL_ALIAS` on the API stack and point frontend `API_INTERNAL_URL`
+to that hostname. This only works when the API stack and frontend resource use
+the same `COOLIFY_SHARED_NETWORK`.
 
 ### Step 1 — PostgreSQL (Coolify Service)
 

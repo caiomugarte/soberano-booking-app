@@ -11,8 +11,9 @@ services:
       API_INTERNAL_URL: ${API_INTERNAL_URL}
     restart: unless-stopped
     networks:
-      - coolify
+      - shared
 
 networks:
-  coolify:
+  shared:
+    name: ${COOLIFY_SHARED_NETWORK}
     external: true

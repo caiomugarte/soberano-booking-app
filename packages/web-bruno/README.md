@@ -70,6 +70,10 @@ container and the shared API container both join the same external Docker
 network. If Coolify does not attach this app to `COOLIFY_SHARED_NETWORK`,
 nginx starts with `host not found in upstream "api"`.
 
+If the API stack sets `API_INTERNAL_ALIAS`, you can also target that custom
+hostname, for example `API_INTERNAL_URL=http://api-dev-internal:3000`. The API
+stack and `web-bruno` still need to share the same `COOLIFY_SHARED_NETWORK`.
+
 Routing behavior in production:
 
 - SPA routes and deep links fall back to `index.html`

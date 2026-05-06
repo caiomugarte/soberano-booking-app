@@ -20,7 +20,7 @@ services:
       internal:
         aliases:
           - ${API_INTERNAL_ALIAS:-api-internal}
-      coolify:
+      shared:
         aliases:
           - ${API_INTERNAL_ALIAS:-api-internal}
 
@@ -40,12 +40,13 @@ services:
       internal:
         aliases:
           - ${MCP_INTERNAL_ALIAS:-mcp-internal}
-      coolify:
+      shared:
         aliases:
           - ${MCP_INTERNAL_ALIAS:-mcp-internal}
 
 networks:
   internal:
     driver: bridge
-  coolify:
+  shared:
+    name: ${COOLIFY_SHARED_NETWORK}
     external: true
