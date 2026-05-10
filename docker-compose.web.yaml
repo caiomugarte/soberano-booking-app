@@ -6,12 +6,14 @@ services:
       context: .
       dockerfile: packages/web/Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL}
         VITE_TENANT_SLUG: ${VITE_TENANT_SLUG}
+    environment:
+      API_INTERNAL_URL: ${API_INTERNAL_URL}
     restart: unless-stopped
     networks:
-      - coolify
+      - shared
 
 networks:
-  coolify:
+  shared:
+    name: ${COOLIFY_SHARED_NETWORK}
     external: true

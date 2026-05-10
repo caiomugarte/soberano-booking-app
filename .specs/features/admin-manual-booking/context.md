@@ -8,7 +8,7 @@ Barbers cannot book appointments in the past, including past hours on the curren
 
 ## GA-2: WhatsApp notification
 **Decision: Always send confirmation to the customer.**
-Same notification as the customer-facing booking flow. For a future monthly plan feature, a single grouped summary message should be sent instead of 4 individual ones.
+Same notification as the customer-facing booking flow for normal admin bookings. Exception: when the admin booking is linked to a `packageId`, follow the `customer-packages` spec and omit the self-service cancel/change link. For a future monthly plan feature, a single grouped summary message should be sent instead of 4 individual ones.
 
 ## GA-3: Monthly plan storage
 **Decision: Deferred.**

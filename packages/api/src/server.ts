@@ -20,6 +20,7 @@ import { platformRoutes } from './http/routes/platform.routes.js';
 import { internalRoutes } from './http/routes/internal.routes.js';
 import { psychologyRoutes } from './http/routes/psychology.routes.js';
 import { startReminderJob } from './infrastructure/jobs/reminder.job.js';
+import { startRecurringSeriesMaterializationJob } from './infrastructure/jobs/recurring-series-materialization.job.js';
 
 const app = Fastify({
   logger: {
@@ -55,6 +56,7 @@ if (env.NODE_ENV === 'development') {
 app.addHook('preHandler', async (request, reply) => {
   if (request.url.startsWith('/api/platform/')) return;
   if (request.url.startsWith('/api/internal/')) return;
+  if (request.url === '/api/health') return;
   if (request.url === '/api/auth/refresh') return;
   if (request.url === '/api/auth/logout') return;
   if (request.url.startsWith('/docs')) return;
@@ -110,6 +112,7 @@ await app.register(psychologyRoutes, { prefix: '/api' });
 try {
   await app.listen({ port: env.PORT, host: '0.0.0.0' });
   startReminderJob();
+  startRecurringSeriesMaterializationJob();
   app.log.info(`Server running on port ${env.PORT}`);
 } catch (err) {
   app.log.error(err);

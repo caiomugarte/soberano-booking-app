@@ -28,7 +28,8 @@ cp -r packages/web-bruno packages/web-{clientname}
 
 Update `packages/web-{clientname}/package.json`:
 - Change the `name` field to `@soberano/web-{clientname}`
-- Update the `VITE_API_URL` in `.env` to point to the shared API
+- Set `VITE_TENANT_SLUG` for the tenant slug
+- Keep browser requests on same-origin `/api` paths; use the package's Vite proxy in development and nginx `API_INTERNAL_URL` proxy in production
 
 ### 2. Create a tenant row
 

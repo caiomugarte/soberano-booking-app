@@ -26,10 +26,12 @@ export interface AdminMe {
 }
 
 export function useAdminMe() {
+  const accessToken = useAuthStore((s) => s.accessToken);
   return useQuery({
     queryKey: ['admin-me'],
     queryFn: () => authRequest<AdminMe>('/admin/me'),
     staleTime: Infinity,
+    enabled: !!accessToken,
   });
 }
 
@@ -37,7 +39,7 @@ export function useLogin() {
   const setAccessToken = useAuthStore((s) => s.setAccessToken);
   return useMutation({
     mutationFn: (data: { email: string; password: string }) =>
-      fetch(`${API_BASE}/api/auth/login`, {
+      fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', 'X-Tenant-Slug': TENANT_SLUG },
@@ -60,10 +62,12 @@ export interface AppointmentPage {
 }
 
 export function useAdminAppointments(date: string) {
+  const accessToken = useAuthStore((s) => s.accessToken);
   return useQuery({
     queryKey: ['admin-appointments', date],
     queryFn: () => authRequest<AppointmentPage>(`/admin/appointments?date=${date}`),
     refetchInterval: 1000 * 60,
+    enabled: !!accessToken,
   });
 }
 
@@ -86,20 +90,24 @@ export interface DayStat {
 }
 
 export function useAdminAppointmentsRange(from: string, to: string) {
+  const accessToken = useAuthStore((s) => s.accessToken);
   return useQuery({
     queryKey: ['admin-appointments-range', from, to],
     queryFn: () =>
       authRequest<{ appointments: AdminAppointment[] }>(`/admin/appointments/range?from=${from}&to=${to}`)
         .then((r) => r.appointments),
     staleTime: 60 * 1000,
+    enabled: !!accessToken,
   });
 }
 
 export function useAdminStats(from: string, to: string) {
+  const accessToken = useAuthStore((s) => s.accessToken);
   return useQuery({
     queryKey: ['admin-stats', from, to],
     queryFn: () => authRequest<{ days: DayStat[] }>(`/admin/stats?from=${from}&to=${to}`).then((r) => r.days),
     staleTime: 5 * 60 * 1000,
+    enabled: !!accessToken,
   });
 }
 
@@ -220,20 +228,23 @@ export function useAdminCreatePackage() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-packages'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-packages-all'] });
     },
   });
 }
 
 export function useAdminCustomerPackages(phone: string) {
+  const accessToken = useAuthStore((s) => s.accessToken);
   return useQuery({
     queryKey: ['admin-packages', phone],
     queryFn: () => authRequest<{ packages: CustomerPackage[] }>('/admin/packages?phone=' + phone).then((r) => r.packages),
-    enabled: phone.length >= 10,
+    enabled: !!accessToken && phone.length >= 10,
     staleTime: 30_000,
   });
 }
 
 export function useAdminPackages(status?: string) {
+  const accessToken = useAuthStore((s) => s.accessToken);
   return useQuery({
     queryKey: ['admin-packages-all', status ?? 'all'],
     queryFn: () =>
@@ -241,6 +252,7 @@ export function useAdminPackages(status?: string) {
         '/admin/packages' + (status ? `?status=${status}` : ''),
       ).then((r) => r.packages),
     staleTime: 30_000,
+    enabled: !!accessToken,
   });
 }
 

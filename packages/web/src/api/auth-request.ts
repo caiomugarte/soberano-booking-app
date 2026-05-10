@@ -1,27 +1,13 @@
 import { useAuthStore } from '../stores/auth.store.ts';
+import { API_BASE } from '../config/api.ts';
 import { TENANT_SLUG } from '../config/env.js';
+import { refreshAccessToken } from './auth-session.ts';
 
-export const API_BASE = import.meta.env.VITE_API_URL ?? '';
-
-async function tryRefresh(): Promise<string | null> {
-  try {
-    const res = await fetch(`${API_BASE}/api/auth/refresh`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'X-Tenant-Slug': TENANT_SLUG },
-    });
-    if (!res.ok) return null;
-    const { accessToken } = await res.json();
-    useAuthStore.getState().setAccessToken(accessToken);
-    return accessToken;
-  } catch {
-    return null;
-  }
-}
+export { API_BASE };
 
 export async function authRequest<T>(path: string, options?: RequestInit): Promise<T> {
   const makeRequest = (token: string | null) =>
-    fetch(`${API_BASE}/api${path}`, {
+    fetch(`${API_BASE}${path}`, {
       credentials: 'include',
       ...options,
       headers: {
@@ -33,11 +19,20 @@ export async function authRequest<T>(path: string, options?: RequestInit): Promi
     });
 
   let token = useAuthStore.getState().accessToken;
+  if (!token) {
+    token = await refreshAccessToken();
+  }
+
+  if (!token) {
+    await useAuthStore.getState().logout();
+    throw new Error('Sessão expirada. Faça login novamente.');
+  }
+
   let res = await makeRequest(token);
 
   // Token expired — try to refresh once and retry
   if (res.status === 401) {
-    const newToken = await tryRefresh();
+    const newToken = await refreshAccessToken();
     if (newToken) {
       res = await makeRequest(newToken);
     } else {

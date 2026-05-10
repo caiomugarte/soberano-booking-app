@@ -1,4 +1,5 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar.tsx';
 import { PageHeader } from './PageHeader.tsx';
 
@@ -9,12 +10,21 @@ interface AppShellProps {
 }
 
 export function AppShell({ breadcrumb, actions, children }: AppShellProps) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
   return (
     <div className="min-h-screen bg-dark">
-      <Sidebar />
-      <div className="pl-60 flex flex-col min-h-screen">
-        <PageHeader breadcrumb={breadcrumb}>{actions}</PageHeader>
-        <main className="px-8 py-6 flex-1">{children}</main>
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <div className="flex min-h-screen flex-col lg:pl-60">
+        <PageHeader breadcrumb={breadcrumb} onOpenSidebar={() => setSidebarOpen(true)}>
+          {actions}
+        </PageHeader>
+        <main className="flex-1 px-4 py-5 sm:px-6 lg:px-8 lg:py-6">{children}</main>
       </div>
     </div>
   );

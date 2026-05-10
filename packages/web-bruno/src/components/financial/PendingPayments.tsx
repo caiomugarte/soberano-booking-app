@@ -1,18 +1,21 @@
+import { useState } from 'react'
+import { PaymentMethodDialog } from '@/components/appointments/PaymentMethodDialog'
 import { Panel } from '@/components/ui/Panel'
 import { Button } from '@/components/ui/Button'
 import { WhatsAppButton } from '@/components/whatsapp/WhatsAppButton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { formatDate, formatCurrency } from '@/lib/format'
-import type { Appointment } from '@/schemas/appointment.schema'
+import type { Appointment, PaymentMethod } from '@/schemas/appointment.schema'
 import type { Patient } from '@/schemas/patient.schema'
 
 interface PendingPaymentsProps {
   appointments: Appointment[]
   patients: Patient[]
-  onMarkPaid: (id: string) => void
+  onMarkPaid: (id: string, paymentMethod: PaymentMethod, paidAt: string) => void
 }
 
 export function PendingPayments({ appointments, patients, onMarkPaid }: PendingPaymentsProps) {
+  const [selectedAppointmentId, setSelectedAppointmentId] = useState<string | null>(null)
   const pending = appointments
     .filter((a) => a.paymentStatus === 'pending' && a.status !== 'cancelled')
     .sort((a, b) => a.date.localeCompare(b.date))
@@ -28,7 +31,7 @@ export function PendingPayments({ appointments, patients, onMarkPaid }: PendingP
         {pending.map((apt) => {
           const patient = patients.find((p) => p.id === apt.patientId)
           return (
-            <div key={apt.id} className="flex items-center justify-between px-5 py-3">
+            <div key={apt.id} className="flex flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="text-sm font-medium text-gray-800">
                   {patient?.name ?? 'Paciente'}
@@ -37,14 +40,19 @@ export function PendingPayments({ appointments, patients, onMarkPaid }: PendingP
                   {formatDate(apt.date)} - {apt.startTime}
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:items-center">
                 <span className="text-sm font-semibold text-amber-600">
                   {formatCurrency(apt.value)}
                 </span>
                 {patient?.phone && (
                   <WhatsAppButton appointmentId={apt.id} />
                 )}
-                <Button variant="secondary" size="sm" onClick={() => onMarkPaid(apt.id)}>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="w-full sm:w-auto"
+                  onClick={() => setSelectedAppointmentId(apt.id)}
+                >
                   Marcar Pago
                 </Button>
               </div>
@@ -52,6 +60,18 @@ export function PendingPayments({ appointments, patients, onMarkPaid }: PendingP
           )
         })}
       </div>
+
+      <PaymentMethodDialog
+        open={selectedAppointmentId !== null}
+        onClose={() => setSelectedAppointmentId(null)}
+        onConfirm={(paymentMethod, paidAt) => {
+          if (!selectedAppointmentId) return
+          onMarkPaid(selectedAppointmentId, paymentMethod, paidAt)
+          setSelectedAppointmentId(null)
+        }}
+        title="Registrar pagamento"
+        confirmLabel="Marcar pago"
+      />
     </Panel>
   )
 }

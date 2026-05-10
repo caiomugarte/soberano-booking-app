@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAdminPackages, useAdminDeactivatePackage, useAdminDeletePackage, useAdminMe, type CustomerPackage } from '../../api/use-admin.ts';
+import { useAdminPackages, useAdminDeactivatePackage, type CustomerPackage } from '../../api/use-admin.ts';
 import { Spinner } from '../../components/ui/Spinner.tsx';
 import { formatCurrency } from '../../lib/format.ts';
-import { BookFromPackageModal } from '../../components/admin/BookFromPackageModal.tsx';
 
 const STATUS_LABEL: Record<string, string> = {
   active: 'Ativo',
@@ -59,69 +58,26 @@ function ConfirmDeactivateModal({
   );
 }
 
-function ConfirmDeleteModal({
-  pkg,
-  onConfirm,
-  onClose,
-  isPending,
-}: {
-  pkg: CustomerPackage;
-  onConfirm: () => void;
-  onClose: () => void;
-  isPending: boolean;
-}) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-dark-surface border border-dark-border rounded-2xl p-6 w-full max-w-sm">
-        <h3 className="text-base font-bold mb-2">Apagar pacote?</h3>
-        <p className="text-muted text-sm mb-6">
-          {pkg.customerName} — {pkg.usedCount}/{pkg.totalUses} usos —{' '}
-          {formatCurrency(pkg.totalPriceCents)}
-        </p>
-        <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            disabled={isPending}
-            className="flex-1 py-2.5 rounded-xl border border-dark-border text-muted hover:text-[#F0EDE8] transition-colors text-sm cursor-pointer bg-transparent disabled:opacity-50"
-          >
-            Voltar
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={isPending}
-            className="flex-1 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors text-sm font-medium cursor-pointer disabled:opacity-50"
-          >
-            {isPending ? <Spinner /> : '✕ Apagar'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function PackagesPage() {
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('');
   const [search, setSearch] = useState('');
   const [deactivatingPkg, setDeactivatingPkg] = useState<CustomerPackage | null>(null);
-  const [deletingPkg, setDeletingPkg] = useState<CustomerPackage | null>(null);
-  const [schedulingPkg, setSchedulingPkg] = useState<CustomerPackage | null>(null);
 
   const { data: packages, isLoading } = useAdminPackages(statusFilter || undefined);
-  const { data: me } = useAdminMe();
   const deactivate = useAdminDeactivatePackage();
-  const deletePkg = useAdminDeletePackage();
 
-  const filtered = (packages ?? []).filter((p) => {
+  const filtered = (packages ?? []).filter((pkg) => {
     if (!search) return true;
-    const q = search.toLowerCase();
+
+    const query = search.toLowerCase();
     return (
-      p.customerName.toLowerCase().includes(q) ||
-      (p.customerPhone ?? '').includes(q)
+      pkg.customerName.toLowerCase().includes(query) ||
+      (pkg.customerPhone ?? '').includes(query)
     );
   });
 
-  const FILTERS: { label: string; value: StatusFilter }[] = [
+  const filters: Array<{ label: string; value: StatusFilter }> = [
     { label: 'Todos', value: '' },
     { label: 'Ativos', value: 'active' },
     { label: 'Concluídos', value: 'completed' },
@@ -142,25 +98,6 @@ export default function PackagesPage() {
           }}
         />
       )}
-      {deletingPkg && (
-        <ConfirmDeleteModal
-          pkg={deletingPkg}
-          isPending={deletePkg.isPending}
-          onClose={() => setDeletingPkg(null)}
-          onConfirm={() => {
-            deletePkg.mutate(deletingPkg.id, {
-              onSuccess: () => setDeletingPkg(null),
-            });
-          }}
-        />
-      )}
-      {schedulingPkg && (
-        <BookFromPackageModal
-          pkg={schedulingPkg}
-          barberId={me?.id ?? null}
-          onClose={() => setSchedulingPkg(null)}
-        />
-      )}
 
       <div className="flex items-center justify-between mb-8">
         <button
@@ -174,7 +111,7 @@ export default function PackagesPage() {
       </div>
 
       <div className="flex gap-1.5 mb-4 flex-wrap">
-        {FILTERS.map(({ label, value }) => (
+        {filters.map(({ label, value }) => (
           <button
             key={value}
             onClick={() => setStatusFilter(value)}
@@ -207,55 +144,41 @@ export default function PackagesPage() {
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {filtered.map((p) => (
+          {filtered.map((pkg) => (
             <div
-              key={p.id}
+              key={pkg.id}
               className="bg-dark-surface border border-dark-border rounded-xl p-5"
             >
               <div className="flex items-start justify-between gap-4 mb-3">
                 <div>
-                  <p className="font-medium text-sm">{p.customerName}</p>
-                  {p.customerPhone && (
-                    <p className="text-muted text-xs mt-0.5">+55 {p.customerPhone}</p>
+                  <p className="font-medium text-sm">{pkg.customerName}</p>
+                  {pkg.customerPhone && (
+                    <p className="text-muted text-xs mt-0.5">+55 {pkg.customerPhone}</p>
                   )}
                 </div>
                 <span
-                  className={`text-xs font-medium px-2 py-0.5 rounded-full border shrink-0 ${STATUS_COLOR[p.status]}`}
+                  className={`text-xs font-medium px-2 py-0.5 rounded-full border shrink-0 ${STATUS_COLOR[pkg.status]}`}
                 >
-                  {STATUS_LABEL[p.status] ?? p.status}
+                  {STATUS_LABEL[pkg.status] ?? pkg.status}
                 </span>
               </div>
+
               <div className="flex items-center justify-between text-sm mb-3">
                 <span className="text-muted text-xs">
-                  {p.usedCount}/{p.totalUses} usos
+                  {pkg.usedCount}/{pkg.totalUses} usos
                 </span>
-                <span className="font-medium text-gold">{formatCurrency(p.totalPriceCents)}</span>
+                <span className="font-medium text-gold">{formatCurrency(pkg.totalPriceCents)}</span>
                 <span className="text-muted text-xs">
-                  {new Date(p.createdAt).toLocaleDateString('pt-BR')}
+                  {new Date(pkg.createdAt).toLocaleDateString('pt-BR')}
                 </span>
               </div>
-              {p.status === 'active' && p.usedCount < p.totalUses && (
+
+              {pkg.status === 'active' && (
                 <button
-                  onClick={() => setSchedulingPkg(p)}
-                  className="w-full py-2 rounded-lg border border-gold text-gold hover:bg-gold/10 transition-colors cursor-pointer text-xs font-medium mb-2"
-                >
-                  + Agendar ({p.totalUses - p.usedCount} restante{p.totalUses - p.usedCount !== 1 ? 's' : ''})
-                </button>
-              )}
-              {p.status === 'active' && (
-                <button
-                  onClick={() => setDeactivatingPkg(p)}
+                  onClick={() => setDeactivatingPkg(pkg)}
                   className="w-full py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer text-xs font-medium"
                 >
                   Desativar
-                </button>
-              )}
-              {p.status === 'cancelled' && (
-                <button
-                  onClick={() => setDeletingPkg(p)}
-                  className="w-full py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer text-xs font-medium"
-                >
-                  ✕ Apagar
                 </button>
               )}
             </div>

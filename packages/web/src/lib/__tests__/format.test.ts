@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import {
   formatPhone, stripPhone, formatCurrency, dateToString,
   formatDateShort, formatDateLong,
@@ -171,8 +171,8 @@ describe('getMonthCalendarDays', () => {
 
 describe('getMonthLabel', () => {
   beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-04-07T00:00:00'));
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-07T12:00:00'));
   });
 
   afterEach(() => {
@@ -190,8 +190,8 @@ describe('getMonthLabel', () => {
 
 describe('getYearLabel', () => {
   beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date('2026-04-07T00:00:00'));
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-07T12:00:00'));
   });
 
   afterEach(() => {

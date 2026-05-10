@@ -2,6 +2,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './http-client'
 import type { Patient, PatientFormData } from '@/schemas/patient.schema'
 
+type PatientUpdateData = {
+  name?: string
+  phone?: string | null
+  email?: string | null
+  cpf?: string | null
+  notes?: string | null
+}
+
 export function usePatients(search?: string) {
   return useQuery({
     queryKey: ['patients', { search }],
@@ -35,7 +43,7 @@ export function useCreatePatient() {
 export function useUpdatePatient() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<PatientFormData> }) =>
+    mutationFn: ({ id, data }: { id: string; data: PatientUpdateData }) =>
       apiFetch<Patient>(`/api/psychology/patients/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),

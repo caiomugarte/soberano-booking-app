@@ -374,10 +374,10 @@ query.phone → required, 400 if absent
 
 ### BT6: Extend `AdminCreateAppointment` use case
 
-**What**: Accept optional `packageId` in input; validate and increment package credit after appointment creation.
+**What**: Accept optional `packageId` in input; validate and increment package credit after appointment creation; suppress the self-service link in the customer confirmation when the booking is package-linked.
 **Where**: `packages/api/src/application/use-cases/booking/admin-create-appointment.ts`
 **Depends on**: BT2
-**Requirement**: BKD-07, BKD-08, BKD-09, BKD-10, BKD-11
+**Requirement**: BKD-07, BKD-08, BKD-09, BKD-10, BKD-11, BKD-18, BKD-19
 
 **Input change**: add `packageId?: string` to `AdminCreateAppointmentInput`.
 
@@ -398,10 +398,21 @@ if (input.packageId) {
 }
 ```
 
+**Notification change after booking succeeds**:
+```
+if (input.customerPhone && date >= today) {
+  sendBookingConfirmation(appointment, {
+    includeManageLink: !input.packageId,
+  })
+}
+```
+
 **Done when**:
 - [ ] When `packageId` is absent, use case behavior is identical to before (no regression — BKD-11)
 - [ ] When `packageId` refers to a non-existent or non-active package, use case throws `ValidationError` before creating the appointment (BKD-10)
 - [ ] When `packageId` is valid, `incrementUsedCount` is called after appointment creation (BKD-08)
+- [ ] When `packageId` is valid and customer has a phone, the confirmation message omits the self-service cancel/change link (BKD-18)
+- [ ] When `packageId` is absent, the confirmation message remains unchanged (BKD-19)
 - [ ] `tsc --noEmit` passes
 
 **Commit**: `feat(api): extend AdminCreateAppointment to link and decrement package`
@@ -434,19 +445,21 @@ if (input.packageId) {
 
 ### BT8: Unit tests for package credit logic
 
-**What**: Tests for the extended `AdminCreateAppointment` use case covering the three `packageId` scenarios.
+**What**: Tests for the extended `AdminCreateAppointment` use case covering the `packageId` scenarios and the package-linked notification rule.
 **Where**: `packages/api/src/application/use-cases/booking/__tests__/admin-create-appointment.test.ts` (new file)
 **Depends on**: BT6
-**Requirement**: BKD-07, BKD-08, BKD-09, BKD-10, BKD-11
+**Requirement**: BKD-07, BKD-08, BKD-09, BKD-10, BKD-11, BKD-18, BKD-19
 
 **Test cases**:
 1. `packageId` absent → appointment created, `packageRepo` never called (no regression)
 2. `packageId` present + package active → appointment created, `incrementUsedCount` called once
 3. `packageId` present + package `status = 'completed'` → throws `ValidationError`, `appointmentRepo.create` never called
 4. `packageId` present + package not found → throws `ValidationError`, `appointmentRepo.create` never called
+5. `packageId` present + customer phone → confirmation is sent without the self-service link option
+6. `packageId` absent + customer phone → confirmation is sent with the existing self-service link behavior
 
 **Done when**:
-- [ ] All 4 test cases pass
+- [ ] All 6 test cases pass
 - [ ] Mocks follow existing pattern from `create-appointment.test.ts` (vi.fn(), no real DB)
 - [ ] `npm test` in `packages/api` passes
 

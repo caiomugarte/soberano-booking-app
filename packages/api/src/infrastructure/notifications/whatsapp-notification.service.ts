@@ -47,9 +47,13 @@ export class WhatsAppNotificationService {
     console.error('[WhatsApp] All retry attempts exhausted');
   }
 
-  async sendBookingConfirmation(appointment: AppointmentWithDetails): Promise<void> {
+  async sendBookingConfirmation(
+    appointment: AppointmentWithDetails,
+    options?: { includeManageLink?: boolean },
+  ): Promise<void> {
     if (!appointment.customer.phone) return;
     const cancelUrl = `${this.config.bookingUrl}/agendamento/${appointment.cancelToken}`;
+    const includeManageLink = options?.includeManageLink ?? true;
     const message = [
       `✅ *Agendamento confirmado!*`,
       ``,
@@ -60,9 +64,13 @@ export class WhatsAppNotificationService {
       `📅 Data: ${formatDate(appointment.date)}`,
       `🕐 Horário: ${appointment.startTime}`,
       `💰 Valor: ${formatCurrency(appointment.priceCents)}`,
-      ``,
-      `Para cancelar ou alterar:`,
-      cancelUrl,
+      ...(includeManageLink
+        ? [
+            ``,
+            `Para cancelar ou alterar:`,
+            cancelUrl,
+          ]
+        : []),
     ].join('\n');
 
     await this.sendWithRetry(

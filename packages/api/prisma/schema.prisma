@@ -25,6 +25,7 @@ model Tenant {
   sessionReports   SessionReport[]
   documents        Document[]
   customerPackages CustomerPackage[]
+  recurringAppointmentSeries RecurringAppointmentSeries[]
 
   @@map("tenants")
 }
@@ -50,6 +51,7 @@ model Provider {
   shifts         ProviderShift[]
   absences       ProviderAbsence[]
   sessionReports SessionReport[]
+  recurringAppointmentSeries RecurringAppointmentSeries[]
 
   @@unique([tenantId, slug])
   @@unique([tenantId, email])
@@ -101,6 +103,7 @@ model Service {
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
   appointments Appointment[]
+  recurringAppointmentSeries RecurringAppointmentSeries[]
 
   @@unique([tenantId, slug])
   @@map("services")
@@ -120,8 +123,11 @@ model Customer {
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
   appointments Appointment[]
   documents    Document[]
+  recurringAppointmentSeries RecurringAppointmentSeries[]
 
   @@unique([tenantId, phone])
+  @@unique([tenantId, cpf])
+  @@unique([tenantId, email])
   @@map("customers")
 }
 
@@ -144,23 +150,56 @@ model Appointment {
   updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   paymentStatus    String    @default("pending") @map("payment_status") @db.VarChar(20)
+  paymentMethod    String?   @map("payment_method") @db.VarChar(20)
   paidAt           DateTime? @map("paid_at") @db.Timestamptz
   appointmentNotes String?   @map("appointment_notes") @db.Text
 
-  packageId      String?   @map("package_id") @db.Uuid
+  packageId          String?   @map("package_id") @db.Uuid
+  recurringSeriesId  String?   @map("recurring_series_id") @db.Uuid
 
-  tenant         Tenant           @relation(fields: [tenantId], references: [id])
-  provider       Provider         @relation(fields: [providerId], references: [id])
-  service        Service          @relation(fields: [serviceId], references: [id])
-  customer       Customer         @relation(fields: [customerId], references: [id])
-  package        CustomerPackage? @relation(fields: [packageId], references: [id])
-  sessionReports SessionReport[]
+  tenant           Tenant                     @relation(fields: [tenantId], references: [id])
+  provider         Provider                   @relation(fields: [providerId], references: [id])
+  service          Service                    @relation(fields: [serviceId], references: [id])
+  customer         Customer                   @relation(fields: [customerId], references: [id])
+  package          CustomerPackage?           @relation(fields: [packageId], references: [id])
+  recurringSeries  RecurringAppointmentSeries? @relation(fields: [recurringSeriesId], references: [id])
+  sessionReports   SessionReport[]
 
   @@index([providerId, date, startTime])
   @@index([date, providerId])
   @@index([customerId])
   @@index([cancelToken])
+  @@index([recurringSeriesId])
   @@map("appointments")
+}
+
+model RecurringAppointmentSeries {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  providerId    String   @map("provider_id") @db.Uuid
+  customerId    String   @map("customer_id") @db.Uuid
+  serviceId     String   @map("service_id") @db.Uuid
+  startDate     DateTime @map("start_date") @db.Date
+  startTime     String   @map("start_time") @db.VarChar(5)
+  endTime       String   @map("end_time") @db.VarChar(5)
+  intervalWeeks Int      @map("interval_weeks")
+  status        String   @default("active") @db.VarChar(20)
+  stopDate      DateTime? @map("stop_date") @db.Date
+  priceCents    Int?     @map("price_cents")
+  notes         String?  @db.Text
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant       Tenant         @relation(fields: [tenantId], references: [id])
+  provider     Provider       @relation(fields: [providerId], references: [id])
+  customer     Customer       @relation(fields: [customerId], references: [id])
+  service      Service        @relation(fields: [serviceId], references: [id])
+  appointments Appointment[]
+
+  @@index([providerId, status])
+  @@index([tenantId, status])
+  @@index([customerId])
+  @@map("recurring_appointment_series")
 }
 
 model SessionReport {

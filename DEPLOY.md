@@ -10,20 +10,48 @@
 | Database | PostgreSQL (Coolify service — shared across all tenants) |
 | API | Coolify Application — `https://api.altion.com.br` (shared) |
 | Super-admin | Coolify Application — `https://admin.altion.com.br` |
-| Soberano web | Coolify Application — `https://soberano.altion.com.br` |
+| Soberano web | Coolify Application — `https://soberano.altion.com.br` (SPA + same-origin `/api` proxy) |
 | _New client web_ | Coolify Application — `https://[slug].altion.com.br` or custom domain |
 
-**Three docker-compose files:**
+**Environment network rule:**
+
+- Production stacks join `coolify-prod`
+- Development stacks join `coolify-dev`
+- Do not attach prod and dev application stacks to the same external Docker network, or shared aliases like `api` will collide
+
+**Docker Compose files:**
 
 | File | Purpose | Deployed |
 |---|---|---|
 | `docker-compose.infra.yaml` | API + MCP — shared platform | Once |
-| `docker-compose.web.yaml` | Per-client frontend | Once per client |
+| `docker-compose.web.yaml` | Soberano frontend | Once |
+| `docker-compose.web-bruno.yaml` | Bruno frontend | Once |
+| `docker-compose.web-marques.yaml` | Marques frontend | Once |
 | `docker-compose.admin.yaml` | Super-admin panel | Once |
 
 ---
 
 ## Initial setup (first time only)
+
+### Step 0 — Create one shared Docker network per environment
+
+On the VPS, create the external networks once:
+
+```bash
+docker network create coolify-prod
+docker network create coolify-dev
+```
+
+Every Coolify application based on these compose files must set `COOLIFY_SHARED_NETWORK` to the correct environment network. The compose files bind their shared `shared` network to that Docker network name at deploy time. Inside each environment network, `http://api:3000` remains safe because only that environment's API container is reachable via the `api` alias.
+
+The API compose file also declares an explicit `api` alias on the shared
+network so tenant frontends can proxy to `http://api:3000` without depending
+on Coolify-generated container names.
+
+If you prefer a custom internal hostname such as `api-dev-internal`, set
+`API_INTERNAL_ALIAS` on the API stack and point frontend `API_INTERNAL_URL`
+to that hostname. This only works when the API stack and frontend resource use
+the same `COOLIFY_SHARED_NETWORK`.
 
 ### Step 1 — PostgreSQL (Coolify Service)
 
@@ -49,6 +77,11 @@
 | Dockerfile Location | `/packages/api/Dockerfile` |
 | Ports Exposes | `3000` |
 | Domain | `https://api.altion.com.br` |
+
+**Coolify stack setting:**
+
+- Enable **Connect to Predefined Networks** so the `api` container can reach
+  the PostgreSQL internal hostname on the selected destination network.
 
 **Watch Paths** (avoids rebuilding when only frontend changes):
 ```
@@ -78,6 +111,10 @@ SUPER_ADMIN_PASSWORD_HASH=<bcrypt hash>
 
 > **Note:** Chatwoot credentials are **not** set here. They live in each tenant's config in the database, managed via the super-admin panel.
 
+Do not define custom Docker networks for this stack inside
+`docker-compose.infra.yaml`. Let Coolify attach the stack to the selected
+destination network.
+
 Deploy and verify the container is **Running**.
 
 ---
@@ -102,10 +139,11 @@ packages/web-admin/**
 packages/shared/**
 ```
 
-**Build Variables** (toggle to "Build Variable"):
+**Compose / Environment Variables:**
 
 ```
-VITE_API_URL=https://api.altion.com.br
+API_INTERNAL_URL=http://api:3000
+COOLIFY_SHARED_NETWORK=coolify-prod
 ```
 
 Deploy and verify the container is **Running**.
@@ -135,9 +173,17 @@ packages/shared/**
 **Build Variables:**
 
 ```
-VITE_API_URL=https://api.altion.com.br
 VITE_TENANT_SLUG=soberano
 ```
+
+**Runtime Variables:**
+
+```
+API_INTERNAL_URL=http://api:3000
+COOLIFY_SHARED_NETWORK=coolify-prod
+```
+
+`API_INTERNAL_URL` is the nginx upstream target on the shared Coolify Docker network. Keep it as the internal API service URL, not a public hostname.
 
 Deploy and verify the container is **Running**.
 
@@ -159,14 +205,34 @@ Credentials are printed to the console — **copy them immediately**.
 ### Step 6 — Verify
 
 ```bash
-# API health
-curl https://api.altion.com.br/api/health
+# Browser-to-API traffic now goes through the tenant domain
+curl https://soberano.altion.com.br/api/health
 
 # Soberano services (must include X-Tenant-Slug)
-curl https://api.altion.com.br/api/services -H "X-Tenant-Slug: soberano"
+curl https://soberano.altion.com.br/api/services -H "X-Tenant-Slug: soberano"
 ```
 
 Open `https://soberano.altion.com.br` — the booking flow should load normally.
+
+### Step 4b — Additional tenant frontends
+
+Deploy each tenant frontend as its own Coolify application using the matching
+compose file:
+
+| Tenant | Compose file | Dockerfile | Build variable |
+|---|---|---|---|
+| Bruno | `docker-compose.web-bruno.yaml` | `packages/web-bruno/Dockerfile` | `VITE_TENANT_SLUG=bruno` |
+| Marques | `docker-compose.web-marques.yaml` | `packages/web-marques/Dockerfile` | `VITE_TENANT_SLUG=marques` |
+
+Each tenant frontend also needs:
+
+```env
+API_INTERNAL_URL=http://api:3000
+COOLIFY_SHARED_NETWORK=coolify-prod
+```
+
+If you deploy a tenant frontend to development, switch
+`COOLIFY_SHARED_NETWORK` to `coolify-dev`.
 
 ---
 
@@ -224,11 +290,8 @@ In the existing Soberano web Coolify resource:
 Add:
 ```
 VITE_TENANT_SLUG=soberano
-```
-
-Update:
-```
-VITE_API_URL=https://api.altion.com.br
+API_INTERNAL_URL=http://api:3000
+COOLIFY_SHARED_NETWORK=coolify-prod
 ```
 
 Trigger a redeploy.
@@ -250,11 +313,11 @@ Follow [Step 3](#step-3--super-admin-panel-docker-composeadminyaml) above to cre
 # Existing booking flow still works
 curl https://soberano.altion.com.br
 
-# API requires tenant header now
-curl https://api.altion.com.br/api/services -H "X-Tenant-Slug: soberano"
+# Same-origin API path works through the tenant domain
+curl https://soberano.altion.com.br/api/services -H "X-Tenant-Slug: soberano"
 
 # Without header → 404
-curl https://api.altion.com.br/api/services  # → {"error":"TENANT_NOT_FOUND"}
+curl https://soberano.altion.com.br/api/services  # → {"error":"TENANT_NOT_FOUND"}
 ```
 
 Ask a barber to log in and confirm the admin dashboard works.
@@ -326,9 +389,17 @@ This creates providers and services for the new tenant. Adjust the seed script o
 **Build Variables:**
 
 ```
-VITE_API_URL=https://api.altion.com.br
 VITE_TENANT_SLUG=marques
 ```
+
+**Runtime Variables:**
+
+```
+API_INTERNAL_URL=http://api:3000
+COOLIFY_SHARED_NETWORK=coolify-prod
+```
+
+The customer-facing frontend should call `https://marques.altion.com.br/api/...`; nginx proxies those requests to `API_INTERNAL_URL` on the shared Coolify network.
 
 **Watch Paths:**
 ```

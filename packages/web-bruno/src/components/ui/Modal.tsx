@@ -22,7 +22,7 @@ export function Modal({ open, onClose, children, zIndex }: ModalProps) {
   return (
     <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: zIndex ?? 50 }}>
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
+      <div className="relative z-10 max-h-[90vh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6">
         {children}
       </div>
     </div>
@@ -38,5 +38,5 @@ Modal.Body = function ModalBody({ children }: { children: ReactNode }) {
 }
 
 Modal.Footer = function ModalFooter({ children }: { children: ReactNode }) {
-  return <div className="mt-6 flex justify-end gap-3">{children}</div>
+  return <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">{children}</div>
 }

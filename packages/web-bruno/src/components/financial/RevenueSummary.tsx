@@ -38,20 +38,23 @@ export function RevenueSummary({
   ]
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {cards.map((card) => (
-        <Panel key={card.label}>
-          <Panel.Body>
-            <div className="text-xs font-medium text-gray-500">{card.label}</div>
-            <div className={`mt-1 text-xl font-bold ${card.color}`}>
-              {formatCurrency(card.value)}
-            </div>
-            {card.subtitle && (
-              <div className="mt-0.5 text-xs text-gray-400">{card.subtitle}</div>
-            )}
-          </Panel.Body>
-        </Panel>
-      ))}
+    <div className="space-y-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {cards.map((card) => (
+          <Panel key={card.label}>
+            <Panel.Body>
+              <div className="text-xs font-medium text-gray-500">{card.label}</div>
+              <div className={`mt-1 text-xl font-bold ${card.color}`}>
+                {formatCurrency(card.value)}
+              </div>
+              {card.subtitle && (
+                <div className="mt-0.5 text-xs text-gray-400">{card.subtitle}</div>
+              )}
+            </Panel.Body>
+          </Panel>
+        ))}
+      </div>
+      <p className="text-xs text-gray-500">Receitas pagas consideram a data do recebimento.</p>
     </div>
   )
 }
