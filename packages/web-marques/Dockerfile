@@ -10,10 +10,8 @@ RUN npm ci --include=dev
 
 COPY packages/web-marques ./packages/web-marques
 
-# Build-time env vars (Vite bakes these into the bundle)
-ARG VITE_API_URL
+# Build-time env vars
 ARG VITE_TENANT_SLUG
-ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_TENANT_SLUG=$VITE_TENANT_SLUG
 
 RUN npm -w @soberano/web-marques run build

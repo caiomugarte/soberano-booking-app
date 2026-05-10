@@ -7,6 +7,7 @@ import type { ProviderRepository } from '../../../../domain/repositories/provide
 import type { CustomerRepository } from '../../../../domain/repositories/customer.repository.js';
 import type { CustomerPackageRepository } from '../../../../domain/repositories/customer-package.repository.js';
 import type { WhatsAppNotificationService } from '../../../../infrastructure/notifications/whatsapp-notification.service.js';
+import type { AppointmentWithDetails } from '../../../../domain/entities/appointment.js';
 
 const activeService = {
   id: 'svc-1', slug: 'corte', name: 'Corte', icon: '✂️',
@@ -61,6 +62,7 @@ const validInput = {
 
 function makeUseCase(overrides?: {
   packageRepo?: Partial<CustomerPackageRepository>;
+  notificationService?: Partial<WhatsAppNotificationService>;
 }) {
   const serviceRepo = {
     findById: vi.fn().mockResolvedValue(activeService),
@@ -82,6 +84,7 @@ function makeUseCase(overrides?: {
   const notificationService = {
     sendBookingConfirmation: vi.fn().mockResolvedValue(undefined),
     notifyBarber: vi.fn().mockResolvedValue(undefined),
+    ...overrides?.notificationService,
   } as unknown as WhatsAppNotificationService;
 
   const packageRepo = overrides?.packageRepo
@@ -96,6 +99,7 @@ function makeUseCase(overrides?: {
     useCase: new AdminCreateAppointment(appointmentRepo, serviceRepo, barberRepo, customerRepo, notificationService, packageRepo),
     appointmentRepo,
     packageRepo,
+    notificationService,
   };
 }
 
@@ -131,5 +135,31 @@ describe('AdminCreateAppointment — package credit', () => {
     });
     await expect(useCase.execute({ ...validInput, packageId: 'pkg-missing' })).rejects.toBeInstanceOf(ValidationError);
     expect(appointmentRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('sends confirmation without self-service link when packageId is present', async () => {
+    const { useCase, notificationService } = makeUseCase({ packageRepo: {} });
+
+    await useCase.execute({ ...validInput, packageId: 'pkg-1' });
+
+    expect(
+      notificationService.sendBookingConfirmation as unknown as ReturnType<typeof vi.fn>,
+    ).toHaveBeenCalledWith(
+      expect.any(Object) as AppointmentWithDetails,
+      { includeManageLink: false },
+    );
+  });
+
+  it('keeps existing confirmation behavior when packageId is absent', async () => {
+    const { useCase, notificationService } = makeUseCase({ packageRepo: {} });
+
+    await useCase.execute(validInput);
+
+    expect(
+      notificationService.sendBookingConfirmation as unknown as ReturnType<typeof vi.fn>,
+    ).toHaveBeenCalledWith(
+      expect.any(Object) as AppointmentWithDetails,
+      { includeManageLink: true },
+    );
   });
 });

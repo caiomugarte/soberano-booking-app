@@ -8,9 +8,9 @@ export default function PatientsPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-bold text-gray-800">Pacientes</h1>
-        <Button onClick={() => setFormOpen(true)}>+ Novo Paciente</Button>
+        <Button className="w-full sm:w-auto" onClick={() => setFormOpen(true)}>+ Novo Paciente</Button>
       </div>
 
       <PatientList />

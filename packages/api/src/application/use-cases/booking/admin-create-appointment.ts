@@ -83,7 +83,9 @@ export class AdminCreateAppointment {
     today.setHours(0, 0, 0, 0);
 
     if (input.customerPhone && date >= today) {
-      this.notificationService.sendBookingConfirmation(appointment).catch((err) => {
+      this.notificationService.sendBookingConfirmation(appointment, {
+        includeManageLink: !input.packageId,
+      }).catch((err) => {
         console.error('[Notification] Failed to send booking confirmation:', err);
       });
       this.notificationService.notifyBarber(appointment, 'booked').catch((err) => {

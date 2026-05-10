@@ -9,6 +9,7 @@ export interface AppointmentEntity {
   serviceId: string;
   customerId: string;
   packageId: string | null;
+  recurringSeriesId: string | null;
   date: Date;
   startTime: string;
   endTime: string;
@@ -19,7 +20,9 @@ export interface AppointmentEntity {
   barberReminderSent: boolean;
   cancelledAt: Date | null;
   createdAt: Date;
+  updatedAt: Date;
   paymentStatus: string;
+  paymentMethod: string | null;
   paidAt: Date | null;
   appointmentNotes: string | null;
 }

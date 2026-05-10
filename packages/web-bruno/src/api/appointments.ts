@@ -1,10 +1,43 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './http-client'
 import { format, addDays, startOfWeek } from 'date-fns'
-import type { Appointment } from '@/schemas/appointment.schema'
+import type {
+  Appointment,
+  AppointmentFormData,
+  SessionType,
+} from '@/schemas/appointment.schema'
 
-type CreateData = Omit<Appointment, 'id' | 'endTime' | 'paidAt'>
-type BatchData = { patientId: string; startDate: string; startTime: string; type: string; weeks: number; value?: number; notes?: string; status?: string; paymentStatus?: string }
+type CreateData = AppointmentFormData
+
+type RecurringSeriesData = {
+  patientId: string
+  startDate: string
+  startTime: string
+  type: SessionType
+  intervalWeeks: number
+  value?: number
+  notes?: string
+}
+
+export type RecurringSeriesResponse = {
+  recurringSeriesId: string
+  created: number
+  cadenceLabel: string
+  protectedUntil: string
+}
+
+export type AppointmentUpdateData = {
+  patientId?: Appointment['patientId']
+  date?: Appointment['date']
+  startTime?: Appointment['startTime']
+  type?: Appointment['type']
+  value?: Appointment['value']
+  notes?: Appointment['notes'] | null
+  status?: Appointment['status']
+  paymentStatus?: Appointment['paymentStatus']
+  paymentMethod?: Appointment['paymentMethod']
+  paidAt?: Appointment['paidAt'] | null
+}
 
 export function useAppointments() {
   return useQuery({
@@ -44,43 +77,61 @@ export function useDateRangeAppointments(from: string, to: string) {
 export function useCreateAppointment() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: CreateData & { date: string }) =>
+    mutationFn: (data: CreateData & { date: string; paidAt?: Appointment['paidAt'] | null }) =>
       apiFetch<Appointment>('/api/psychology/sessions', {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['appointments'] }),
+        qc.invalidateQueries({ queryKey: ['financial'] }),
+      ])
+    },
   })
 }
 
 export function useCreateRecurringAppointments() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (params: { baseData: Omit<CreateData, 'date'>; startDate: string; weeks: number }) => {
-      const payload: BatchData = {
-        patientId: params.baseData.patientId,
-        startDate: params.startDate,
-        startTime: params.baseData.startTime,
-        type: params.baseData.type,
-        weeks: params.weeks,
-        value: params.baseData.value,
-        notes: params.baseData.notes,
-        status: params.baseData.status,
-        paymentStatus: params.baseData.paymentStatus,
-      }
-      return apiFetch<{ created: number; skipped: number }>('/api/psychology/sessions/batch', {
+    mutationFn: (payload: RecurringSeriesData) =>
+      apiFetch<RecurringSeriesResponse>('/api/psychology/recurring-series', {
         method: 'POST',
         body: JSON.stringify(payload),
-      })
+      }),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['appointments'] }),
+        qc.invalidateQueries({ queryKey: ['financial'] }),
+      ])
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
+  })
+}
+
+export function useStopRecurringSeries() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ recurringSeriesId, stopDate }: { recurringSeriesId: string; stopDate: string }) =>
+      apiFetch<{ recurringSeriesId: string; stopDate: string; removedAppointments: number }>(
+        `/api/psychology/recurring-series/${recurringSeriesId}/stop`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ stopDate }),
+        },
+      ),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['appointments'] }),
+        qc.invalidateQueries({ queryKey: ['financial'] }),
+      ])
+    },
   })
 }
 
 export function useCreateBatchAppointments() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (items: Array<CreateData & { date: string }>) => {
+    mutationFn: async (items: Array<CreateData & { date: string; paidAt?: Appointment['paidAt'] | null }>) => {
       const results = await Promise.allSettled(
         items.map((item) =>
           apiFetch<Appointment>('/api/psychology/sessions', {
@@ -91,19 +142,45 @@ export function useCreateBatchAppointments() {
       )
       return results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []))
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['appointments'] }),
+        qc.invalidateQueries({ queryKey: ['financial'] }),
+      ])
+    },
   })
 }
 
 export function useUpdateAppointment() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Appointment> }) =>
+    mutationFn: ({ id, data }: { id: string; data: AppointmentUpdateData }) =>
       apiFetch<Appointment>(`/api/psychology/sessions/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['appointments'] }),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['appointments'] }),
+        qc.invalidateQueries({ queryKey: ['financial'] }),
+      ])
+    },
+  })
+}
+
+export function useDeleteAppointment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) =>
+      apiFetch<void>(`/api/psychology/sessions/${id}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: async () => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['appointments'] }),
+        qc.invalidateQueries({ queryKey: ['financial'] }),
+      ])
+    },
   })
 }
 

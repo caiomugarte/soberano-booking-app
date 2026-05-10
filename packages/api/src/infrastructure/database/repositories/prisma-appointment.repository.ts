@@ -22,6 +22,7 @@ const includeRelations = {
   },
   service: true,
   customer: true,
+  recurringSeries: true,
   package: {
     select: {
       totalUses: true,
@@ -78,7 +79,7 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
       where: {
         providerId: barberId,
         date,
-        status: 'confirmed',
+        status: { not: 'cancelled' },
         ...(excludeId ? { NOT: { id: excludeId } } : {}),
       },
       select: { startTime: true },
@@ -132,6 +133,16 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
 
   async deleteById(id: string): Promise<void> {
     await this.db.appointment.delete({ where: { id } });
+  }
+
+  async deleteFutureByRecurringSeriesId(recurringSeriesId: string, from: Date): Promise<number> {
+    const result = await this.db.appointment.deleteMany({
+      where: {
+        recurringSeriesId,
+        date: { gte: from },
+      },
+    });
+    return result.count;
   }
 
   async findUpcomingWithoutReminder(minutesAhead: number): Promise<AppointmentWithDetails[]> {
@@ -225,6 +236,25 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
     return rows.map(mapAppointment);
   }
 
+  async findByRecurringSeriesId(
+    recurringSeriesId: string,
+    from: Date,
+    to?: Date,
+  ): Promise<AppointmentWithDetails[]> {
+    const rows = await this.db.appointment.findMany({
+      where: {
+        recurringSeriesId,
+        date: {
+          gte: from,
+          ...(to ? { lte: to } : {}),
+        },
+      },
+      include: includeRelations,
+      orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
+    });
+    return rows.map(mapAppointment);
+  }
+
   async updatePaymentStatus(id: string, paidAt: Date): Promise<AppointmentWithDetails> {
     const raw = await this.db.appointment.update({
       where: { id },
@@ -236,7 +266,24 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
 
   async getFinancialSummary(providerId: string, from: Date, to: Date): Promise<FinancialSummary> {
     const rows = await this.db.appointment.findMany({
-      where: { providerId, date: { gte: from, lte: to } },
+      where: {
+        providerId,
+        OR: [
+          {
+            paymentStatus: 'paid',
+            paidAt: { gte: from, lte: to },
+          },
+          {
+            paymentStatus: 'paid',
+            paidAt: null,
+            date: { gte: from, lte: to },
+          },
+          {
+            paymentStatus: { not: 'paid' },
+            date: { gte: from, lte: to },
+          },
+        ],
+      },
       include: includeRelations,
       orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
     });
