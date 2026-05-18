@@ -5,6 +5,7 @@ import { useUIStore } from '@/stores/ui.store'
 
 const navItems = [
   { to: ROUTES.DASHBOARD, label: 'Agenda', icon: '📅' },
+  { to: ROUTES.APPOINTMENTS, label: 'Agendamentos', icon: '🗂️' },
   { to: ROUTES.PATIENTS, label: 'Pacientes', icon: '👥' },
   { to: ROUTES.FINANCIAL, label: 'Financeiro', icon: '💰' },
   { to: ROUTES.SETTINGS, label: 'Configurações', icon: '⚙️' },

@@ -9,7 +9,19 @@ export interface CustomerRepository {
   createWalkin(name: string, tenantId: string): Promise<CustomerEntity>;
   updateName(id: string, name: string): Promise<CustomerEntity>;
   findAll(tenantId: string, search?: string): Promise<CustomerEntity[]>;
-  create(data: { tenantId: string; name: string; phone?: string; email?: string; cpf?: string; notes?: string }): Promise<CustomerEntity>;
+  create(data: {
+    tenantId: string;
+    name: string;
+    phone?: string;
+    email?: string;
+    cpf?: string;
+    notes?: string | null;
+    careMode?: CustomerEntity['careMode'];
+    psychotherapyPriceCents?: number | null;
+    psychotherapyFrequency?: CustomerEntity['psychotherapyFrequency'];
+    birthDate?: Date | null;
+    address?: string | null;
+  }): Promise<CustomerEntity>;
   update(id: string, partial: Partial<Omit<CustomerEntity, 'id'>>): Promise<CustomerEntity>;
   deleteById(id: string): Promise<void>;
 }

@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { PaymentMethodDialog } from '@/components/appointments/PaymentMethodDialog'
+import { ProtocolCreditActionDialog } from '@/components/appointments/ProtocolCreditActionDialog'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { AppointmentStatusBadge, PaymentStatusBadge } from '@/components/ui/StatusBadge'
 import { WhatsAppButton } from '@/components/whatsapp/WhatsAppButton'
-import { formatCurrency, formatDate, toDateInputValue } from '@/lib/format'
-import { PAYMENT_METHOD_LABELS, SESSION_TYPE_LABELS } from '@/config/constants'
-import type { Appointment, PaymentMethod } from '@/schemas/appointment.schema'
+import { formatAppointmentCharge } from '@/lib/appointment-pricing'
+import { formatDate, toDateInputValue } from '@/lib/format'
+import { PAYMENT_METHOD_LABELS, PROTOCOL_LINK_TYPE_LABELS, SESSION_TYPE_LABELS } from '@/config/constants'
+import type { Appointment, PaymentMethod, ProtocolCreditAction } from '@/schemas/appointment.schema'
 import type { Patient } from '@/schemas/patient.schema'
 
 interface SlotDetailProps {
@@ -14,10 +16,10 @@ interface SlotDetailProps {
   onClose: () => void
   appointment: Appointment | null
   patient: Patient | null
-  onUpdateStatus: (id: string, status: Appointment['status']) => void
+  onUpdateStatus: (id: string, status: Appointment['status'], protocolCreditAction?: ProtocolCreditAction) => Promise<void>
   onMarkPaid: (id: string, paymentMethod: PaymentMethod, paidAt: string) => void
   onEdit: (appointment: Appointment) => void
-  onDelete: (id: string) => Promise<void>
+  onDelete: (id: string, protocolCreditAction?: ProtocolCreditAction) => Promise<void>
   onStopRecurringSeries: (recurringSeriesId: string, stopDate: string) => Promise<void>
 }
 
@@ -40,6 +42,7 @@ export function SlotDetail({
   const [isDeleting, setIsDeleting] = useState(false)
   const [isStoppingRecurring, setIsStoppingRecurring] = useState(false)
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
+  const [protocolActionMode, setProtocolActionMode] = useState<'cancel' | 'delete' | null>(null)
 
   if (!appointment) return null
 
@@ -63,15 +66,16 @@ export function SlotDetail({
     setConfirmDelete(false)
     setConfirmStopRecurring(false)
     setPaymentDialogOpen(false)
+    setProtocolActionMode(null)
     onClose()
   }
 
-  async function handleDelete() {
+  async function handleDelete(protocolCreditAction?: ProtocolCreditAction) {
     setDeleteError('')
     setIsDeleting(true)
 
     try {
-      await onDelete(currentAppointment.id)
+      await onDelete(currentAppointment.id, protocolCreditAction)
     } catch (error) {
       console.error('[SlotDetail] Failed to delete appointment:', error)
       setDeleteError(error instanceof Error ? error.message : 'Erro ao excluir sessão')
@@ -80,6 +84,16 @@ export function SlotDetail({
     }
 
     setIsDeleting(false)
+  }
+
+  async function handleCancel(protocolCreditAction?: ProtocolCreditAction) {
+    setDeleteError('')
+    try {
+      await onUpdateStatus(currentAppointment.id, 'cancelled', protocolCreditAction)
+      setProtocolActionMode(null)
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : 'Erro ao cancelar sessão')
+    }
   }
 
   async function handleStopRecurringSeries() {
@@ -126,7 +140,7 @@ export function SlotDetail({
           </div>
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-sm text-gray-500">Valor</span>
-            <span className="text-sm font-medium">{formatCurrency(currentAppointment.value)}</span>
+            <span className="text-sm font-medium">{formatAppointmentCharge(currentAppointment)}</span>
           </div>
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <span className="text-sm text-gray-500">Status</span>
@@ -136,6 +150,12 @@ export function SlotDetail({
             <span className="text-sm text-gray-500">Pagamento</span>
             <PaymentStatusBadge status={currentAppointment.paymentStatus} />
           </div>
+          {currentAppointment.protocolLinkType && currentAppointment.protocolLinkType !== 'standalone' && (
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-sm text-gray-500">Vínculo</span>
+              <span className="text-sm">{PROTOCOL_LINK_TYPE_LABELS[currentAppointment.protocolLinkType]}</span>
+            </div>
+          )}
           {isRecurring && (
             <div className="rounded-lg border border-primary-200 bg-primary-50 p-3">
               <p className="text-sm font-medium text-primary-900">Sessão recorrente</p>
@@ -193,10 +213,10 @@ export function SlotDetail({
           >
             Editar
           </Button>
-          {patient?.phone && currentAppointment.paymentStatus === 'pending' && (
+          {patient?.phone && currentAppointment.paymentStatus === 'pending' && currentAppointment.protocolLinkType !== 'protocol' && (
             <WhatsAppButton appointmentId={currentAppointment.id} onError={setWhatsappError} />
           )}
-          {currentAppointment.paymentStatus === 'pending' && currentAppointment.status !== 'cancelled' && (
+          {currentAppointment.paymentStatus === 'pending' && currentAppointment.status !== 'cancelled' && currentAppointment.protocolLinkType !== 'protocol' && (
             <Button
               variant="secondary"
               size="sm"
@@ -209,7 +229,9 @@ export function SlotDetail({
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => onUpdateStatus(currentAppointment.id, 'completed')}
+              onClick={() => {
+                void onUpdateStatus(currentAppointment.id, 'completed')
+              }}
             >
               Realizado
             </Button>
@@ -218,7 +240,9 @@ export function SlotDetail({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => onUpdateStatus(currentAppointment.id, 'no_show')}
+              onClick={() => {
+                void onUpdateStatus(currentAppointment.id, 'no_show')
+              }}
             >
               Falta
             </Button>
@@ -227,7 +251,14 @@ export function SlotDetail({
             <Button
               variant="danger"
               size="sm"
-              onClick={() => onUpdateStatus(currentAppointment.id, 'cancelled')}
+              onClick={() => {
+                if (currentAppointment.protocolLinkType === 'protocol') {
+                  setProtocolActionMode('cancel')
+                  return
+                }
+
+                void onUpdateStatus(currentAppointment.id, 'cancelled')
+              }}
             >
               Desmarcado
             </Button>
@@ -284,7 +315,15 @@ export function SlotDetail({
               <Button
                 variant="danger"
                 size="sm"
-                onClick={handleDelete}
+                onClick={() => {
+                  if (currentAppointment.protocolLinkType === 'protocol') {
+                    setConfirmDelete(false)
+                    setProtocolActionMode('delete')
+                    return
+                  }
+
+                  handleDelete()
+                }}
                 disabled={isDeleting}
               >
                 {isDeleting ? 'Excluindo...' : 'Confirmar exclusão'}
@@ -317,6 +356,35 @@ export function SlotDetail({
         }}
         title="Registrar pagamento"
         confirmLabel="Marcar pago"
+      />
+
+      <ProtocolCreditActionDialog
+        open={protocolActionMode !== null}
+        onClose={() => {
+          if (isDeleting) return
+          setProtocolActionMode(null)
+        }}
+        onConfirm={(action) => {
+          if (protocolActionMode === 'cancel') {
+            void handleCancel(action)
+            return
+          }
+
+          void handleDelete(action)
+          setProtocolActionMode(null)
+        }}
+        title={
+          protocolActionMode === 'cancel'
+            ? 'Cancelar sessão vinculada'
+            : 'Excluir sessão vinculada'
+        }
+        description={
+          protocolActionMode === 'cancel'
+            ? 'Escolha se o crédito deve voltar ao protocolo ou ficar consumido ao desmarcar esta sessão.'
+            : 'Escolha se o crédito deve voltar ao protocolo ou ficar consumido antes de excluir esta sessão.'
+        }
+        isPending={isDeleting}
+        error={deleteError || null}
       />
     </Modal>
   )

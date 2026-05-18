@@ -5,12 +5,14 @@ import { AppointmentForm } from '@/components/appointments/AppointmentForm'
 import { PatientDocuments } from '@/components/patients/PatientDocuments'
 import { PatientForm } from '@/components/patients/PatientForm'
 import { PatientHistory } from '@/components/patients/PatientHistory'
+import { PatientProtocolsPanel } from '@/components/protocols/PatientProtocolsPanel'
 import { Button } from '@/components/ui/Button'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import { Modal } from '@/components/ui/Modal'
 import { Panel } from '@/components/ui/Panel'
 import { Spinner } from '@/components/ui/Spinner'
-import { formatCPF, formatPhone } from '@/lib/format'
+import { CARE_MODE_LABELS, FREQUENCY_LABELS } from '@/config/constants'
+import { formatCPF, formatDate, formatPhone } from '@/lib/format'
 
 export default function PatientDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -112,6 +114,34 @@ export default function PatientDetailPage() {
                     <span>{formatCPF(patient.cpf)}</span>
                   </div>
                 )}
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="text-gray-500">Modo de cuidado</span>
+                  <span>{CARE_MODE_LABELS[patient.careMode]}</span>
+                </div>
+                {patient.birthDate && (
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="text-gray-500">Nascimento</span>
+                    <span>{formatDate(patient.birthDate)}</span>
+                  </div>
+                )}
+                {patient.address && (
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                    <span className="text-gray-500">Endereço</span>
+                    <span className="max-w-sm text-right">{patient.address}</span>
+                  </div>
+                )}
+                {patient.careMode === 'psychotherapy' && patient.psychotherapyPriceCents && (
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="text-gray-500">Valor acordado</span>
+                    <span>R$ {(patient.psychotherapyPriceCents / 100).toFixed(2).replace('.', ',')}</span>
+                  </div>
+                )}
+                {patient.careMode === 'psychotherapy' && patient.psychotherapyFrequency && (
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="text-gray-500">Frequência</span>
+                    <span>{FREQUENCY_LABELS[patient.psychotherapyFrequency]}</span>
+                  </div>
+                )}
               </Panel.Body>
             </Panel>
 
@@ -128,6 +158,12 @@ export default function PatientDetailPage() {
           <div className="mb-6">
             <PatientDocuments patientId={patient.id} />
           </div>
+
+          {patient.careMode === 'neuromodulation' && (
+            <div className="mb-6">
+              <PatientProtocolsPanel patientId={patient.id} />
+            </div>
+          )}
 
           <h2 className="mb-4 text-lg font-semibold text-gray-800">Histórico de Sessões</h2>
           <PatientHistory patient={patient} />

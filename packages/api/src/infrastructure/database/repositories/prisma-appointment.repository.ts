@@ -7,6 +7,7 @@ import type {
   DayStat,
   FinancialSummary,
 } from '../../../domain/repositories/appointment.repository.js';
+import type { NeuromodulationProtocolWithCounters } from '../../../domain/entities/neuromodulation-protocol.js';
 
 const includeRelations = {
   provider: {
@@ -22,6 +23,13 @@ const includeRelations = {
   },
   service: true,
   customer: true,
+  protocol: {
+    select: {
+      id: true,
+      status: true,
+      totalSessions: true,
+    },
+  },
   recurringSeries: true,
   package: {
     select: {
@@ -43,7 +51,12 @@ function mapAppointment(raw: any): AppointmentWithDetails {
     const rank = (pkg.appointments as { id: string }[]).findIndex((a) => a.id === raw.id) + 1;
     mappedPackage = { appointmentNumber: rank, totalUses: pkg.totalUses, totalPriceCents: pkg.totalPriceCents };
   }
-  return { ...rest, barberId: providerId, barber: provider, package: mappedPackage } as AppointmentWithDetails;
+  return {
+    ...rest,
+    barberId: providerId,
+    barber: provider,
+    package: mappedPackage,
+  } as AppointmentWithDetails;
 }
 
 export class PrismaAppointmentRepository implements AppointmentRepository {
@@ -288,17 +301,136 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
       orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
     });
     const appointments = rows.map(mapAppointment);
-    const paidCount = appointments.filter((a: AppointmentWithDetails) => a.paymentStatus === 'paid').length;
-    const revenueCents = appointments
+    const billableAppointments = appointments.filter(
+      (appointment: AppointmentWithDetails) =>
+        !appointment.protocolId || appointment.protocolCreditOutcome === 'maintenance',
+    );
+    const paidCount = billableAppointments.filter((a: AppointmentWithDetails) => a.paymentStatus === 'paid').length;
+    const revenueCents = billableAppointments
       .filter((a: AppointmentWithDetails) => a.paymentStatus === 'paid')
       .reduce((sum: number, a: AppointmentWithDetails) => sum + a.priceCents, 0);
+    const protocolRows = await this.db.neuromodulationProtocol.findMany({
+      where: {
+        providerId,
+        OR: [
+          {
+            paymentStatus: 'paid',
+            paidAt: { gte: from, lte: to },
+          },
+          {
+            paymentStatus: { not: 'paid' },
+            createdAt: { gte: from, lte: to },
+          },
+        ],
+      },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+          },
+        },
+        appointments: {
+          select: {
+            id: true,
+            protocolCreditOutcome: true,
+          },
+        },
+      },
+      orderBy: [{ createdAt: 'asc' }],
+    });
+    const protocolSales = protocolRows.map((protocolRow: any) => {
+      const reservedSessions = protocolRow.appointments.filter(
+        (appointment: { protocolCreditOutcome: string | null }) => appointment.protocolCreditOutcome === 'reserved',
+      ).length;
+      const consumedSessions =
+        protocolRow.appointments.filter(
+          (appointment: { protocolCreditOutcome: string | null }) => appointment.protocolCreditOutcome === 'consumed',
+        ).length + protocolRow.manualConsumedCount;
+      const protocol = {
+        id: protocolRow.id,
+        tenantId: protocolRow.tenantId,
+        providerId: protocolRow.providerId,
+        customerId: protocolRow.customerId,
+        totalSessions: protocolRow.totalSessions,
+        status: protocolRow.status,
+        totalPriceCents: protocolRow.totalPriceCents,
+        paymentStatus: protocolRow.paymentStatus,
+        paymentMethod: protocolRow.paymentMethod,
+        paidAt: protocolRow.paidAt,
+        manualConsumedCount: protocolRow.manualConsumedCount,
+        notes: protocolRow.notes,
+        createdAt: protocolRow.createdAt,
+        updatedAt: protocolRow.updatedAt,
+        reservedSessions,
+        consumedSessions,
+        remainingSessions: Math.max(protocolRow.totalSessions - reservedSessions - consumedSessions, 0),
+      } satisfies NeuromodulationProtocolWithCounters;
+
+      return {
+        protocol,
+        customer: protocolRow.customer,
+      };
+    });
+    const protocolRevenueCents = protocolSales
+      .filter((entry: { protocol: NeuromodulationProtocolWithCounters }) => entry.protocol.paymentStatus === 'paid')
+      .reduce((sum: number, entry: { protocol: NeuromodulationProtocolWithCounters }) => sum + entry.protocol.totalPriceCents, 0);
+    const protocolPendingCount = protocolSales.filter(
+      (entry: { protocol: NeuromodulationProtocolWithCounters }) => entry.protocol.paymentStatus !== 'paid',
+    ).length;
     return {
-      totalSessions: appointments.length,
-      paidCount,
-      pendingCount: appointments.length - paidCount,
-      revenueCents,
-      appointments,
+      totalSessions: billableAppointments.length,
+      paidCount: paidCount + protocolSales.filter((entry: { protocol: NeuromodulationProtocolWithCounters }) => entry.protocol.paymentStatus === 'paid').length,
+      pendingCount: (billableAppointments.length - paidCount) + protocolPendingCount,
+      revenueCents: revenueCents + protocolRevenueCents,
+      appointments: billableAppointments,
+      protocolSales,
     };
+  }
+
+  async updateDetails(id: string, data: {
+    customerId?: string;
+    serviceId?: string;
+    protocolId?: string | null;
+    protocolCreditOutcome?: 'reserved' | 'consumed' | 'released' | 'maintenance' | null;
+    date?: Date;
+    startTime?: string;
+    endTime?: string;
+    priceCents?: number;
+    status?: string;
+    paymentStatus?: 'pending' | 'paid';
+    paymentMethod?: 'card' | 'pix' | 'cash' | null;
+    paidAt?: Date | null;
+    appointmentNotes?: string | null;
+    cancelToken?: string;
+    reminderSent?: boolean;
+    barberReminderSent?: boolean;
+  }): Promise<AppointmentWithDetails> {
+    const raw = await this.db.appointment.update({
+      where: { id },
+      data: {
+        ...(data.customerId !== undefined ? { customerId: data.customerId } : {}),
+        ...(data.serviceId !== undefined ? { serviceId: data.serviceId } : {}),
+        ...(data.protocolId !== undefined ? { protocolId: data.protocolId } : {}),
+        ...(data.protocolCreditOutcome !== undefined ? { protocolCreditOutcome: data.protocolCreditOutcome } : {}),
+        ...(data.date !== undefined ? { date: data.date } : {}),
+        ...(data.startTime !== undefined ? { startTime: data.startTime } : {}),
+        ...(data.endTime !== undefined ? { endTime: data.endTime } : {}),
+        ...(data.priceCents !== undefined ? { priceCents: data.priceCents } : {}),
+        ...(data.status !== undefined ? { status: data.status } : {}),
+        ...(data.paymentStatus !== undefined ? { paymentStatus: data.paymentStatus } : {}),
+        ...(data.paymentMethod !== undefined ? { paymentMethod: data.paymentMethod } : {}),
+        ...(data.paidAt !== undefined ? { paidAt: data.paidAt } : {}),
+        ...(data.appointmentNotes !== undefined ? { appointmentNotes: data.appointmentNotes } : {}),
+        ...(data.cancelToken !== undefined ? { cancelToken: data.cancelToken } : {}),
+        ...(data.reminderSent !== undefined ? { reminderSent: data.reminderSent } : {}),
+        ...(data.barberReminderSent !== undefined ? { barberReminderSent: data.barberReminderSent } : {}),
+      },
+      include: includeRelations,
+    });
+
+    return mapAppointment(raw);
   }
 
   async getStatsByDateRange(barberId: string, from: Date, to: Date): Promise<DayStat[]> {

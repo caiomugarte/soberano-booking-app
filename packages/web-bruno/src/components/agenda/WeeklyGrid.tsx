@@ -14,7 +14,7 @@ import { usePatients } from '@/api/patients'
 import { useAbsences, useShifts } from '@/api/settings'
 import { TIME_SLOTS, DAYS_OF_WEEK } from '@/config/constants'
 import { getAppointmentForSlot } from '@/lib/slots'
-import type { Appointment, PaymentMethod } from '@/schemas/appointment.schema'
+import type { Appointment, PaymentMethod, ProtocolCreditAction } from '@/schemas/appointment.schema'
 
 interface WeeklyGridProps {
   onCreateAppointment: (date: string, time: string) => void
@@ -87,11 +87,9 @@ export function WeeklyGrid({ onCreateAppointment, onEditAppointment, onNotice }:
     setSelectedAppointment(null)
   }
 
-  function handleUpdateStatus(id: string, status: Appointment['status']) {
-    updateAppointment.mutate(
-      { id, data: { status } },
-      { onSuccess: handleDetailClose },
-    )
+  async function handleUpdateStatus(id: string, status: Appointment['status'], protocolCreditAction?: ProtocolCreditAction) {
+    await updateAppointment.mutateAsync({ id, data: { status, protocolCreditAction } })
+    handleDetailClose()
   }
 
   function handleMarkPaid(id: string, paymentMethod: PaymentMethod, paidAt: string) {
@@ -113,8 +111,9 @@ export function WeeklyGrid({ onCreateAppointment, onEditAppointment, onNotice }:
     onEditAppointment(appointment)
   }
 
-  async function handleDeleteAppointment(id: string) {
-    await deleteAppointment.mutateAsync(id)
+  async function handleDeleteAppointment(id: string, protocolCreditAction?: ProtocolCreditAction) {
+    const patientId = selectedAppointment?.id === id ? selectedAppointment.patientId : undefined
+    await deleteAppointment.mutateAsync({ id, protocolCreditAction, patientId })
     handleDetailClose()
   }
 
@@ -203,7 +202,7 @@ export function WeeklyGrid({ onCreateAppointment, onEditAppointment, onNotice }:
       </div>
 
       <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm md:block">
-        <table className="w-full min-w-[760px] table-fixed">
+        <table className="w-full min-w-[880px] table-fixed">
           <thead>
             <tr>
               <th className="w-16 border-b border-r border-gray-200 bg-gray-50 px-2 py-3 text-xs font-medium text-gray-500">

@@ -30,10 +30,10 @@ export function RevenueSummary({
     { label: 'Receita Mensal', value: monthlyRevenue, color: 'text-sage-600', subtitle: monthLabel },
     { label: 'Receita Anual', value: annualRevenue, color: 'text-emerald-600', subtitle: yearLabel },
     {
-      label: 'Pendente',
+      label: 'Pendências',
       value: pendingTotal,
       color: 'text-amber-600',
-      subtitle: `${pendingCount} sessões`,
+      subtitle: `${pendingCount} itens`,
     },
   ]
 

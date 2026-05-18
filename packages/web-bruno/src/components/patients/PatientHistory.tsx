@@ -7,6 +7,7 @@ import {
 } from '@/api/appointments'
 import { usePatientReports, useCreateSessionReport, useUpdateSessionReport, useDeleteSessionReport } from '@/api/session-reports'
 import { PaymentMethodDialog } from '@/components/appointments/PaymentMethodDialog'
+import { ProtocolCreditActionDialog } from '@/components/appointments/ProtocolCreditActionDialog'
 import { Button } from '@/components/ui/Button'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -15,9 +16,10 @@ import { Panel } from '@/components/ui/Panel'
 import { AppointmentStatusBadge, PaymentStatusBadge } from '@/components/ui/StatusBadge'
 import { Textarea } from '@/components/ui/Textarea'
 import { WhatsAppButton } from '@/components/whatsapp/WhatsAppButton'
-import { PAYMENT_METHOD_LABELS, SESSION_TYPE_LABELS } from '@/config/constants'
-import { formatDate, formatCurrency, getTodayDateInputValue, toDateInputValue } from '@/lib/format'
-import type { Appointment, PaymentMethod } from '@/schemas/appointment.schema'
+import { PAYMENT_METHOD_LABELS, PROTOCOL_LINK_TYPE_LABELS, SESSION_TYPE_LABELS } from '@/config/constants'
+import { formatAppointmentCharge } from '@/lib/appointment-pricing'
+import { formatDate, getTodayDateInputValue, toDateInputValue } from '@/lib/format'
+import type { Appointment, PaymentMethod, ProtocolCreditAction } from '@/schemas/appointment.schema'
 import type { Patient } from '@/schemas/patient.schema'
 
 interface PatientHistoryProps {
@@ -52,6 +54,7 @@ export function PatientHistory({ patient }: PatientHistoryProps) {
   const [selectedPaymentAppointmentId, setSelectedPaymentAppointmentId] = useState<string | null>(null)
   const [appointmentToDelete, setAppointmentToDelete] = useState<Appointment | null>(null)
   const [appointmentToStopRecurring, setAppointmentToStopRecurring] = useState<Appointment | null>(null)
+  const [protocolDeleteError, setProtocolDeleteError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function handleMarkPaid(id: string, paymentMethod: PaymentMethod, paidAt: string) {
@@ -141,9 +144,28 @@ export function PatientHistory({ patient }: PatientHistoryProps) {
   function handleDeleteSession() {
     if (!appointmentToDelete) return
 
-    deleteAppointment.mutate(appointmentToDelete.id, {
+    deleteAppointment.mutate({ id: appointmentToDelete.id, patientId: patient.id }, {
       onSuccess: () => setAppointmentToDelete(null),
     })
+  }
+
+  function handleDeleteProtocolSession(action: ProtocolCreditAction) {
+    if (!appointmentToDelete) return
+
+    setProtocolDeleteError(null)
+    deleteAppointment.mutate(
+      {
+        id: appointmentToDelete.id,
+        patientId: patient.id,
+        protocolCreditAction: action,
+      },
+      {
+        onSuccess: () => setAppointmentToDelete(null),
+        onError: (error) => {
+          setProtocolDeleteError(error instanceof Error ? error.message : 'Erro ao excluir sessão')
+        },
+      },
+    )
   }
 
   function handleStopRecurring() {
@@ -190,7 +212,7 @@ export function PatientHistory({ patient }: PatientHistoryProps) {
                     <span className="text-xs text-gray-500">
                       {SESSION_TYPE_LABELS[apt.type]}
                     </span>
-                    <span className="text-xs font-medium">{formatCurrency(apt.value)}</span>
+                    <span className="text-xs font-medium">{formatAppointmentCharge(apt)}</span>
                   </div>
                   <div className="flex flex-wrap items-center gap-1.5">
                     <AppointmentStatusBadge status={apt.status} />
@@ -215,6 +237,11 @@ export function PatientHistory({ patient }: PatientHistoryProps) {
                         {apt.recurrenceStatus === 'active' ? 'Recorrente ativa' : 'Recorrência encerrada'}
                       </span>
                     )}
+                    {apt.protocolLinkType && apt.protocolLinkType !== 'standalone' && (
+                      <span className="inline-flex items-center rounded-full bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">
+                        {PROTOCOL_LINK_TYPE_LABELS[apt.protocolLinkType]}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 lg:justify-end">
@@ -226,7 +253,7 @@ export function PatientHistory({ patient }: PatientHistoryProps) {
                   >
                     {hasReport ? 'Ver Relatório' : '+ Relatório'}
                   </Button>
-                  {apt.paymentStatus === 'pending' && apt.status !== 'cancelled' && (
+                  {apt.paymentStatus === 'pending' && apt.status !== 'cancelled' && apt.protocolLinkType !== 'protocol' && (
                     <>
                       <Button
                         className="w-full sm:w-auto"
@@ -260,6 +287,7 @@ export function PatientHistory({ patient }: PatientHistoryProps) {
                     size="sm"
                     onClick={() => {
                       deleteAppointment.reset()
+                      setProtocolDeleteError(null)
                       setAppointmentToDelete(apt)
                     }}
                   >
@@ -285,7 +313,7 @@ export function PatientHistory({ patient }: PatientHistoryProps) {
       />
 
       <ConfirmationDialog
-        open={appointmentToDelete !== null}
+        open={appointmentToDelete !== null && appointmentToDelete?.protocolLinkType !== 'protocol'}
         onClose={() => {
           if (deleteAppointment.isPending) return
           deleteAppointment.reset()
@@ -301,6 +329,25 @@ export function PatientHistory({ patient }: PatientHistoryProps) {
         confirmLabel="Excluir sessão"
         isPending={deleteAppointment.isPending}
         error={deleteAppointment.error instanceof Error ? deleteAppointment.error.message : null}
+      />
+
+      <ProtocolCreditActionDialog
+        open={appointmentToDelete?.protocolLinkType === 'protocol'}
+        onClose={() => {
+          if (deleteAppointment.isPending) return
+          deleteAppointment.reset()
+          setProtocolDeleteError(null)
+          setAppointmentToDelete(null)
+        }}
+        onConfirm={handleDeleteProtocolSession}
+        title="Excluir sessão vinculada"
+        description={
+          appointmentToDelete
+            ? `Esta sessão está vinculada a um protocolo. Escolha se o crédito deve voltar ao protocolo ou ficar consumido antes de excluir a sessão de ${formatDate(appointmentToDelete.date)} às ${appointmentToDelete.startTime}.`
+            : ''
+        }
+        isPending={deleteAppointment.isPending}
+        error={protocolDeleteError}
       />
 
       <ConfirmationDialog

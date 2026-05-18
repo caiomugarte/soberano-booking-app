@@ -11,6 +11,7 @@ export const DAYS_OF_WEEK = [
   { key: 3, label: 'Quarta' },
   { key: 4, label: 'Quinta' },
   { key: 5, label: 'Sexta' },
+  { key: 6, label: 'Sábado' },
 ] as const
 
 export const STATUS_LABELS: Record<string, string> = {
@@ -33,9 +34,30 @@ export const PAYMENT_METHOD_LABELS: Record<string, string> = {
 }
 
 export const SESSION_TYPE_LABELS: Record<string, string> = {
-  individual: 'Individual',
-  couple: 'Casal',
-  family: 'Família',
+  psychotherapy: 'Psicoterapia',
+  neuromodulation: 'Neuromodulação',
+}
+
+export const CARE_MODE_LABELS: Record<string, string> = {
+  psychotherapy: 'Psicoterapia',
+  neuromodulation: 'Neuromodulação',
+}
+
+export const FREQUENCY_LABELS: Record<string, string> = {
+  weekly: 'Semanal',
+  biweekly: 'Quinzenal',
+}
+
+export const PROTOCOL_STATUS_LABELS: Record<string, string> = {
+  active: 'Ativo',
+  maintenance: 'Manutenção',
+  finished: 'Finalizado',
+}
+
+export const PROTOCOL_LINK_TYPE_LABELS: Record<string, string> = {
+  standalone: 'Sessão avulsa',
+  protocol: 'Vinculada ao protocolo',
+  maintenance: 'Manutenção',
 }
 
 export const DEFAULT_MESSAGE_TEMPLATE =
