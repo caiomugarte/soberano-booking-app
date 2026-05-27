@@ -63,7 +63,7 @@ ON UPDATE CASCADE;
 
 DROP INDEX "customer_packages_tenant_id_customer_phone_status_idx";
 
-CREATE INDEX "customer_packages_tenant_id_provider_id_customer_phone_status_idx"
+CREATE INDEX "customer_packages_tenant_id_provider_id_customer_phone_stat_idx"
 ON "customer_packages"("tenant_id", "provider_id", "customer_phone", "status");
 
 CREATE INDEX "customer_packages_tenant_id_provider_id_status_idx"
