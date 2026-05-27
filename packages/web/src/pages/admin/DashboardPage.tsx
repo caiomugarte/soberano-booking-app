@@ -2,24 +2,24 @@ import {useEffect, useRef, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {
   type AdminAppointment,
+  type CustomerPackage,
   type DayStat,
   useAdminAppointments,
   useAdminAppointmentsRange,
   useAdminCancelAppointment,
   useAdminMe,
   useAdminStats,
-  useAdminUpdateAppointmentCustomer,
-  useAdminUpdateAppointmentSchedule,
   useDeleteAppointment,
   useUpdateAppointmentStatus
 } from '../../api/use-admin.ts';
-import {useServices} from '../../api/use-services.ts';
-import {useSlots} from '../../api/use-slots.ts';
 import {useAuthStore} from '../../stores/auth.store.ts';
 import {queryClient} from '../../config/query-client.ts';
-import {Button} from '../../components/ui/Button.tsx';
 import {AdminBookingModal} from '../../components/admin/AdminBookingModal.tsx';
+import {AdminAppointmentCancelModal, AdminAppointmentDeleteModal, AdminAppointmentNoShowModal} from '../../components/admin/AdminAppointmentManagementDialogs.tsx';
+import {AdminAppointmentSection} from '../../components/admin/AdminAppointmentSection.tsx';
+import {AdminEditAppointmentModal} from '../../components/admin/AdminEditAppointmentModal.tsx';
 import {AdminPackageModal} from '../../components/admin/AdminPackageModal.tsx';
+import {PackageWorkspaceModal} from '../../components/admin/PackageWorkspaceModal.tsx';
 import {Spinner} from '../../components/ui/Spinner.tsx';
 import {
   dateToString,
@@ -32,20 +32,6 @@ import {
   getYearLabel,
   MONTH_NAMES,
 } from '../../lib/format.ts';
-
-const STATUS_LABEL: Record<string, string> = {
-  confirmed: 'Confirmado',
-  completed: 'Concluído',
-  no_show: 'Não compareceu',
-  cancelled: 'Cancelado',
-};
-
-const STATUS_COLOR: Record<string, string> = {
-  confirmed: 'text-gold border-gold/30 bg-gold/10',
-  completed: 'text-green-400 border-green-400/30 bg-green-400/10',
-  no_show: 'text-red-400 border-red-400/30 bg-red-400/10',
-  cancelled: 'text-muted border-dark-border bg-dark-surface2',
-};
 
 function BarberProfile({
   barber,
@@ -117,385 +103,6 @@ function BarberProfile({
           </button>
         </div>
       )}
-    </div>
-  );
-}
-
-function AppointmentCard({
-  appointment,
-  timePassed,
-  onCancelClick,
-  onNoShowClick,
-  onDeleteClick,
-  onEditClick,
-}: {
-  appointment: AdminAppointment;
-  timePassed: boolean;
-  onCancelClick: (id: string) => void;
-  onNoShowClick: (id: string) => void;
-  onDeleteClick: (id: string) => void;
-  onEditClick: (appointment: AdminAppointment) => void;
-}) {
-  const updateStatus = useUpdateAppointmentStatus();
-  const isConfirmed = appointment.status === 'confirmed';
-  const isCompleted = appointment.status === 'completed';
-  const isNoShow = appointment.status === 'no_show';
-
-  return (
-    <div className={`bg-dark-surface border rounded-xl p-5 transition-opacity ${appointment.status === 'cancelled' ? 'opacity-50' : ''} border-dark-border`}>
-      <div className="flex items-start justify-between gap-4 mb-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xl">{appointment.service.icon}</span>
-            <span className="font-bold text-sm">{appointment.service.name}</span>
-            <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${STATUS_COLOR[appointment.status]}`}>
-              {STATUS_LABEL[appointment.status] ?? appointment.status}
-            </span>
-          </div>
-          {appointment.package && (
-            <p className="text-xs text-gold/70 mt-0.5">
-              Pacote · {appointment.package.appointmentNumber}/{appointment.package.totalUses} · {formatCurrency(appointment.package.totalPriceCents)}
-            </p>
-          )}
-          <p className="text-muted text-sm">{appointment.customer.name}</p>
-          {appointment.customer.phone && <p className="text-muted text-xs">+55 {appointment.customer.phone}</p>}
-        </div>
-        <div className="text-right shrink-0">
-          <p className="text-gold text-lg font-bold">{appointment.startTime}</p>
-          <p className="text-muted text-xs">até {appointment.endTime}</p>
-          <p className="text-sm font-medium mt-1">{formatCurrency(appointment.priceCents)}</p>
-        </div>
-      </div>
-
-      {isConfirmed && (
-        <div className="flex gap-1.5 mb-1.5">
-          <button
-            onClick={() => onEditClick(appointment)}
-            className="flex-1 py-2 rounded-lg bg-dark-surface2 border border-dark-border text-muted hover:text-[#F0EDE8] hover:border-gold/40 transition-colors cursor-pointer text-xs font-medium"
-          >
-            ✎ Editar cliente
-          </button>
-        </div>
-      )}
-      {isConfirmed && (
-        <div className="flex gap-1.5">
-          <button
-            onClick={() => updateStatus.mutate({ id: appointment.id, status: 'completed' })}
-            disabled={updateStatus.isPending || !timePassed}
-            className="flex-1 py-2 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed text-xs font-medium"
-          >
-            ✓ Concluído
-          </button>
-          <button
-            onClick={() => onNoShowClick(appointment.id)}
-            disabled={updateStatus.isPending || !timePassed}
-            className="flex-1 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed text-xs font-medium"
-          >
-            ✗ Não veio
-          </button>
-          {!timePassed && (
-            <button
-              onClick={() => onCancelClick(appointment.id)}
-              disabled={updateStatus.isPending}
-              className="flex-1 py-2 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500/20 transition-colors cursor-pointer disabled:opacity-50 text-xs font-medium"
-            >
-              ✕ Cancelar
-            </button>
-          )}
-          {timePassed && (
-            <button
-              onClick={() => onDeleteClick(appointment.id)}
-              className="py-2 px-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer text-xs font-medium"
-            >
-              ✕ Apagar
-            </button>
-          )}
-        </div>
-      )}
-
-      {(isCompleted || isNoShow) && (
-        <div className="flex gap-1.5">
-          <span className="text-xs text-muted self-center mr-1">Corrigir:</span>
-          {isCompleted && (
-            <button
-              onClick={() => updateStatus.mutate({ id: appointment.id, status: 'no_show' })}
-              disabled={updateStatus.isPending}
-              className="py-1.5 px-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed text-xs font-medium"
-            >
-              ✗ Não veio
-            </button>
-          )}
-          {isNoShow && (
-            <button
-              onClick={() => updateStatus.mutate({ id: appointment.id, status: 'completed' })}
-              disabled={updateStatus.isPending}
-              className="py-1.5 px-3 rounded-lg bg-green-500/10 border border-green-500/30 text-green-400 hover:bg-green-500/20 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed text-xs font-medium"
-            >
-              ✓ Concluído
-            </button>
-          )}
-          <button
-            onClick={() => onDeleteClick(appointment.id)}
-            className="py-1.5 px-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer text-xs font-medium"
-          >
-            ✕ Apagar
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-function EditAppointmentModal({
-  appointment,
-  barberId,
-  onClose,
-}: {
-  appointment: AdminAppointment;
-  barberId: string | null;
-  onClose: () => void;
-}) {
-  // Customer section
-  const [name, setName] = useState(appointment.customer.name);
-  const [phone, setPhone] = useState(appointment.customer.phone ?? '');
-  // Schedule section
-  const [serviceId, setServiceId] = useState(appointment.service.id);
-  const [date, setDate] = useState(appointment.date.slice(0, 10));
-  const [time, setTime] = useState(appointment.startTime);
-
-  const { data: services } = useServices();
-  const { data: slots } = useSlots(barberId, date, appointment.id);
-  const updateCustomer = useAdminUpdateAppointmentCustomer();
-  const updateSchedule = useAdminUpdateAppointmentSchedule();
-
-  const isPending = updateCustomer.isPending || updateSchedule.isPending;
-  const error = (updateCustomer.error || updateSchedule.error) as Error | null;
-
-  const phoneChanged = phone !== (appointment.customer.phone ?? '');
-  const nameChanged = name !== appointment.customer.name;
-  const serviceChanged = serviceId !== appointment.service.id;
-  const dateChanged = date !== appointment.date.slice(0, 10);
-  const timeChanged = time !== appointment.startTime;
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const selectedDate = date ? new Date(date + 'T00:00:00') : null;
-  const newDateIsInThePast = selectedDate !== null && selectedDate < today;
-
-  const customerValid = name.trim().length > 0 && (phone === '' || /^\d{10,11}$/.test(phone));
-  const scheduleValid = TIME_REGEX.test(time) && date.length > 0;
-  const hasChanges = nameChanged || phoneChanged || serviceChanged || dateChanged || timeChanged;
-  const canSave = hasChanges && customerValid && scheduleValid;
-
-  function handleTimeChange(raw: string) {
-    const digits = raw.replace(/\D/g, '').slice(0, 4);
-    setTime(digits.length > 2 ? digits.slice(0, 2) + ':' + digits.slice(2) : digits);
-  }
-
-  async function handleSave() {
-    const customerDirty = nameChanged || phoneChanged;
-    const scheduleDirty = serviceChanged || dateChanged || timeChanged;
-
-    try {
-      // Customer must complete first so the schedule notification reaches the correct phone
-      if (customerDirty) {
-        const payload: { id: string; name?: string; phone?: string } = { id: appointment.id };
-        if (nameChanged) payload.name = name.trim();
-        if (phoneChanged && phone) payload.phone = phone;
-        await updateCustomer.mutateAsync(payload);
-      }
-
-      if (scheduleDirty) {
-        const payload: { id: string; serviceId?: string; date?: string; startTime?: string } = { id: appointment.id };
-        if (serviceChanged) payload.serviceId = serviceId;
-        if (dateChanged) payload.date = date;
-        if (timeChanged) payload.startTime = time;
-        await updateSchedule.mutateAsync(payload);
-      }
-
-      onClose();
-    } catch {}
-  }
-
-  const availableSlots = slots?.filter((s) => s.available) ?? [];
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-dark-surface border border-dark-border rounded-2xl w-full max-w-sm max-h-[90dvh] overflow-hidden flex flex-col">
-        <div className="overflow-y-auto p-6">
-          <div className="flex items-center justify-between mb-5">
-            <h2 className="font-serif text-base tracking-widest uppercase text-gold">Editar Agendamento</h2>
-            <button
-              onClick={onClose}
-              className="text-muted hover:text-[#F0EDE8] transition-colors bg-transparent border-none cursor-pointer text-lg leading-none"
-            >
-              ×
-            </button>
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-[11px] tracking-[0.12em] uppercase text-muted mb-2">Serviço</label>
-            <select
-              value={serviceId}
-              onChange={(e) => setServiceId(e.target.value)}
-              className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-[#F0EDE8] outline-none focus:border-gold appearance-none"
-            >
-              {services?.map((s) => (
-                <option key={s.id} value={s.id}>{s.icon} {s.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="mb-4">
-            <label className="block text-[11px] tracking-[0.12em] uppercase text-muted mb-2">Data</label>
-            <div className="relative">
-              {!date && (
-                <span className="absolute inset-0 flex items-center px-4 text-sm text-[#F0EDE8] pointer-events-none">
-                  Selecione uma data
-                </span>
-              )}
-              <input
-                type="date"
-                value={date}
-                max="2099-12-31"
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-[#F0EDE8] outline-none focus:border-gold appearance-none min-h-[50px]"
-              />
-            </div>
-          </div>
-
-          <div className="mb-5">
-            <label className="block text-[11px] tracking-[0.12em] uppercase text-muted mb-2">Horário</label>
-            <input
-              value={time}
-              onChange={(e) => handleTimeChange(e.target.value)}
-              placeholder="09:00"
-              className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-[#F0EDE8] outline-none focus:border-gold"
-            />
-            {availableSlots.length > 0 && (
-              <div className="mt-2">
-                <p className="text-[11px] tracking-[0.12em] uppercase text-muted mb-1.5">Horários Disponíveis</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {availableSlots.map((s) => (
-                    <button
-                      key={s.time}
-                      type="button"
-                      onClick={() => setTime(s.time)}
-                      className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors cursor-pointer
-                        ${time === s.time
-                          ? 'border-gold bg-gold/20 text-gold'
-                          : 'border-dark-border bg-dark text-muted hover:border-gold/40 hover:text-[#F0EDE8]'
-                        }`}
-                    >
-                      {s.time}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {(dateChanged || timeChanged) && !newDateIsInThePast && (
-              <p className="text-xs text-gold/80 mt-2">O cliente receberá uma mensagem no WhatsApp com o novo horário.</p>
-            )}
-          </div>
-
-          {/* Divider */}
-          <div className="border-t border-dark-border mb-5" />
-
-          {/* Customer section */}
-          <p className="text-[11px] tracking-[0.12em] uppercase text-muted mb-3">Cliente</p>
-
-          <div className="mb-4">
-            <label className="block text-[11px] tracking-[0.12em] uppercase text-muted mb-2">Nome</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-[#F0EDE8] outline-none focus:border-gold"
-            />
-          </div>
-
-          <div className="mb-5">
-            <label className="block text-[11px] tracking-[0.12em] uppercase text-muted mb-2">Telefone (somente números)</label>
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
-              placeholder="Ex: 11999998888"
-              className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-[#F0EDE8] placeholder-muted outline-none focus:border-gold"
-            />
-            {phone && !/^\d{10,11}$/.test(phone) && (
-              <p className="text-xs text-red-400 mt-1">Telefone deve ter 10 ou 11 dígitos.</p>
-            )}
-            {phoneChanged && /^\d{10,11}$/.test(phone) && (
-              <p className="text-xs text-gold/80 mt-1">O cliente receberá uma nova confirmação no novo número.</p>
-            )}
-          </div>
-
-          {error && <p className="text-red-400 text-xs text-center mb-3">{error.message}</p>}
-
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              disabled={isPending}
-              className="flex-1 py-2.5 rounded-xl border border-dark-border text-muted hover:text-[#F0EDE8] transition-colors text-sm cursor-pointer bg-transparent disabled:opacity-50"
-            >
-              Voltar
-            </button>
-            <Button
-              onClick={handleSave}
-              disabled={!canSave}
-              loading={isPending}
-              className="flex-1"
-            >
-              Salvar
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CancelModal({
-  onConfirm,
-  onClose,
-  isPending,
-}: {
-  onConfirm: (reason: string) => void;
-  onClose: () => void;
-  isPending: boolean;
-}) {
-  const [reason, setReason] = useState('');
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-dark-surface border border-dark-border rounded-2xl p-6 w-full max-w-sm">
-        <h3 className="text-lg font-bold mb-1">Cancelar agendamento</h3>
-        <p className="text-muted text-sm mb-4">O cliente receberá uma mensagem no WhatsApp com o motivo.</p>
-        <textarea
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="Motivo do cancelamento..."
-          rows={3}
-          className="w-full bg-dark border border-dark-border rounded-xl px-4 py-3 text-sm text-[#F0EDE8] placeholder-muted outline-none focus:border-gold resize-none mb-4"
-        />
-        <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            disabled={isPending}
-            className="flex-1 py-2.5 rounded-xl border border-dark-border text-muted hover:text-[#F0EDE8] transition-colors text-sm cursor-pointer bg-transparent disabled:opacity-50"
-          >
-            Voltar
-          </button>
-          <Button
-            onClick={() => onConfirm(reason)}
-            disabled={!reason.trim()}
-            loading={isPending}
-            className="flex-1"
-          >
-            Confirmar cancelamento
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -907,60 +514,6 @@ function ActionFab({ onPackage, onBooking }: { onPackage: () => void; onBooking:
   );
 }
 
-function DeleteModal({ onConfirm, onClose, isPending }: { onConfirm: () => void; onClose: () => void; isPending: boolean }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-dark-surface border border-dark-border rounded-2xl p-6 w-full max-w-sm">
-        <h3 className="text-lg font-bold mb-1">Apagar agendamento</h3>
-        <p className="text-muted text-sm mb-6">Tem certeza que deseja apagar este agendamento? Esta ação não pode ser desfeita.</p>
-        <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            disabled={isPending}
-            className="flex-1 py-2.5 rounded-xl border border-dark-border text-muted hover:text-[#F0EDE8] transition-colors text-sm cursor-pointer bg-transparent disabled:opacity-50"
-          >
-            Voltar
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={isPending}
-            className="flex-1 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors text-sm font-medium cursor-pointer disabled:opacity-50"
-          >
-            {isPending ? <Spinner /> : '✕ Apagar'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function NoShowModal({ onConfirm, onClose, isPending }: { onConfirm: () => void; onClose: () => void; isPending: boolean }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-dark-surface border border-dark-border rounded-2xl p-6 w-full max-w-sm">
-        <h3 className="text-lg font-bold mb-1">Confirmar não comparecimento</h3>
-        <p className="text-muted text-sm mb-6">Tem certeza que o cliente não compareceu? Esta ação não pode ser desfeita.</p>
-        <div className="flex gap-3">
-          <button
-            onClick={onClose}
-            disabled={isPending}
-            className="flex-1 py-2.5 rounded-xl border border-dark-border text-muted hover:text-[#F0EDE8] transition-colors text-sm cursor-pointer bg-transparent disabled:opacity-50"
-          >
-            Voltar
-          </button>
-          <button
-            onClick={onConfirm}
-            disabled={isPending}
-            className="flex-1 py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors text-sm font-medium cursor-pointer disabled:opacity-50"
-          >
-            {isPending ? <Spinner /> : '✗ Confirmar'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function DashboardPage() {
   const today = dateToString(new Date());
   const [view, setView] = useState<'day' | 'week' | 'month' | 'year'>('day');
@@ -972,6 +525,7 @@ export default function DashboardPage() {
   const [editAppointment, setEditAppointment] = useState<AdminAppointment | null>(null);
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [showPackageModal, setShowPackageModal] = useState(false);
+  const [packageWorkspace, setPackageWorkspace] = useState<CustomerPackage | null>(null);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
   const { data: me } = useAdminMe();
@@ -992,7 +546,8 @@ export default function DashboardPage() {
 
   function handleDeleteConfirm() {
     if (!deleteId) return;
-    deleteMutation.mutate(deleteId, {
+    const appointment = appointments?.find((item) => item.id === deleteId) ?? null;
+    deleteMutation.mutate(appointment ? { id: deleteId, packageId: appointment.packageId } : deleteId, {
       onSuccess: () => setDeleteId(null),
     });
   }
@@ -1010,14 +565,16 @@ export default function DashboardPage() {
 
   function handleCancelConfirm(reason: string) {
     if (!cancelId) return;
-    cancelAppointment.mutate({ id: cancelId, reason }, {
+    const appointment = appointments?.find((item) => item.id === cancelId) ?? null;
+    cancelAppointment.mutate({ id: cancelId, reason, packageId: appointment?.packageId ?? null }, {
       onSuccess: () => setCancelId(null),
     });
   }
 
   function handleNoShowConfirm() {
     if (!noShowId) return;
-    updateStatus.mutate({ id: noShowId, status: 'no_show' }, {
+    const appointment = appointments?.find((item) => item.id === noShowId) ?? null;
+    updateStatus.mutate({ id: noShowId, status: 'no_show', packageId: appointment?.packageId ?? null }, {
       onSuccess: () => setNoShowId(null),
     });
   }
@@ -1038,29 +595,43 @@ export default function DashboardPage() {
   return (
     <div className="relative z-10 max-w-[680px] mx-auto px-5 py-8 pb-20">
       {cancelId && (
-        <CancelModal
+        <AdminAppointmentCancelModal
           onConfirm={handleCancelConfirm}
           onClose={() => setCancelId(null)}
           isPending={cancelAppointment.isPending}
         />
       )}
       {noShowId && (
-        <NoShowModal
+        <AdminAppointmentNoShowModal
           onConfirm={handleNoShowConfirm}
           onClose={() => setNoShowId(null)}
           isPending={updateStatus.isPending}
         />
       )}
       {deleteId && (
-        <DeleteModal
+        <AdminAppointmentDeleteModal
           onConfirm={handleDeleteConfirm}
           onClose={() => setDeleteId(null)}
           isPending={deleteMutation.isPending}
         />
       )}
-      {editAppointment && <EditAppointmentModal appointment={editAppointment} barberId={me?.id ?? null} onClose={() => setEditAppointment(null)} />}
+      {editAppointment && <AdminEditAppointmentModal appointment={editAppointment} barberId={me?.id ?? null} onClose={() => setEditAppointment(null)} />}
       {showBookingModal && <AdminBookingModal barberId={me?.id ?? null} onClose={() => setShowBookingModal(false)} />}
-      {showPackageModal && <AdminPackageModal onClose={() => setShowPackageModal(false)} />}
+      {showPackageModal && (
+        <AdminPackageModal
+          onClose={() => setShowPackageModal(false)}
+          onCreated={(pkg) => setPackageWorkspace(pkg)}
+        />
+      )}
+      {packageWorkspace && (
+        <PackageWorkspaceModal
+          packageId={packageWorkspace.id}
+          initialPackage={packageWorkspace}
+          initialMode="schedule"
+          barberId={me?.id ?? null}
+          onClose={() => setPackageWorkspace(null)}
+        />
+      )}
       <ActionFab onPackage={() => setShowPackageModal(true)} onBooking={() => setShowBookingModal(true)} />
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
@@ -1136,34 +707,38 @@ export default function DashboardPage() {
           </div>
 
           {/* Overdue — time passed, needs action */}
-          {overdue.length > 0 && (
-            <section className="mb-6">
-              <h2 className="text-xs tracking-widest uppercase text-orange-400 mb-3">Aguardando confirmação</h2>
-              <div className="flex flex-col gap-3">
-                {overdue.map((a) => <AppointmentCard key={a.id} appointment={a} timePassed={true} onCancelClick={setCancelId} onNoShowClick={setNoShowId} onDeleteClick={setDeleteId} onEditClick={setEditAppointment} />)}
-              </div>
-            </section>
-          )}
+          <AdminAppointmentSection
+            title="Aguardando confirmação"
+            titleClassName="text-orange-400"
+            appointments={overdue}
+            timePassed={true}
+            onCancelClick={setCancelId}
+            onNoShowClick={setNoShowId}
+            onDeleteClick={setDeleteId}
+            onEditClick={setEditAppointment}
+          />
 
           {/* Upcoming */}
-          {upcoming.length > 0 && (
-            <section className="mb-6">
-              <h2 className="text-xs tracking-widest uppercase text-muted mb-3">Próximos</h2>
-              <div className="flex flex-col gap-3">
-                {upcoming.map((a) => <AppointmentCard key={a.id} appointment={a} timePassed={false} onCancelClick={setCancelId} onNoShowClick={setNoShowId} onDeleteClick={setDeleteId} onEditClick={setEditAppointment} />)}
-              </div>
-            </section>
-          )}
+          <AdminAppointmentSection
+            title="Próximos"
+            appointments={upcoming}
+            timePassed={false}
+            onCancelClick={setCancelId}
+            onNoShowClick={setNoShowId}
+            onDeleteClick={setDeleteId}
+            onEditClick={setEditAppointment}
+          />
 
           {/* Done */}
-          {done.length > 0 && (
-            <section>
-              <h2 className="text-xs tracking-widest uppercase text-muted mb-3">Concluídos / Outros</h2>
-              <div className="flex flex-col gap-3">
-                {done.map((a) => <AppointmentCard key={a.id} appointment={a} timePassed={true} onCancelClick={setCancelId} onNoShowClick={setNoShowId} onDeleteClick={setDeleteId} onEditClick={setEditAppointment} />)}
-              </div>
-            </section>
-          )}
+          <AdminAppointmentSection
+            title="Concluídos / Outros"
+            appointments={done}
+            timePassed={true}
+            onCancelClick={setCancelId}
+            onNoShowClick={setNoShowId}
+            onDeleteClick={setDeleteId}
+            onEditClick={setEditAppointment}
+          />
 
         </>
       ))}

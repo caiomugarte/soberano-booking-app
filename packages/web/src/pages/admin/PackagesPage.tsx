@@ -1,6 +1,15 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { useAdminPackages, useAdminDeactivatePackage, type CustomerPackage } from '../../api/use-admin.ts';
+import {
+  adminPackageQueryKeys,
+  type CustomerPackage,
+  type CustomerPackageStatus,
+  useAdminDeactivatePackage,
+  useAdminMe,
+  useAdminPackages,
+} from '../../api/use-admin.ts';
+import { PackageWorkspaceModal } from '../../components/admin/PackageWorkspaceModal.tsx';
 import { Spinner } from '../../components/ui/Spinner.tsx';
 import { formatCurrency } from '../../lib/format.ts';
 
@@ -16,7 +25,12 @@ const STATUS_COLOR: Record<string, string> = {
   cancelled: 'text-muted border-dark-border bg-dark-surface2',
 };
 
-type StatusFilter = '' | 'active' | 'completed' | 'cancelled';
+type StatusFilter = CustomerPackageStatus | 'all';
+
+interface WorkspaceState {
+  pkg: CustomerPackage;
+  mode: 'details' | 'schedule';
+}
 
 function ConfirmDeactivateModal({
   pkg,
@@ -60,11 +74,14 @@ function ConfirmDeactivateModal({
 
 export default function PackagesPage() {
   const navigate = useNavigate();
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('');
+  const queryClient = useQueryClient();
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [search, setSearch] = useState('');
   const [deactivatingPkg, setDeactivatingPkg] = useState<CustomerPackage | null>(null);
+  const [workspace, setWorkspace] = useState<WorkspaceState | null>(null);
 
-  const { data: packages, isLoading } = useAdminPackages(statusFilter || undefined);
+  const { data: me } = useAdminMe();
+  const { data: packages, isLoading } = useAdminPackages(statusFilter === 'all' ? undefined : statusFilter);
   const deactivate = useAdminDeactivatePackage();
 
   const filtered = (packages ?? []).filter((pkg) => {
@@ -78,14 +95,33 @@ export default function PackagesPage() {
   });
 
   const filters: Array<{ label: string; value: StatusFilter }> = [
-    { label: 'Todos', value: '' },
     { label: 'Ativos', value: 'active' },
     { label: 'Concluídos', value: 'completed' },
     { label: 'Cancelados', value: 'cancelled' },
+    { label: 'Todos', value: 'all' },
   ];
+
+  function openWorkspace(pkg: CustomerPackage, mode: 'details' | 'schedule') {
+    setWorkspace({ pkg, mode });
+  }
+
+  function closeWorkspace() {
+    queryClient.invalidateQueries({ queryKey: adminPackageQueryKeys.all });
+    setWorkspace(null);
+  }
 
   return (
     <div className="relative z-10 max-w-[680px] mx-auto px-5 py-8 pb-20">
+      {workspace && (
+        <PackageWorkspaceModal
+          packageId={workspace.pkg.id}
+          initialPackage={workspace.pkg}
+          initialMode={workspace.mode}
+          barberId={me?.id ?? null}
+          onClose={closeWorkspace}
+        />
+      )}
+
       {deactivatingPkg && (
         <ConfirmDeactivateModal
           pkg={deactivatingPkg}
@@ -173,14 +209,32 @@ export default function PackagesPage() {
                 </span>
               </div>
 
-              {pkg.status === 'active' && (
+              <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => setDeactivatingPkg(pkg)}
-                  className="w-full py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer text-xs font-medium"
+                  onClick={() => openWorkspace(pkg, 'details')}
+                  className="flex-1 min-w-[120px] py-2 rounded-lg bg-dark-surface2 border border-dark-border text-muted hover:text-[#F0EDE8] hover:border-gold/40 transition-colors cursor-pointer text-xs font-medium"
                 >
-                  Desativar
+                  Ver detalhes
                 </button>
-              )}
+
+                {pkg.status === 'active' && pkg.usedCount < pkg.totalUses && (
+                  <button
+                    onClick={() => openWorkspace(pkg, 'schedule')}
+                    className="flex-1 min-w-[120px] py-2 rounded-lg bg-gold/10 border border-gold/30 text-gold hover:bg-gold/20 transition-colors cursor-pointer text-xs font-medium"
+                  >
+                    Agendar uso
+                  </button>
+                )}
+
+                {pkg.status === 'active' && (
+                  <button
+                    onClick={() => setDeactivatingPkg(pkg)}
+                    className="flex-1 min-w-[120px] py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer text-xs font-medium"
+                  >
+                    Desativar
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

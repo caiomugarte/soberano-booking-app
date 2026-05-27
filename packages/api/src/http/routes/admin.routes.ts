@@ -17,6 +17,14 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   // All admin routes require authentication
   app.addHook('preHandler', authGuard);
 
+  async function reevaluatePackageLifecycle(
+    packageId: string | null | undefined,
+    packageRepo: PrismaCustomerPackageRepository,
+  ): Promise<void> {
+    if (!packageId) return;
+    await packageRepo.reevaluateLifecycle(packageId);
+  }
+
   // Get the logged-in provider's profile
   app.get('/admin/me', async (request, reply) => {
     const providerRepo = new PrismaProviderRepository(request.tenantPrisma);
@@ -81,9 +89,11 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   app.delete<{ Params: { id: string } }>('/admin/appointments/:id', async (request, reply) => {
     const { id } = request.params;
     const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
+    const packageRepo = new PrismaCustomerPackageRepository(request.tenantPrisma);
     const appointment = await appointmentRepo.findById(id);
     if (!appointment) return reply.status(404).send({ error: 'NOT_FOUND' });
     await appointmentRepo.deleteById(id);
+    await reevaluatePackageLifecycle(appointment.packageId, packageRepo);
     return reply.status(204).send();
   });
 
@@ -124,7 +134,16 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     }
 
     const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
+    const packageRepo = new PrismaCustomerPackageRepository(request.tenantPrisma);
+    const appointment = await appointmentRepo.findById(id);
+    if (!appointment) {
+      return reply.status(404).send({
+        error: 'NOT_FOUND',
+        message: 'Agendamento não encontrado.',
+      });
+    }
     await appointmentRepo.updateStatus(id, status);
+    await reevaluatePackageLifecycle(appointment.packageId, packageRepo);
     return { message: 'Status atualizado.' };
   });
 
@@ -204,6 +223,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
     const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
     const serviceRepo = new PrismaServiceRepository(request.tenantPrisma);
+    const packageRepo = new PrismaCustomerPackageRepository(request.tenantPrisma);
     const appointment = await appointmentRepo.findById(id);
     if (!appointment) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Agendamento não encontrado.' });
 
@@ -247,6 +267,8 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
         barberReminderSent: false,
       } : {}),
     });
+
+    await reevaluatePackageLifecycle(appointment.packageId, packageRepo);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -335,20 +357,47 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
     }
     const packageRepo = new PrismaCustomerPackageRepository(request.tenantPrisma);
-    const pkg = await packageRepo.create({ ...parsed.data, tenantId: request.tenant.id });
+    const pkg = await packageRepo.create({
+      ...parsed.data,
+      tenantId: request.tenant.id,
+      providerId: request.providerId!,
+    });
     return reply.status(201).send(pkg);
   });
 
   // List packages — by phone (active only) or all with optional status filter
   app.get('/admin/packages', async (request, reply) => {
-    const { phone, status } = request.query as { phone?: string; status?: string };
+    const parsed = z.object({
+      phone: z.string().regex(/^\d{10,11}$/, 'Telefone deve ter 10 ou 11 dígitos').optional(),
+      status: z.enum(['active', 'completed', 'cancelled']).optional(),
+    }).safeParse(request.query);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    }
+
+    const { phone, status } = parsed.data;
     const packageRepo = new PrismaCustomerPackageRepository(request.tenantPrisma);
     if (phone) {
-      const packages = await packageRepo.findActiveByPhone(request.tenant.id, phone);
+      const packages = await packageRepo.findActiveByPhone(request.tenant.id, request.providerId!, phone);
       return { packages };
     }
-    const packages = await packageRepo.findAllByTenant(request.tenant.id, status ? { status } : undefined);
+    const packages = await packageRepo.findAllByProvider(
+      request.tenant.id,
+      request.providerId!,
+      status ? { status } : undefined,
+    );
     return { packages };
+  });
+
+  // Package details for the authenticated provider
+  app.get<{ Params: { id: string } }>('/admin/packages/:id', async (request, reply) => {
+    const { id } = request.params;
+    const packageRepo = new PrismaCustomerPackageRepository(request.tenantPrisma);
+    const pkg = await packageRepo.findDetailsByIdForProvider(id, request.tenant.id, request.providerId!);
+    if (!pkg) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Pacote não encontrado.' });
+    }
+    return { package: pkg };
   });
 
   // Deactivate a package
@@ -356,7 +405,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const { id } = request.params;
     const packageRepo = new PrismaCustomerPackageRepository(request.tenantPrisma);
     try {
-      const pkg = await packageRepo.deactivate(id, request.tenant.id);
+      const pkg = await packageRepo.deactivate(id, request.tenant.id, request.providerId!);
       return { package: pkg };
     } catch (err) {
       if ((err as Error).message === 'NOT_FOUND') return reply.status(404).send({ error: 'NOT_FOUND' });
@@ -370,7 +419,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const { id } = request.params;
     const packageRepo = new PrismaCustomerPackageRepository(request.tenantPrisma);
     try {
-      await packageRepo.deleteById(id, request.tenant.id);
+      await packageRepo.deleteById(id, request.tenant.id, request.providerId!);
       return reply.status(204).send();
     } catch (err) {
       if ((err as Error).message === 'NOT_FOUND') return reply.status(404).send({ error: 'NOT_FOUND' });
@@ -394,6 +443,8 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     }
 
     await appointmentRepo.updateStatus(id, APPOINTMENT_STATUS.CANCELLED, new Date());
+    const packageRepo = new PrismaCustomerPackageRepository(request.tenantPrisma);
+    await reevaluatePackageLifecycle(appointment.packageId, packageRepo);
 
     // Fire-and-forget notification to customer
     const config = tenantConfigSchema.parse(request.tenant.config);

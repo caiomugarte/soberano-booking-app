@@ -46,8 +46,10 @@ export class AdminCreateAppointment {
 
     let packagePriceCents: number | undefined;
     if (input.packageId && this.packageRepo) {
-      const pkg = await this.packageRepo.findByIdAndTenant(input.packageId, input.tenantId);
-      if (!pkg || pkg.status !== 'active') throw new ValidationError('Pacote inválido ou já utilizado.');
+      const pkg = await this.packageRepo.findByIdForProvider(input.packageId, input.tenantId, input.barberId);
+      if (!pkg || pkg.status !== 'active' || pkg.usedCount >= pkg.totalUses) {
+        throw new ValidationError('Pacote inválido, cancelado ou sem usos restantes.');
+      }
       packagePriceCents = Math.floor(pkg.totalPriceCents / pkg.totalUses);
     }
 
@@ -77,6 +79,7 @@ export class AdminCreateAppointment {
 
     if (input.packageId && this.packageRepo) {
       await this.packageRepo.incrementUsedCount(input.packageId);
+      await this.packageRepo.reevaluateLifecycle(input.packageId);
     }
 
     const today = new Date();
