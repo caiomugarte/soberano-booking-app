@@ -278,7 +278,7 @@ model CustomerPackage {
   provider     Provider      @relation(fields: [providerId], references: [id])
   appointments Appointment[]
 
-  @@index([tenantId, providerId, customerPhone, status])
+  @@index([tenantId, providerId, customerPhone, status], map: "customer_packages_tenant_id_provider_id_customer_phone_stat_idx")
   @@index([tenantId, providerId, status])
   @@map("customer_packages")
 }
