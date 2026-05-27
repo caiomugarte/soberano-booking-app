@@ -51,6 +51,7 @@ model Provider {
   appointments   Appointment[]
   shifts         ProviderShift[]
   absences       ProviderAbsence[]
+  customerPackages CustomerPackage[]
   sessionReports SessionReport[]
   neuromodulationProtocols NeuromodulationProtocol[]
   recurringAppointmentSeries RecurringAppointmentSeries[]
@@ -263,6 +264,7 @@ model SessionReport {
 model CustomerPackage {
   id               String   @id @default(uuid()) @db.Uuid
   tenantId         String   @map("tenant_id") @db.Uuid
+  providerId       String   @map("provider_id") @db.Uuid
   customerName     String   @map("customer_name") @db.VarChar(200)
   customerPhone    String?  @map("customer_phone") @db.VarChar(20)
   totalUses        Int      @map("total_uses")
@@ -273,9 +275,11 @@ model CustomerPackage {
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  provider     Provider      @relation(fields: [providerId], references: [id])
   appointments Appointment[]
 
-  @@index([tenantId, customerPhone, status])
+  @@index([tenantId, providerId, customerPhone, status])
+  @@index([tenantId, providerId, status])
   @@map("customer_packages")
 }
 

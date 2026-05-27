@@ -13,7 +13,7 @@ export interface AdminAppointment {
   priceCents: number;
   packageId: string | null;
   service: { id: string; name: string; icon: string };
-  customer: { name: string; phone: string };
+  customer: { name: string; phone: string | null };
   barber: { firstName: string; lastName: string; avatarUrl: string | null };
   package: { appointmentNumber: number; totalUses: number; totalPriceCents: number } | null;
 }
@@ -74,10 +74,13 @@ export function useAdminAppointments(date: string) {
 export function useDeleteAppointment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) =>
-      authRequest(`/admin/appointments/${id}`, { method: 'DELETE' }),
-    onSuccess: () => {
+    mutationFn: (input: string | { id: string; packageId?: string | null }) =>
+      authRequest(`/admin/appointments/${typeof input === 'string' ? input : input.id}`, { method: 'DELETE' }),
+    onSuccess: (_data, input) => {
       queryClient.invalidateQueries({ queryKey: ['admin-appointments'] });
+      if (typeof input !== 'string' && input.packageId) {
+        invalidatePackageQueries(queryClient);
+      }
     },
   });
 }
@@ -114,13 +117,16 @@ export function useAdminStats(from: string, to: string) {
 export function useUpdateAppointmentStatus() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, status }: { id: string; status: string }) =>
+    mutationFn: ({ id, status }: { id: string; status: string; packageId?: string | null }) =>
       authRequest(`/admin/appointments/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ status }),
       }),
-    onSuccess: () => {
+    onSuccess: (_data, input) => {
       queryClient.invalidateQueries({ queryKey: ['admin-appointments'] });
+      if (input.packageId) {
+        invalidatePackageQueries(queryClient);
+      }
     },
   });
 }
@@ -128,13 +134,16 @@ export function useUpdateAppointmentStatus() {
 export function useAdminCancelAppointment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+    mutationFn: ({ id, reason }: { id: string; reason: string; packageId?: string | null }) =>
       authRequest(`/admin/appointments/${id}/cancel`, {
         method: 'POST',
         body: JSON.stringify({ reason }),
       }),
-    onSuccess: () => {
+    onSuccess: (_data, input) => {
       queryClient.invalidateQueries({ queryKey: ['admin-appointments'] });
+      if (input.packageId) {
+        invalidatePackageQueries(queryClient);
+      }
     },
   });
 }
@@ -149,15 +158,42 @@ export interface AdminBookingInput {
   packageId?: string;
 }
 
+export type CustomerPackageStatus = 'active' | 'completed' | 'cancelled';
+
 export interface CustomerPackage {
   id: string;
+  providerId: string;
   customerName: string;
   customerPhone: string | null;
   totalUses: number;
   usedCount: number;
   totalPriceCents: number;
-  status: 'active' | 'completed' | 'cancelled';
+  status: CustomerPackageStatus;
   createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomerPackageProgress {
+  appointmentNumber: number;
+  totalUses: number;
+  totalPriceCents: number;
+}
+
+export interface CustomerPackageLinkedAppointment {
+  id: string;
+  providerId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  priceCents: number;
+  service: { id: string; name: string; icon: string };
+  customer: { id: string; name: string; phone: string | null };
+  packageProgress: CustomerPackageProgress;
+}
+
+export interface CustomerPackageDetails extends CustomerPackage {
+  linkedAppointments: CustomerPackageLinkedAppointment[];
 }
 
 export interface AdminCreatePackageInput {
@@ -165,6 +201,17 @@ export interface AdminCreatePackageInput {
   customerPhone?: string;
   totalUses: number;
   totalPriceCents: number;
+}
+
+export const adminPackageQueryKeys = {
+  all: ['admin-packages'] as const,
+  byPhone: (phone: string) => ['admin-packages', 'phone', phone] as const,
+  list: (status: CustomerPackageStatus | 'all') => ['admin-packages', 'list', status] as const,
+  details: (packageId: string) => ['admin-packages', 'details', packageId] as const,
+};
+
+function invalidatePackageQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: adminPackageQueryKeys.all });
 }
 
 export function useAdminCreateBooking() {
@@ -175,8 +222,11 @@ export function useAdminCreateBooking() {
         method: 'POST',
         body: JSON.stringify(input),
       }),
-    onSuccess: () => {
+    onSuccess: (_data, input) => {
       queryClient.invalidateQueries({ queryKey: ['admin-appointments'] });
+      if (input.packageId) {
+        invalidatePackageQueries(queryClient);
+      }
     },
   });
 }
@@ -184,13 +234,16 @@ export function useAdminCreateBooking() {
 export function useAdminUpdateAppointmentSchedule() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, serviceId, date, startTime }: { id: string; serviceId?: string; date?: string; startTime?: string }) =>
+    mutationFn: ({ id, serviceId, date, startTime }: { id: string; serviceId?: string; date?: string; startTime?: string; packageId?: string | null }) =>
       authRequest(`/admin/appointments/${id}/schedule`, {
         method: 'PATCH',
         body: JSON.stringify({ serviceId, date, startTime }),
       }),
-    onSuccess: () => {
+    onSuccess: (_data, input) => {
       queryClient.invalidateQueries({ queryKey: ['admin-appointments'] });
+      if (input.packageId) {
+        invalidatePackageQueries(queryClient);
+      }
     },
   });
 }
@@ -227,8 +280,7 @@ export function useAdminCreatePackage() {
         body: JSON.stringify(input),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-packages'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-packages-all'] });
+      invalidatePackageQueries(queryClient);
     },
   });
 }
@@ -236,17 +288,17 @@ export function useAdminCreatePackage() {
 export function useAdminCustomerPackages(phone: string) {
   const accessToken = useAuthStore((s) => s.accessToken);
   return useQuery({
-    queryKey: ['admin-packages', phone],
+    queryKey: adminPackageQueryKeys.byPhone(phone),
     queryFn: () => authRequest<{ packages: CustomerPackage[] }>('/admin/packages?phone=' + phone).then((r) => r.packages),
     enabled: !!accessToken && phone.length >= 10,
     staleTime: 30_000,
   });
 }
 
-export function useAdminPackages(status?: string) {
+export function useAdminPackages(status?: CustomerPackageStatus) {
   const accessToken = useAuthStore((s) => s.accessToken);
   return useQuery({
-    queryKey: ['admin-packages-all', status ?? 'all'],
+    queryKey: adminPackageQueryKeys.list(status ?? 'all'),
     queryFn: () =>
       authRequest<{ packages: CustomerPackage[] }>(
         '/admin/packages' + (status ? `?status=${status}` : ''),
@@ -256,14 +308,24 @@ export function useAdminPackages(status?: string) {
   });
 }
 
+export function useAdminPackageDetails(packageId: string | null) {
+  const accessToken = useAuthStore((s) => s.accessToken);
+  return useQuery({
+    queryKey: packageId ? adminPackageQueryKeys.details(packageId) : adminPackageQueryKeys.all,
+    queryFn: () =>
+      authRequest<{ package: CustomerPackageDetails }>(`/admin/packages/${packageId}`).then((r) => r.package),
+    staleTime: 30_000,
+    enabled: !!accessToken && !!packageId,
+  });
+}
+
 export function useAdminDeactivatePackage() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
       authRequest(`/admin/packages/${id}/deactivate`, { method: 'PATCH' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-packages-all'] });
-      queryClient.invalidateQueries({ queryKey: ['admin-packages'] });
+      invalidatePackageQueries(queryClient);
     },
   });
 }
@@ -274,7 +336,7 @@ export function useAdminDeletePackage() {
     mutationFn: (id: string) =>
       authRequest(`/admin/packages/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-packages-all'] });
+      invalidatePackageQueries(queryClient);
     },
   });
 }

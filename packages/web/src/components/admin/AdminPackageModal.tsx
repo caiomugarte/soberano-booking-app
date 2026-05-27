@@ -2,13 +2,18 @@ import { useEffect, useState } from 'react';
 import { Button } from '../ui/Button.tsx';
 import { Input } from '../ui/Input.tsx';
 import { formatPhone, stripPhone } from '../../lib/format.ts';
-import { useAdminCreatePackage, useAdminCustomerLookup } from '../../api/use-admin.ts';
+import {
+  type CustomerPackage,
+  useAdminCreatePackage,
+  useAdminCustomerLookup,
+} from '../../api/use-admin.ts';
 
 interface AdminPackageModalProps {
   onClose: () => void;
+  onCreated?: (pkg: CustomerPackage) => void;
 }
 
-export function AdminPackageModal({ onClose }: AdminPackageModalProps) {
+export function AdminPackageModal({ onClose, onCreated }: AdminPackageModalProps) {
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [usesDisplay, setUsesDisplay] = useState('');
@@ -56,7 +61,10 @@ export function AdminPackageModal({ onClose }: AdminPackageModalProps) {
       totalUses: uses,
       totalPriceCents,
     }, {
-      onSuccess: () => onClose(),
+      onSuccess: (pkg) => {
+        onCreated?.(pkg);
+        onClose();
+      },
     });
   }
 

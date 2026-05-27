@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "customer_packages_tenant_id_provider_id_customer_phone_status_i" RENAME TO "customer_packages_tenant_id_provider_id_customer_phone_stat_idx";
