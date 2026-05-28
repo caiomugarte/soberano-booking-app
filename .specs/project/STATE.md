@@ -62,6 +62,7 @@ _None recorded yet._
 | 003 | Reset the web-bruno patient modal fields on open so new patient creation does not reuse the previous values | 2026-05-04 | not committed | ✅ Done |
 | 004 | Make the web-bruno patient form treat blank email as optional on create and clearable on edit | 2026-05-04 | not committed | ✅ Done |
 | 005 | Highlight `Psicoterapia` and `Neuromodulação` with distinct colors in the `web-bruno` weekly agenda | 2026-05-18 | not committed | ✅ Done |
+| 006 | Add a mobile-friendly package creation entry point to `PackagesPage` using the dashboard-style floating action pattern and the existing package workspace handoff | 2026-05-28 | not committed | ✅ Done |
 
 ## Deferred Ideas
 

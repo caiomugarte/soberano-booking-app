@@ -41,4 +41,5 @@ Two requested behaviors cannot be implemented correctly as web-only changes:
   - otherwise become `completed`
 - `packages/api/src/http/routes/admin.routes.ts` now reevaluates package lifecycle after package-linked admin create, status change, reschedule, cancel, and delete mutations
 - `packages/web/src/components/admin/PackageWorkspaceModal.tsx` is now the shared package-first modal for both post-create scheduling and packages-page details
+- `packages/web/src/components/admin/AdminPackageModal.tsx` already exposes the reusable creation handoff through `onCreated(pkg)`, and `DashboardPage` opens `PackageWorkspaceModal` in `schedule` mode from that callback
 - `packages/web/src/components/admin/AdminAppointmentCard.tsx`, `AdminEditAppointmentModal.tsx`, and `AdminAppointmentManagementDialogs.tsx` are the reusable admin booking-management pieces that the package workspace can compose instead of duplicating dashboard logic
