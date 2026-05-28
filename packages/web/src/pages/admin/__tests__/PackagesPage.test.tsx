@@ -19,7 +19,53 @@ vi.mock('../../../api/use-admin.ts', () => ({
 }));
 
 vi.mock('../../../components/admin/PackageWorkspaceModal.tsx', () => ({
-  PackageWorkspaceModal: ({ packageId }: { packageId: string }) => <div>Workspace {packageId}</div>,
+  PackageWorkspaceModal: ({ packageId, initialMode }: { packageId: string; initialMode: string }) => (
+    <div>Workspace {packageId} {initialMode}</div>
+  ),
+}));
+
+vi.mock('../../../components/admin/AdminPackageModal.tsx', () => ({
+  AdminPackageModal: ({
+    onClose,
+    onCreated,
+  }: {
+    onClose: () => void;
+    onCreated?: (pkg: {
+      id: string;
+      providerId: string;
+      customerName: string;
+      customerPhone: string | null;
+      totalUses: number;
+      usedCount: number;
+      totalPriceCents: number;
+      status: 'active' | 'completed' | 'cancelled';
+      createdAt: string;
+      updatedAt: string;
+    }) => void;
+  }) => (
+    <div>
+      <div>Novo pacote modal</div>
+      <button
+        onClick={() => {
+          onCreated?.({
+            id: 'pkg-new',
+            providerId: 'provider-1',
+            customerName: 'Cliente novo',
+            customerPhone: '11999990000',
+            totalUses: 4,
+            usedCount: 0,
+            totalPriceCents: 15000,
+            status: 'active',
+            createdAt: '2026-05-27T12:00:00.000Z',
+            updatedAt: '2026-05-27T12:00:00.000Z',
+          });
+          onClose();
+        }}
+      >
+        Confirmar criacao
+      </button>
+    </div>
+  ),
 }));
 
 function renderPackagesPage() {
@@ -117,5 +163,24 @@ describe('PackagesPage', () => {
     expect(useAdminPackages).toHaveBeenNthCalledWith(1, 'active');
     expect(useAdminPackages).toHaveBeenLastCalledWith(undefined);
     expect(screen.getByText('Maria')).toBeInTheDocument();
+  });
+
+  it('opens package creation and continues into the workspace after create', async () => {
+    const user = userEvent.setup();
+    useAdminPackages.mockReturnValue({
+      data: [],
+      isLoading: false,
+    });
+
+    renderPackagesPage();
+
+    await user.click(screen.getByRole('button', { name: 'Abrir ações de pacote' }));
+    await user.click(screen.getByRole('button', { name: '+ Pacote' }));
+    expect(screen.getByText('Novo pacote modal')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Confirmar criacao' }));
+
+    expect(screen.queryByText('Novo pacote modal')).not.toBeInTheDocument();
+    expect(screen.getByText('Workspace pkg-new schedule')).toBeInTheDocument();
   });
 });

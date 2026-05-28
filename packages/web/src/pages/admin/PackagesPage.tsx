@@ -9,6 +9,7 @@ import {
   useAdminMe,
   useAdminPackages,
 } from '../../api/use-admin.ts';
+import { AdminPackageModal } from '../../components/admin/AdminPackageModal.tsx';
 import { PackageWorkspaceModal } from '../../components/admin/PackageWorkspaceModal.tsx';
 import { Spinner } from '../../components/ui/Spinner.tsx';
 import { formatCurrency } from '../../lib/format.ts';
@@ -30,6 +31,36 @@ type StatusFilter = CustomerPackageStatus | 'all';
 interface WorkspaceState {
   pkg: CustomerPackage;
   mode: 'details' | 'schedule';
+}
+
+function CreatePackageFab({ onCreate }: { onCreate: () => void }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      {open && <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+        {open && (
+          <button
+            onClick={() => {
+              setOpen(false);
+              onCreate();
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-dark-surface border border-gold text-gold text-sm font-medium shadow-lg cursor-pointer whitespace-nowrap hover:bg-gold/10 transition-colors"
+          >
+            + Pacote
+          </button>
+        )}
+        <button
+          onClick={() => setOpen((value) => !value)}
+          aria-label={open ? 'Fechar ações de pacote' : 'Abrir ações de pacote'}
+          className="w-14 h-14 rounded-full bg-gold text-dark font-bold text-2xl shadow-lg cursor-pointer flex items-center justify-center transition-transform hover:scale-105 border-none"
+        >
+          {open ? '×' : '+'}
+        </button>
+      </div>
+    </>
+  );
 }
 
 function ConfirmDeactivateModal({
@@ -77,6 +108,7 @@ export default function PackagesPage() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [search, setSearch] = useState('');
+  const [showPackageModal, setShowPackageModal] = useState(false);
   const [deactivatingPkg, setDeactivatingPkg] = useState<CustomerPackage | null>(null);
   const [workspace, setWorkspace] = useState<WorkspaceState | null>(null);
 
@@ -122,6 +154,13 @@ export default function PackagesPage() {
         />
       )}
 
+      {showPackageModal && (
+        <AdminPackageModal
+          onClose={() => setShowPackageModal(false)}
+          onCreated={(pkg) => setWorkspace({ pkg, mode: 'schedule' })}
+        />
+      )}
+
       {deactivatingPkg && (
         <ConfirmDeactivateModal
           pkg={deactivatingPkg}
@@ -134,6 +173,8 @@ export default function PackagesPage() {
           }}
         />
       )}
+
+      <CreatePackageFab onCreate={() => setShowPackageModal(true)} />
 
       <div className="flex items-center justify-between mb-8">
         <button
