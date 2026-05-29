@@ -10,20 +10,13 @@ import { PrismaCustomerPackageRepository } from '../../infrastructure/database/r
 import { WhatsAppNotificationService } from '../../infrastructure/notifications/whatsapp-notification.service.js';
 import { ChatwootClient } from '../../infrastructure/notifications/chatwoot.client.js';
 import { AdminCreateAppointment } from '../../application/use-cases/booking/admin-create-appointment.js';
+import { PackageLifecycleManager } from '../../application/use-cases/booking/package-lifecycle-manager.js';
 import { APPOINTMENT_STATUS, bookingSchema, createPackageSchema, tenantConfigSchema } from '@soberano/shared';
 import { NotFoundError, SlotTakenError, ValidationError } from '../../shared/errors.js';
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
   // All admin routes require authentication
   app.addHook('preHandler', authGuard);
-
-  async function reevaluatePackageLifecycle(
-    packageId: string | null | undefined,
-    packageRepo: PrismaCustomerPackageRepository,
-  ): Promise<void> {
-    if (!packageId) return;
-    await packageRepo.reevaluateLifecycle(packageId);
-  }
 
   // Get the logged-in provider's profile
   app.get('/admin/me', async (request, reply) => {
@@ -90,10 +83,16 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const { id } = request.params;
     const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
     const packageRepo = new PrismaCustomerPackageRepository(request.tenantPrisma);
+    const packageLifecycleManager = new PackageLifecycleManager(packageRepo);
     const appointment = await appointmentRepo.findById(id);
     if (!appointment) return reply.status(404).send({ error: 'NOT_FOUND' });
     await appointmentRepo.deleteById(id);
-    await reevaluatePackageLifecycle(appointment.packageId, packageRepo);
+    await packageLifecycleManager.syncForAppointment({
+      packageId: appointment.packageId,
+      tenantId: request.tenant.id,
+      providerId: request.providerId!,
+      event: 'appointment_deleted',
+    });
     return reply.status(204).send();
   });
 
@@ -143,7 +142,24 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       });
     }
     await appointmentRepo.updateStatus(id, status);
-    await reevaluatePackageLifecycle(appointment.packageId, packageRepo);
+    const config =
+      appointment.packageId && status === APPOINTMENT_STATUS.COMPLETED
+        ? tenantConfigSchema.parse(request.tenant.config)
+        : null;
+    const notificationService = config
+      ? new WhatsAppNotificationService(config, new ChatwootClient(config))
+      : undefined;
+    const packageLifecycleManager = new PackageLifecycleManager(packageRepo, notificationService);
+    await packageLifecycleManager.syncForAppointment({
+      packageId: appointment.packageId,
+      tenantId: request.tenant.id,
+      providerId: request.providerId!,
+      event:
+        status === APPOINTMENT_STATUS.COMPLETED
+          ? 'appointment_completed'
+          : 'appointment_no_show',
+      appointment,
+    });
     return { message: 'Status atualizado.' };
   });
 
@@ -224,6 +240,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
     const serviceRepo = new PrismaServiceRepository(request.tenantPrisma);
     const packageRepo = new PrismaCustomerPackageRepository(request.tenantPrisma);
+    const packageLifecycleManager = new PackageLifecycleManager(packageRepo);
     const appointment = await appointmentRepo.findById(id);
     if (!appointment) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Agendamento não encontrado.' });
 
@@ -268,7 +285,12 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       } : {}),
     });
 
-    await reevaluatePackageLifecycle(appointment.packageId, packageRepo);
+    await packageLifecycleManager.syncForAppointment({
+      packageId: appointment.packageId,
+      tenantId: request.tenant.id,
+      providerId: request.providerId!,
+      event: 'appointment_rescheduled',
+    });
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -444,7 +466,13 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
     await appointmentRepo.updateStatus(id, APPOINTMENT_STATUS.CANCELLED, new Date());
     const packageRepo = new PrismaCustomerPackageRepository(request.tenantPrisma);
-    await reevaluatePackageLifecycle(appointment.packageId, packageRepo);
+    const packageLifecycleManager = new PackageLifecycleManager(packageRepo);
+    await packageLifecycleManager.syncForAppointment({
+      packageId: appointment.packageId,
+      tenantId: request.tenant.id,
+      providerId: request.providerId!,
+      event: 'appointment_cancelled',
+    });
 
     // Fire-and-forget notification to customer
     const config = tenantConfigSchema.parse(request.tenant.config);

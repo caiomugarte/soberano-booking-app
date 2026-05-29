@@ -105,7 +105,7 @@ T5 + T8 + T9 + T12 → T13
 
 ### T3: Reevaluate package lifecycle on package-linked appointment mutations
 
-**What**: Centralize package lifecycle reevaluation in the admin booking flow so package status stays correct after package-linked creates, schedule edits, cancellations, deletes, and status changes.
+**What**: Centralize package lifecycle reevaluation in the admin booking flow so package status stays correct after package-linked creates, schedule edits, cancellations, deletes, and status changes, and so the provider payment reminder can fire when the final linked appointment is completed.
 **Where**:
 - `packages/api/src/application/use-cases/booking/admin-create-appointment.ts`
 - `packages/api/src/http/routes/admin.routes.ts`
@@ -113,12 +113,14 @@ T5 + T8 + T9 + T12 → T13
 
 **Depends on**: T2
 **Reuses**: Existing admin appointment mutation flows in `admin.routes.ts` and the current package-link notification behavior already present in `AdminCreateAppointment`
-**Requirement**: LIFE-01, LIFE-02, LIFE-03, BKD-07, BKD-08, BKD-09, BKD-10, BKD-11, BKD-20, PKG-12, PKG-13
+**Requirement**: LIFE-01, LIFE-02, LIFE-03, PAY-01, BKD-07, BKD-08, BKD-09, BKD-10, BKD-11, BKD-20, BKD-21, BKD-22, BKD-23, BKD-24, PKG-12, PKG-13
 
 **Done when**:
 - [ ] Package-linked creation still increments `usedCount`, but package status is derived through the shared lifecycle evaluator instead of immediate hard completion
 - [ ] Provider-owned package validation happens before appointment creation when `packageId` is present
 - [ ] Lifecycle reevaluation runs after package-linked appointment cancel, delete, status mutation, and schedule mutation when the future-booking state could change
+- [ ] When a package-linked appointment is marked `completed` and the package transitions from `active` to `completed`, the provider receives a payment reminder with the package amount
+- [ ] The payment reminder does not fire for `no_show`, cancellation, delete, or manual deactivation paths that also end the package lifecycle
 - [ ] Non-package appointment mutations keep their current behavior
 - [ ] The package-linked WhatsApp confirmation still omits the self-service block, while non-package bookings keep the existing confirmation template
 - [ ] `cd packages/api && npx tsc --noEmit` exits 0
@@ -144,7 +146,7 @@ T5 + T8 + T9 + T12 → T13
 - [ ] `GET /admin/packages` supports `?status=active|completed|cancelled`
 - [ ] A provider-scoped package details route exists for the workspace modal, for example `GET /admin/packages/:id`
 - [ ] The details route returns linked package bookings with the fields required by the web design
-- [ ] `PATCH /admin/packages/:id/deactivate` is provider-scoped and rejects non-owned packages
+- [ ] `PATCH /admin/packages/:id/deactivate` is provider-scoped, rejects non-owned packages, and cancels only future confirmed linked appointments while leaving past or already-finalized linked appointments untouched
 - [ ] Cross-provider package access returns 404 or an equivalent protected error shape
 - [ ] `cd packages/api && npx tsc --noEmit` exits 0
 
@@ -154,20 +156,23 @@ T5 + T8 + T9 + T12 → T13
 
 ### T5: Add API regression coverage for provider ownership and delayed completion
 
-**What**: Add focused tests around provider ownership, package lifecycle reevaluation, and package details access so the new rules stay protected as later booking work changes.
+**What**: Add focused tests around provider ownership, package lifecycle reevaluation, package-completion payment reminders, and package details access so the new rules stay protected as later booking work changes.
 **Where**:
 - `packages/api/src/application/use-cases/booking/__tests__/admin-create-appointment.test.ts`
 - new targeted test files where needed under `packages/api/src/**/__tests__/`
 
 **Depends on**: T4
 **Reuses**: Existing mocked-repository Vitest pattern already used in `admin-create-appointment.test.ts`
-**Requirement**: OWN-01, OWN-02, OWN-03, LIFE-01, LIFE-02, LIFE-03, BKD-07, BKD-09, BKD-10, BKD-15, BKD-16
+**Requirement**: OWN-01, OWN-02, OWN-03, LIFE-01, LIFE-02, LIFE-03, PAY-01, BKD-07, BKD-09, BKD-10, BKD-15, BKD-16, BKD-21, BKD-22, BKD-23, BKD-24
 
 **Done when**:
 - [ ] Tests cover rejecting a package owned by a different provider
 - [ ] Tests cover keeping a fully allocated package `active` while a future non-cancelled linked booking still exists
 - [ ] Tests cover moving a package to `completed` only after no future non-cancelled linked bookings remain
+- [ ] Tests cover sending the provider payment reminder only when a package-linked `completed` mutation causes an `active` → `completed` transition
+- [ ] Tests cover not sending that reminder for `no_show` or other non-completion terminal paths
 - [ ] Tests cover package details access being denied across providers
+- [ ] Tests cover package deactivation cancelling future confirmed linked appointments without mutating linked appointments that are already in the past
 - [ ] `cd packages/api && npm test -- --runInBand` passes
 
 **Commit**: `test(api): cover package ownership and lifecycle rules`
@@ -277,6 +282,7 @@ T5 + T8 + T9 + T12 → T13
 - [ ] The page still allows switching to completed, cancelled, and all packages
 - [ ] Search remains client-side on the returned provider-owned package set
 - [ ] Active package cards expose actions such as "Ver detalhes", "Agendar uso", and "Desativar" according to the design
+- [ ] The deactivation confirmation copy explains that future linked appointments will be cancelled while past appointments stay unchanged
 - [ ] Completed and cancelled packages remain visible but read-only for lifecycle actions
 - [ ] `npm -w @soberano/web run build` passes
 
@@ -343,6 +349,7 @@ T5 + T8 + T9 + T12 → T13
 - [ ] There is coverage for opening the shared package workspace after successful package creation
 - [ ] There is coverage for the single-package auto-select vs multi-package explicit-select behavior in `AdminBookingModal`
 - [ ] There is coverage for keeping fully booked packages in the active UI when the API still marks them active because future linked bookings exist
+- [ ] There is coverage for the deactivation confirmation warning future cancellations without mentioning past linked appointments
 - [ ] `npm -w @soberano/web run test` passes
 
 **Commit**: `test(web): cover package workspace and provider-scoped package flows`

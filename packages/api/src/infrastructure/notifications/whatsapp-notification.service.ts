@@ -194,6 +194,29 @@ export class WhatsAppNotificationService {
     await this.sendWithRetry(appointment.barber.phone, barberFullName, message);
   }
 
+  async sendPackagePaymentReminder(
+    appointment: AppointmentWithDetails,
+    totalPriceCents: number,
+  ): Promise<void> {
+    if (!appointment.barber.phone) {
+      console.log(`[WhatsApp] Barber ${appointment.barber.firstName} has no phone configured, skipping package payment reminder`);
+      return;
+    }
+
+    const message = [
+      `💰 *Cobrar pacote*`,
+      ``,
+      `👤 Cliente: ${appointment.customer.name}`,
+      `✂️ Serviço finalizado: ${appointment.service.name}`,
+      `📦 Valor do pacote: ${formatCurrency(totalPriceCents)}`,
+      ``,
+      `O último atendimento do pacote foi concluído. Lembre-se de cobrar o cliente.`,
+    ].join('\n');
+
+    const barberFullName = `${appointment.barber.firstName} ${appointment.barber.lastName}`;
+    await this.sendWithRetry(appointment.barber.phone, barberFullName, message);
+  }
+
   async notifyBarber(appointment: AppointmentWithDetails, event: 'booked' | 'cancelled' | 'changed'): Promise<void> {
     if (!appointment.barber.phone) {
       console.log(`[WhatsApp] Barber ${appointment.barber.firstName} has no phone configured, skipping notification`);
