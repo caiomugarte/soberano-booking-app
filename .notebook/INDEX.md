@@ -4,6 +4,7 @@
 
 | File | Tags | Summary |
 |---|---|---|
+| [admin-appointment-query-invalidation-gotcha.md](admin-appointment-query-invalidation-gotcha.md) | web, admin, react-query, appointments, packages, gotcha | Day, week, and stats views use separate query keys, so package-linked mutations must invalidate all of them |
 | [password-service-stale-js-gotcha.md](password-service-stale-js-gotcha.md) | api, auth, tests, vitest, gotcha | Stale JS artifact in `src/` can shadow the TS password service and break bcrypt imports |
 | [api-runtime-deploy-gotchas.md](api-runtime-deploy-gotchas.md) | deploy, api, cron, coolify, traefik | Shared API deploy model; every API instance also starts reminder cron |
 | [booking-time-step-week-navigation.md](booking-time-step-week-navigation.md) | booking, week-nav, gotcha | getWeekDates is today-anchored; weekOffset must use today as reference, not Monday |
