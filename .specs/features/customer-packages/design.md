@@ -49,6 +49,8 @@ The current codebase does not support the full request as a web-only change:
 
 That means the UI can be redesigned now, but correct provider isolation and lifecycle behavior require API and schema updates.
 
+There is also no package-specific provider payment reminder today. Existing barber notifications cover only new bookings, customer-driven changes/cancellations, and the generic upcoming appointment reminder.
+
 ---
 
 ## Architecture Overview
@@ -223,6 +225,22 @@ export interface AdminBookingInput {
   - `AdminCreateAppointment` uses the presence of `packageId` to choose the notification variant
   - `WhatsAppNotificationService.sendBookingConfirmation` accepts an option or variant to omit the final "Para cancelar ou alterar" block when the booking is package-linked
 
+### Package completion payment reminder rule
+
+- **Purpose**: Remind the provider to collect the package payment when the final package appointment is actually completed
+- **Trigger for this scope**:
+  - an admin package-linked appointment is marked `completed`
+  - package lifecycle reevaluation changes the package from `active` to `completed`
+- **Non-triggers**:
+  - package reaches `completed` after `no_show`
+  - package reaches `completed` after cancellation, deletion, or manual package deactivation
+  - the last appointment is only in the past but has not been explicitly marked `completed`
+- **Implementation direction**:
+  - keep the trigger inside the same package-aware lifecycle service/use case that already reevaluates package status after appointment mutations
+  - compare the package state before and after reevaluation so the reminder is sent only on the `active` → `completed` transition
+  - add a dedicated `WhatsAppNotificationService` method for this barber-facing reminder instead of overloading `notifyBarber()`
+  - include at least `customerName` and `totalPriceCents` in the message body
+
 ### `DashboardPage` (modified)
 
 - **Purpose**: Add "Novo Pacote" button and wire `AdminPackageModal`
@@ -257,6 +275,7 @@ export interface AdminBookingInput {
 | Package page booking UX | Reuse one shared package workspace modal | Keeps scheduling and details logic in one place across post-create and Packages page entry points |
 | Initial Packages page filter | `active` by default | Matches provider mental model and reduces information overload |
 | Package lifecycle label | Stay `active` while future linked bookings exist | Prevents premature completion state when all uses are merely allocated |
+| Provider payment reminder trigger | Only on package `active` → `completed` caused by a `completed` appointment | Avoids asking the barber to charge on `no_show`, cancellation, or manual deactivation |
 
 ---
 
@@ -497,7 +516,7 @@ PackagesPage
   ├── Status filter pills (Todos / Ativos / Concluídos / Cancelados)
   ├── Search input (client-side filter on name/phone)
   └── PackageCard list
-        └── DeactivateModal (confirmation)
+        └── DeactivateModal (confirmation + future-cancellation warning)
 ```
 
 ### New Endpoint: `GET /admin/packages` — extended behavior
@@ -514,11 +533,16 @@ Backward compatible: all existing callers always pass `phone`.
 ### New Endpoint: `PATCH /admin/packages/:id/deactivate`
 
 ```
-→ findByIdAndTenant(id, tenant.id) → 404 if not found
+→ find package by provider scope → 404 if not found
 → if status !== 'active' → 400 VALIDATION_ERROR
-→ update status = 'cancelled'
+→ find linked appointments where status = confirmed and the booking is still in the future
+→ cancel those future appointments (status = cancelled, cancelledAt = now)
+→ leave past / already-finalized linked appointments unchanged
+→ update package status = 'cancelled'
 → 200 with updated package
 ```
+
+Implementation note: this is no longer a trivial repository update. To keep `admin.routes.ts` thin, the cascading cancellation should live in a dedicated application use case or package-aware service that receives the package and appointment repositories.
 
 ### New Repository Method
 
@@ -531,7 +555,7 @@ findAllByTenant(
 
 Implementation: `findMany({ where: { tenantId, ...(status ? { status } : {}) }, orderBy: { createdAt: 'desc' } })`
 
-Also needed: `deactivate(id: string): Promise<CustomerPackageEntity>` — sets `status = 'cancelled'`.
+Also needed: package deactivation logic that can load provider-owned packages, find future linked appointments, cancel only the eligible future bookings, and then persist `status = 'cancelled'`.
 
 ### New Hooks (frontend)
 
@@ -584,6 +608,20 @@ Package list (filtered)
     [Desativar] button (active only)
 DeactivateModal (confirmation)
 ```
+
+**Deactivate modal copy**:
+- warn that future linked appointments will be cancelled
+- explicitly state that appointments that already happened stay unchanged
+- no per-appointment count is required for this scope; generic copy keeps the flow small and avoids another summary endpoint
+
+**Reminder coupling**:
+- `packages/api/src/infrastructure/jobs/reminder.job.ts` only selects upcoming appointments with `status = 'confirmed'`
+- once package deactivation cancels the future linked bookings, no reminder-specific code change is needed to suppress later alerts
+- the package payment reminder is separate from the upcoming-appointment reminder job and should be fired inline from the package lifecycle mutation that closes the package
+
+**Credit policy note**:
+- automatic package credit restoration remains out of scope here
+- package deactivation cancels future bookings, but does not introduce a refund or used-count rollback rule
 
 **Status badge colors** (matching existing patterns):
 - `active`: `text-gold border-gold/30 bg-gold/10`

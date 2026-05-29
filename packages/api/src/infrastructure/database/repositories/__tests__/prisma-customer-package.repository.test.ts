@@ -17,7 +17,7 @@ const basePackageRecord = {
 };
 
 function makeDb() {
-  return {
+  const db = {
     customerPackage: {
       findMany: vi.fn(),
       findFirst: vi.fn(),
@@ -26,8 +26,14 @@ function makeDb() {
     },
     appointment: {
       findFirst: vi.fn(),
+      updateMany: vi.fn(),
     },
-  } as unknown as TenantPrismaClient & {
+    $transaction: vi.fn(),
+  };
+
+  db.$transaction.mockImplementation(async (callback: (tx: typeof db) => Promise<unknown>) => callback(db));
+
+  return db as unknown as TenantPrismaClient & {
     customerPackage: {
       findMany: ReturnType<typeof vi.fn>;
       findFirst: ReturnType<typeof vi.fn>;
@@ -36,7 +42,9 @@ function makeDb() {
     };
     appointment: {
       findFirst: ReturnType<typeof vi.fn>;
+      updateMany: ReturnType<typeof vi.fn>;
     };
+    $transaction: ReturnType<typeof vi.fn>;
   };
 }
 
@@ -108,5 +116,36 @@ describe('PrismaCustomerPackageRepository', () => {
       }),
     );
     expect(result).toBeNull();
+  });
+
+  it('deactivation cancels only future confirmed linked appointments before marking the package cancelled', async () => {
+    const db = makeDb();
+    db.customerPackage.findFirst.mockResolvedValue(basePackageRecord);
+    db.customerPackage.update.mockResolvedValue({
+      ...basePackageRecord,
+      status: 'cancelled',
+      updatedAt: new Date('2026-05-27T12:00:00Z'),
+    });
+    const repository = new PrismaCustomerPackageRepository(db);
+
+    const result = await repository.deactivate('pkg-1', 'tenant-1', 'provider-1');
+
+    expect(db.appointment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          packageId: 'pkg-1',
+          status: 'confirmed',
+        }),
+        data: expect.objectContaining({
+          status: 'cancelled',
+          cancelledAt: expect.any(Date),
+        }),
+      }),
+    );
+    expect(db.customerPackage.update).toHaveBeenCalledWith({
+      where: { id: 'pkg-1' },
+      data: { status: 'cancelled' },
+    });
+    expect(result.status).toBe('cancelled');
   });
 });

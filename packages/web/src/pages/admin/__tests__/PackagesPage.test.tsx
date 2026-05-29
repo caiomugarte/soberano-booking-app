@@ -183,4 +183,36 @@ describe('PackagesPage', () => {
     expect(screen.queryByText('Novo pacote modal')).not.toBeInTheDocument();
     expect(screen.getByText('Workspace pkg-new schedule')).toBeInTheDocument();
   });
+
+  it('warns that deactivation cancels only future confirmed linked bookings', async () => {
+    const user = userEvent.setup();
+    useAdminPackages.mockReturnValue({
+      data: [
+        {
+          id: 'pkg-active',
+          providerId: 'provider-1',
+          customerName: 'Maria',
+          customerPhone: '11999998888',
+          totalUses: 4,
+          usedCount: 1,
+          totalPriceCents: 12000,
+          status: 'active',
+          createdAt: '2026-05-27T12:00:00.000Z',
+          updatedAt: '2026-05-27T12:00:00.000Z',
+        },
+      ],
+      isLoading: false,
+    });
+
+    renderPackagesPage();
+    await user.click(screen.getByRole('button', { name: 'Desativar' }));
+
+    expect(screen.getByText('Desativar pacote?')).toBeInTheDocument();
+    expect(
+      screen.getByText(/agendamentos confirmados futuros deste pacote serao cancelados/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/atendimentos passados e agendamentos que ja foram finalizados permanecem como estao/i),
+    ).toBeInTheDocument();
+  });
 });

@@ -1,4 +1,5 @@
 import type { Prisma, CustomerPackage as PrismaCustomerPackage } from '@prisma/client';
+import { APPOINTMENT_STATUS } from '@soberano/shared';
 import type { TenantPrismaClient } from '../../../config/tenant-prisma.js';
 import type {
   CustomerPackageDetailsEntity,
@@ -178,7 +179,28 @@ export class PrismaCustomerPackageRepository implements CustomerPackageRepositor
     const pkg = await this.db.customerPackage.findFirst({ where: { id, tenantId, providerId } });
     if (!pkg) throw new Error('NOT_FOUND');
     if (pkg.status !== 'active') throw new Error('NOT_ACTIVE');
-    const updated = await this.db.customerPackage.update({ where: { id }, data: { status: 'cancelled' } });
+    const { today, currentTime } = getCurrentLifecycleWindow();
+    const updated = await this.db.$transaction(async (tx) => {
+      await tx.appointment.updateMany({
+        where: {
+          packageId: id,
+          status: APPOINTMENT_STATUS.CONFIRMED,
+          OR: [
+            { date: { gt: today } },
+            { date: today, startTime: { gt: currentTime } },
+          ],
+        },
+        data: {
+          status: APPOINTMENT_STATUS.CANCELLED,
+          cancelledAt: new Date(),
+        },
+      });
+
+      return tx.customerPackage.update({
+        where: { id },
+        data: { status: 'cancelled' },
+      });
+    });
     return mapCustomerPackage(updated);
   }
 

@@ -20,6 +20,7 @@ This creates operational friction and makes the package page unreliable as the s
 - [ ] Provider can inspect package booking dates and manage linked appointments directly from the package flow
 - [ ] Package status remains active until the last booked usage is no longer a future appointment
 - [ ] Packages page opens focused on active packages first, reducing noise
+- [ ] Provider receives a WhatsApp reminder to collect package payment when the final package appointment is completed
 
 ## Out of Scope
 
@@ -31,6 +32,7 @@ This creates operational friction and makes the package page unreliable as the s
 | Customer-facing package view | Admin-only feature for now |
 | Manual credit adjustment | Not requested; deferred |
 | Automatic credit restoration on cancelled package bookings | Not requested in this scope; package lifecycle is corrected, but credit policy remains unchanged |
+| Package payment status tracking or receivables workflow | Not requested; current ask is reminder-only, not a billing ledger |
 | Cross-provider package sharing or reassignment | New rule is the opposite: packages are provider-owned |
 | Pagination on package list | Barbershop scale (<200 packages); full list acceptable |
 
@@ -103,7 +105,7 @@ This creates operational friction and makes the package page unreliable as the s
 3. WHEN the provider changes the status filter THEN system SHALL allow switching between active, completed, cancelled, and all packages
 4. WHEN the provider types in the search field THEN system SHALL filter the visible packages by customer name or phone without requiring a new request
 5. WHEN a package is active and still has remaining usages THEN the package card SHALL expose an "Agendar uso" action
-6. WHEN a package is active THEN the package card SHALL still allow deactivation with confirmation
+6. WHEN a package is active THEN the package card SHALL still allow deactivation with confirmation that warns future linked appointments will be cancelled while past appointments remain unchanged
 7. WHEN a package is completed or cancelled THEN the package card SHALL remain visible but read-only for lifecycle actions
 
 **Independent Test**: Open Packages, confirm only active packages are shown first, switch to "Todos", search by customer name, and confirm package cards expose actions consistent with the package state.
@@ -135,10 +137,27 @@ This creates operational friction and makes the package page unreliable as the s
 1. WHEN a package still has remaining usages THEN its status SHALL be `active`
 2. WHEN a package has no remaining usages but still has future non-cancelled linked appointments THEN its status SHALL remain `active`
 3. WHEN a package has no remaining usages and no future non-cancelled linked appointments left THEN its status SHALL become `completed`
-4. WHEN a package is manually deactivated THEN its status SHALL become `cancelled` regardless of remaining future scheduling opportunities
+4. WHEN a package is manually deactivated THEN its status SHALL become `cancelled`, any future linked confirmed appointments SHALL be cancelled as part of the same action, and linked appointments that already happened SHALL remain unchanged
 5. WHEN the Packages page is filtered to active packages THEN packages that are fully booked but still have future linked appointments SHALL still appear there
 
-**Independent Test**: Fully book a package with two future appointments, verify it still appears as active, then verify it moves to completed only after the last future booking is no longer pending in the future.
+**Independent Test**: Fully book a package with two future appointments, verify it still appears as active, then verify it moves to completed only after the last future booking is no longer pending in the future. Also deactivate a package with one future linked appointment and one past linked appointment, and verify the package becomes cancelled, the future appointment is cancelled, and the past appointment remains unchanged.
+
+---
+
+### P2: Remind the Provider to Collect Package Payment
+
+**User Story**: As a provider, I want a reminder when the last package appointment is completed, so that I remember to ask the customer to pay for the package.
+
+**Why P2**: This is a business follow-up tied to the end of the package lifecycle and should happen automatically inside the same provider-managed flow.
+
+**Acceptance Criteria**:
+
+1. WHEN a package-linked appointment is marked `completed` and that action makes the package transition from `active` to `completed` THEN system SHALL send a WhatsApp reminder to the package owner/provider to collect the package payment
+2. WHEN that reminder is sent THEN it SHALL include at least the customer name and the package total price
+3. WHEN the package reaches `completed` because future bookings were cancelled, marked `no_show`, deleted, or manually deactivated instead of a final completed appointment THEN system SHALL NOT send the payment reminder
+4. WHEN the provider has no phone configured THEN system SHALL skip the reminder without failing the appointment status update
+
+**Independent Test**: Mark the final linked appointment of a fully allocated package as `completed`, verify the package transitions to completed, and verify the provider receives the payment reminder. Repeat with `no_show` and verify no reminder is sent.
 
 ---
 
@@ -166,6 +185,9 @@ This creates operational friction and makes the package page unreliable as the s
 - WHEN `useAdminCustomerPackages` is called with a phone shorter than 10 digits THEN the query SHALL remain disabled
 - WHEN a package-linked booking is created from the package page instead of `AdminBookingModal` THEN the same no-link WhatsApp rule SHALL still apply because the booking is linked by `packageId`
 - WHEN a package is fully booked but still has future linked appointments THEN the web UI SHALL continue presenting it as active
+- WHEN a package is deactivated and some linked appointments are already in the past THEN those past appointments SHALL remain unchanged and SHALL NOT be included in the deactivation warning copy
+- WHEN a package is deactivated and some linked appointments are still future confirmed bookings THEN those future bookings SHALL be cancelled so later reminder jobs no longer treat them as upcoming active appointments
+- WHEN the final package appointment is merely in the past but has not been explicitly marked `completed` in the admin flow THEN the provider payment reminder SHALL NOT fire yet in this scope
 
 ---
 
@@ -232,9 +254,11 @@ Note: The exact endpoint shape can be finalized in design, but the current web c
 
 **Acceptance Criteria**:
 
-1. WHEN called with a valid active package owned by the authenticated provider THEN system SHALL set `status = 'cancelled'` and return the updated package
-2. WHEN the package does not exist or belongs to a different provider THEN system SHALL return `404`
-3. WHEN the package is already completed or cancelled THEN system SHALL return `400 VALIDATION_ERROR`
+1. WHEN called with a valid active package owned by the authenticated provider THEN system SHALL cancel any linked appointments that are still future `confirmed` bookings, set `status = 'cancelled'`, and return the updated package
+2. WHEN linked appointments are already in the past, or already `cancelled`, `completed`, or `no_show`, THEN system SHALL leave them unchanged during package deactivation
+3. WHEN future linked appointments are cancelled by package deactivation THEN later customer and barber reminder jobs SHALL no longer treat them as upcoming active bookings
+4. WHEN the package does not exist or belongs to a different provider THEN system SHALL return `404`
+5. WHEN the package is already completed or cancelled THEN system SHALL return `400 VALIDATION_ERROR`
 
 ---
 
@@ -246,6 +270,17 @@ Note: The exact endpoint shape can be finalized in design, but the current web c
 2. WHEN `usedCount < totalUses` THEN package SHALL remain `active`
 3. WHEN `usedCount >= totalUses` AND at least one future non-cancelled linked appointment still exists THEN package SHALL remain `active`
 4. WHEN `usedCount >= totalUses` AND no future non-cancelled linked appointments remain THEN package SHALL become `completed`
+
+---
+
+### B8: Provider Payment Reminder on Final Package Completion
+
+**Acceptance Criteria**:
+
+1. WHEN a package-linked appointment status is updated to `completed` and package reevaluation transitions that package from `active` to `completed` THEN system SHALL send a WhatsApp reminder to the owning provider to collect payment for the package
+2. WHEN the reminder is sent THEN it SHALL include at least the customer name and the package total price
+3. WHEN the package becomes `completed` through `cancelled`, `no_show`, deletion, or manual deactivation paths THEN system SHALL NOT send the payment reminder
+4. WHEN the provider has no phone configured, or WhatsApp delivery is unavailable, THEN system SHALL skip or log the reminder failure without failing the appointment mutation response
 
 ---
 
@@ -281,6 +316,7 @@ Note: The exact endpoint shape can be finalized in design, but the current web c
 | LIFE-01 | P2: Package stays active while remaining uses exist | Design | Pending |
 | LIFE-02 | P2: Fully booked package stays active while future bookings exist | Design | Pending |
 | LIFE-03 | P2: Package completes only after future lifecycle is resolved | Design | Pending |
+| PAY-01 | P2: Provider reminded to collect package payment on final completion | Design | Pending |
 | BKD-01 | B1: Create package with provider ownership | Design | Pending |
 | BKD-02 | B1: Blank phone stored as null | Design | Pending |
 | BKD-03 | B1: Validation errors on bad input | Design | Pending |
@@ -301,6 +337,10 @@ Note: The exact endpoint shape can be finalized in design, but the current web c
 | BKD-18 | B6: 404 for missing or non-owned package | Design | Pending |
 | BKD-19 | B6: 400 for already completed/cancelled package | Design | Pending |
 | BKD-20 | B7: Reevaluate lifecycle on package-linked booking mutations | Design | Pending |
+| BKD-21 | B8: Send provider payment reminder on active-to-completed transition | Design | Pending |
+| BKD-22 | B8: Reminder includes customer name and package total price | Design | Pending |
+| BKD-23 | B8: No reminder for no_show/cancelled/delete/deactivate completion paths | Design | Pending |
+| BKD-24 | B8: Reminder failure does not fail appointment mutation | Design | Pending |
 
 ---
 
@@ -314,3 +354,4 @@ Note: The exact endpoint shape can be finalized in design, but the current web c
 - [ ] Providers can inspect linked package bookings and manage them from the package context instead of searching the agenda
 - [ ] Packages page defaults to active packages and reduces information overload on first open
 - [ ] Fully booked packages remain active until the last future linked booking is no longer pending in the future
+- [ ] When the last package appointment is marked `completed`, the provider receives a payment-collection reminder with the package amount

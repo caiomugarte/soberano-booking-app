@@ -7,6 +7,7 @@ import type { CustomerPackageRepository } from '../../../domain/repositories/cus
 import type { AppointmentWithDetails } from '../../../domain/entities/appointment.js';
 import { NotFoundError, SlotTakenError, ValidationError } from '../../../shared/errors.js';
 import { WhatsAppNotificationService } from '../../../infrastructure/notifications/whatsapp-notification.service.js';
+import { PackageLifecycleManager } from './package-lifecycle-manager.js';
 
 interface AdminCreateAppointmentInput {
   tenantId: string;
@@ -79,7 +80,14 @@ export class AdminCreateAppointment {
 
     if (input.packageId && this.packageRepo) {
       await this.packageRepo.incrementUsedCount(input.packageId);
-      await this.packageRepo.reevaluateLifecycle(input.packageId);
+      const packageLifecycleManager = new PackageLifecycleManager(this.packageRepo, this.notificationService);
+      await packageLifecycleManager.syncForAppointment({
+        packageId: input.packageId,
+        tenantId: input.tenantId,
+        providerId: input.barberId,
+        event: 'appointment_created',
+        appointment,
+      });
     }
 
     const today = new Date();

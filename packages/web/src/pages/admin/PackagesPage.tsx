@@ -82,6 +82,10 @@ function ConfirmDeactivateModal({
           {pkg.customerName} — {pkg.usedCount}/{pkg.totalUses} usos —{' '}
           {formatCurrency(pkg.totalPriceCents)}
         </p>
+        <p className="text-muted text-sm mb-6">
+          Os agendamentos confirmados futuros deste pacote serao cancelados. Atendimentos passados e
+          agendamentos que ja foram finalizados permanecem como estao.
+        </p>
         <div className="flex gap-3">
           <button
             onClick={onClose}
