@@ -77,7 +77,7 @@ export function useDeleteAppointment() {
     mutationFn: (input: string | { id: string; packageId?: string | null }) =>
       authRequest(`/admin/appointments/${typeof input === 'string' ? input : input.id}`, { method: 'DELETE' }),
     onSuccess: (_data, input) => {
-      queryClient.invalidateQueries({ queryKey: ['admin-appointments'] });
+      invalidateAdminAppointmentQueries(queryClient);
       if (typeof input !== 'string' && input.packageId) {
         invalidatePackageQueries(queryClient);
       }
@@ -123,7 +123,7 @@ export function useUpdateAppointmentStatus() {
         body: JSON.stringify({ status }),
       }),
     onSuccess: (_data, input) => {
-      queryClient.invalidateQueries({ queryKey: ['admin-appointments'] });
+      invalidateAdminAppointmentQueries(queryClient);
       if (input.packageId) {
         invalidatePackageQueries(queryClient);
       }
@@ -140,7 +140,7 @@ export function useAdminCancelAppointment() {
         body: JSON.stringify({ reason }),
       }),
     onSuccess: (_data, input) => {
-      queryClient.invalidateQueries({ queryKey: ['admin-appointments'] });
+      invalidateAdminAppointmentQueries(queryClient);
       if (input.packageId) {
         invalidatePackageQueries(queryClient);
       }
@@ -214,6 +214,12 @@ function invalidatePackageQueries(queryClient: ReturnType<typeof useQueryClient>
   queryClient.invalidateQueries({ queryKey: adminPackageQueryKeys.all });
 }
 
+function invalidateAdminAppointmentQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: ['admin-appointments'] });
+  queryClient.invalidateQueries({ queryKey: ['admin-appointments-range'] });
+  queryClient.invalidateQueries({ queryKey: ['admin-stats'] });
+}
+
 export function useAdminCreateBooking() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -223,7 +229,7 @@ export function useAdminCreateBooking() {
         body: JSON.stringify(input),
       }),
     onSuccess: (_data, input) => {
-      queryClient.invalidateQueries({ queryKey: ['admin-appointments'] });
+      invalidateAdminAppointmentQueries(queryClient);
       if (input.packageId) {
         invalidatePackageQueries(queryClient);
       }
@@ -240,7 +246,7 @@ export function useAdminUpdateAppointmentSchedule() {
         body: JSON.stringify({ serviceId, date, startTime }),
       }),
     onSuccess: (_data, input) => {
-      queryClient.invalidateQueries({ queryKey: ['admin-appointments'] });
+      invalidateAdminAppointmentQueries(queryClient);
       if (input.packageId) {
         invalidatePackageQueries(queryClient);
       }
@@ -257,7 +263,7 @@ export function useAdminUpdateAppointmentCustomer() {
         body: JSON.stringify({ name, phone }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-appointments'] });
+      invalidateAdminAppointmentQueries(queryClient);
     },
   });
 }
@@ -326,6 +332,7 @@ export function useAdminDeactivatePackage() {
       authRequest(`/admin/packages/${id}/deactivate`, { method: 'PATCH' }),
     onSuccess: () => {
       invalidatePackageQueries(queryClient);
+      invalidateAdminAppointmentQueries(queryClient);
     },
   });
 }
