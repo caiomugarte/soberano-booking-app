@@ -11,6 +11,7 @@ import { WhatsAppNotificationService } from '../../infrastructure/notifications/
 import { ChatwootClient } from '../../infrastructure/notifications/chatwoot.client.js';
 import { AdminCreateAppointment } from '../../application/use-cases/booking/admin-create-appointment.js';
 import { PackageLifecycleManager } from '../../application/use-cases/booking/package-lifecycle-manager.js';
+import { DeactivatePackage } from '../../application/use-cases/booking/deactivate-package.js';
 import { APPOINTMENT_STATUS, bookingSchema, createPackageSchema, tenantConfigSchema } from '@soberano/shared';
 import { NotFoundError, SlotTakenError, ValidationError } from '../../shared/errors.js';
 
@@ -426,8 +427,17 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: { id: string } }>('/admin/packages/:id/deactivate', async (request, reply) => {
     const { id } = request.params;
     const packageRepo = new PrismaCustomerPackageRepository(request.tenantPrisma);
+    const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
+    const config = tenantConfigSchema.parse(request.tenant.config);
+    const notificationService = new WhatsAppNotificationService(config, new ChatwootClient(config));
+    const deactivatePackage = new DeactivatePackage(packageRepo, appointmentRepo, notificationService);
     try {
-      const pkg = await packageRepo.deactivate(id, request.tenant.id, request.providerId!);
+      const pkg = await deactivatePackage.execute({
+        id,
+        tenantId: request.tenant.id,
+        providerId: request.providerId!,
+        cancellationReason: 'O pacote vinculado a este agendamento foi desativado.',
+      });
       return { package: pkg };
     } catch (err) {
       if ((err as Error).message === 'NOT_FOUND') return reply.status(404).send({ error: 'NOT_FOUND' });

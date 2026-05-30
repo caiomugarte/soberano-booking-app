@@ -46,10 +46,17 @@ Two requested behaviors cannot be implemented correctly as web-only changes:
 - `packages/api/prisma/schema.prisma:model CustomerPackage` now carries `providerId` and provider-scoped indexes
 - `packages/api/src/infrastructure/database/repositories/prisma-customer-package.repository.ts` now owns the lifecycle reevaluation rule:
   - stay `active` while `usedCount < totalUses`
-  - or while any future non-cancelled linked appointment still exists
+  - or while any linked appointment still in `confirmed` exists
   - otherwise become `completed`
+- A package-linked booking created for a past or already-started slot must also keep the package `active` until that booking is finalized; otherwise the package can be marked `completed` at creation time and the later `completed` mutation never triggers `sendPackagePaymentReminder()`
+- `packages/api/src/application/use-cases/booking/package-lifecycle-manager.ts` now sends the provider reminder when the last open booking is transitioned from `confirmed` to `completed` and the package ends in `completed`, even if the package row was already prematurely marked `completed`
 - `packages/api/src/http/routes/admin.routes.ts` now reevaluates package lifecycle after package-linked admin create, status change, reschedule, cancel, and delete mutations
 - `packages/api/src/application/use-cases/booking/package-lifecycle-manager.ts` is the shared lifecycle helper used by the admin create flow and the package-aware admin mutation routes
+- `packages/api/src/application/use-cases/booking/deactivate-package.ts` is the package-deactivation orchestration path for customer-facing effects:
+  - it gathers the future confirmed linked bookings before deactivation
+  - calls `CustomerPackageRepository.deactivate()`
+  - reloads each cancelled booking through `AppointmentRepository.findById()`
+  - reuses `WhatsAppNotificationService.sendBarberCancellationToCustomer()` with the reason `O pacote vinculado a este agendamento foi desativado.`
 - `packages/web/src/components/admin/PackageWorkspaceModal.tsx` is now the shared package-first modal for both post-create scheduling and packages-page details
 - `packages/web/src/components/admin/AdminPackageModal.tsx` already exposes the reusable creation handoff through `onCreated(pkg)`, and `DashboardPage` opens `PackageWorkspaceModal` in `schedule` mode from that callback
 - `packages/web/src/components/admin/AdminAppointmentCard.tsx`, `AdminEditAppointmentModal.tsx`, and `AdminAppointmentManagementDialogs.tsx` are the reusable admin booking-management pieces that the package workspace can compose instead of duplicating dashboard logic
