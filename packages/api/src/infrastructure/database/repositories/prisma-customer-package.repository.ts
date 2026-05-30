@@ -152,9 +152,9 @@ export class PrismaCustomerPackageRepository implements CustomerPackageRepositor
     if (!pkg) return null;
     if (pkg.status === 'cancelled') return mapCustomerPackage(pkg);
 
-    const hasFutureLinkedAppointments = await this.hasFutureLinkedAppointments(id);
+    const hasOpenLinkedAppointments = await this.hasOpenLinkedAppointments(id);
     const nextStatus: CustomerPackageStatus =
-      pkg.usedCount < pkg.totalUses || hasFutureLinkedAppointments ? 'active' : 'completed';
+      pkg.usedCount < pkg.totalUses || hasOpenLinkedAppointments ? 'active' : 'completed';
 
     if (pkg.status === nextStatus) {
       return mapCustomerPackage(pkg);
@@ -211,16 +211,11 @@ export class PrismaCustomerPackageRepository implements CustomerPackageRepositor
     await this.db.customerPackage.delete({ where: { id } });
   }
 
-  private async hasFutureLinkedAppointments(packageId: string): Promise<boolean> {
-    const { today, currentTime } = getCurrentLifecycleWindow();
+  private async hasOpenLinkedAppointments(packageId: string): Promise<boolean> {
     const appointment = await this.db.appointment.findFirst({
       where: {
         packageId,
-        status: { not: 'cancelled' },
-        OR: [
-          { date: { gt: today } },
-          { date: today, startTime: { gt: currentTime } },
-        ],
+        status: APPOINTMENT_STATUS.CONFIRMED,
       },
       select: { id: true },
     });

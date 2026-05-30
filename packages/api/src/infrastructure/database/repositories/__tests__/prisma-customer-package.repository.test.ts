@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TenantPrismaClient } from '../../../../config/tenant-prisma.js';
 import { PrismaCustomerPackageRepository } from '../prisma-customer-package.repository.js';
 
@@ -49,6 +49,15 @@ function makeDb() {
 }
 
 describe('PrismaCustomerPackageRepository', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-29T18:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('scopes active-by-phone queries to tenant and provider ownership', async () => {
     const db = makeDb();
     db.customerPackage.findMany.mockResolvedValue([basePackageRecord]);
@@ -67,7 +76,7 @@ describe('PrismaCustomerPackageRepository', () => {
     });
   });
 
-  it('keeps a fully allocated package active while a future non-cancelled linked booking still exists', async () => {
+  it('keeps a fully allocated package active while an open confirmed linked booking still exists', async () => {
     const db = makeDb();
     db.customerPackage.findUnique.mockResolvedValue(basePackageRecord);
     db.appointment.findFirst.mockResolvedValue({ id: 'appt-1' });
@@ -79,7 +88,7 @@ describe('PrismaCustomerPackageRepository', () => {
     expect(db.customerPackage.update).not.toHaveBeenCalled();
   });
 
-  it('moves a fully allocated package to completed only after no future non-cancelled linked bookings remain', async () => {
+  it('moves a fully allocated package to completed only after no open confirmed linked bookings remain', async () => {
     const db = makeDb();
     db.customerPackage.findUnique.mockResolvedValue(basePackageRecord);
     db.appointment.findFirst.mockResolvedValue(null);
@@ -92,6 +101,35 @@ describe('PrismaCustomerPackageRepository', () => {
 
     const result = await repository.reevaluateLifecycle('pkg-1');
 
+    expect(db.customerPackage.update).toHaveBeenCalledWith({
+      where: { id: 'pkg-1' },
+      data: { status: 'completed' },
+    });
+    expect(result?.status).toBe('completed');
+  });
+
+  it('does not keep a package active for a same-day appointment already marked completed', async () => {
+    const db = makeDb();
+    db.customerPackage.findUnique.mockResolvedValue(basePackageRecord);
+    db.appointment.findFirst.mockResolvedValue(null);
+    db.customerPackage.update.mockResolvedValue({
+      ...basePackageRecord,
+      status: 'completed',
+      updatedAt: new Date('2026-05-29T18:00:00Z'),
+    });
+    const repository = new PrismaCustomerPackageRepository(db);
+
+    const result = await repository.reevaluateLifecycle('pkg-1');
+
+    expect(db.appointment.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          packageId: 'pkg-1',
+          status: 'confirmed',
+        }),
+        select: { id: true },
+      }),
+    );
     expect(db.customerPackage.update).toHaveBeenCalledWith({
       where: { id: 'pkg-1' },
       data: { status: 'completed' },

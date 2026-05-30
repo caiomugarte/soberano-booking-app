@@ -127,6 +127,39 @@ describe('PackageLifecycleManager', () => {
     expect(notifier.sendPackagePaymentReminder).toHaveBeenCalledWith(appointment, 12000);
   });
 
+  it('still sends the provider payment reminder when the package was already marked completed before the last confirmed booking was finalized', async () => {
+    const packageRepo = makePackageRepo({
+      findByIdForProvider: vi.fn().mockResolvedValue({
+        id: 'pkg-1',
+        tenantId: 'tenant-1',
+        providerId: 'provider-1',
+        customerName: 'Maria',
+        customerPhone: '11999997777',
+        totalUses: 4,
+        usedCount: 4,
+        totalPriceCents: 12000,
+        status: 'completed',
+        createdAt: new Date('2026-06-01T00:00:00Z'),
+        updatedAt: new Date('2026-06-16T11:00:00Z'),
+      }),
+    });
+    const notifier = {
+      sendPackagePaymentReminder: vi.fn().mockResolvedValue(undefined),
+    };
+    const manager = new PackageLifecycleManager(packageRepo, notifier);
+
+    await manager.syncForAppointment({
+      packageId: 'pkg-1',
+      tenantId: 'tenant-1',
+      providerId: 'provider-1',
+      event: 'appointment_completed',
+      appointment,
+    });
+
+    expect(packageRepo.reevaluateLifecycle).toHaveBeenCalledWith('pkg-1');
+    expect(notifier.sendPackagePaymentReminder).toHaveBeenCalledWith(appointment, 12000);
+  });
+
   it('does not send the provider payment reminder for no-show lifecycle completion paths', async () => {
     const packageRepo = makePackageRepo();
     const notifier = {

@@ -1,3 +1,4 @@
+import { APPOINTMENT_STATUS } from '@soberano/shared';
 import type { AppointmentWithDetails } from '../../../domain/entities/appointment.js';
 import type { CustomerPackageRepository } from '../../../domain/repositories/customer-package.repository.js';
 
@@ -48,7 +49,8 @@ export class PackageLifecycleManager {
       input.event !== 'appointment_completed' ||
       !input.appointment ||
       !this.notifier ||
-      previousPackage.status !== 'active' ||
+      input.appointment.status !== APPOINTMENT_STATUS.CONFIRMED ||
+      previousPackage.status === 'cancelled' ||
       nextPackage.status !== 'completed'
     ) {
       return;
