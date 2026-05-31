@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './http-client'
+import { getTodayDateInputValue } from '@/lib/format'
 import type { Patient, PatientFormData } from '@/schemas/patient.schema'
 
 type PatientUpdateData = {
@@ -8,6 +9,11 @@ type PatientUpdateData = {
   email?: string | null
   cpf?: string | null
   notes?: string | null
+  careMode?: Patient['careMode']
+  psychotherapyPriceCents?: Patient['psychotherapyPriceCents'] | null
+  psychotherapyFrequency?: Patient['psychotherapyFrequency'] | null
+  birthDate?: Patient['birthDate'] | null
+  address?: Patient['address'] | null
 }
 
 export function usePatients(search?: string) {
@@ -18,6 +24,20 @@ export function usePatients(search?: string) {
         `/api/psychology/patients${search ? `?search=${encodeURIComponent(search)}` : ''}`,
       ),
   })
+}
+
+function isBirthdayToday(patient: Patient, today: string): boolean {
+  return Boolean(patient.birthDate) && patient.birthDate!.slice(5, 10) === today.slice(5, 10)
+}
+
+export function useTodayBirthdays() {
+  const query = usePatients()
+  const today = getTodayDateInputValue()
+
+  return {
+    ...query,
+    data: (query.data ?? []).filter((patient) => isBirthdayToday(patient, today)),
+  }
 }
 
 export function usePatient(id: string | undefined) {
@@ -36,7 +56,9 @@ export function useCreatePatient() {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['patients'] }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['patients'] })
+    },
   })
 }
 
@@ -48,7 +70,12 @@ export function useUpdatePatient() {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['patients'] }),
+    onSuccess: async (_, variables) => {
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['patients'] }),
+        qc.invalidateQueries({ queryKey: ['patients', variables.id] }),
+      ])
+    },
   })
 }
 
@@ -57,6 +84,8 @@ export function useDeletePatient() {
   return useMutation({
     mutationFn: (id: string) =>
       apiFetch<void>(`/api/psychology/patients/${id}`, { method: 'DELETE' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['patients'] }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ['patients'] })
+    },
   })
 }

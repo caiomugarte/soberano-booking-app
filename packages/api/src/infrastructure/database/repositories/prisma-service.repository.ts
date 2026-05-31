@@ -17,4 +17,14 @@ export class PrismaServiceRepository implements ServiceRepository {
   async findById(id: string): Promise<ServiceEntity | null> {
     return this.db.service.findUnique({ where: { id } });
   }
+
+  async findBySlug(slug: string): Promise<ServiceEntity | null> {
+    return this.db.service.findFirst({
+      where: {
+        slug,
+        isActive: true,
+      },
+      orderBy: { sortOrder: 'asc' },
+    });
+  }
 }

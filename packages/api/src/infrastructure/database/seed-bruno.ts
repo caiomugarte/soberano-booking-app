@@ -14,9 +14,8 @@ const PROVIDER = {
 };
 
 const SERVICES = [
-  { slug: 'individual', name: 'Sessão Individual', icon: '🧠', priceCents: 20000, duration: 50, sortOrder: 1 },
-  { slug: 'casal',      name: 'Sessão de Casal',   icon: '👫', priceCents: 25000, duration: 50, sortOrder: 2 },
-  { slug: 'familiar',   name: 'Sessão Familiar',   icon: '👨‍👩‍👧', priceCents: 30000, duration: 50, sortOrder: 3 },
+  { slug: 'psychotherapy', name: 'Psicoterapia', icon: '🧠', priceCents: 20000, duration: 50, sortOrder: 1 },
+  { slug: 'neuromodulation', name: 'Neuromodulação', icon: '⚡', priceCents: 0, duration: 50, sortOrder: 2 },
 ];
 
 async function seed() {
@@ -71,6 +70,18 @@ async function seed() {
     });
     console.log(`  Service: ${service.name}`);
   }
+
+  await prisma.service.updateMany({
+    where: {
+      tenantId: tenant.id,
+      slug: {
+        in: ['individual', 'couple', 'family', 'casal', 'familiar'],
+      },
+    },
+    data: {
+      isActive: false,
+    },
+  });
 
   console.log('=====================================\n');
   console.log('Seed completed!');

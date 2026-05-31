@@ -1,6 +1,16 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { useAdminPackages, useAdminDeactivatePackage, type CustomerPackage } from '../../api/use-admin.ts';
+import {
+  adminPackageQueryKeys,
+  type CustomerPackage,
+  type CustomerPackageStatus,
+  useAdminDeactivatePackage,
+  useAdminMe,
+  useAdminPackages,
+} from '../../api/use-admin.ts';
+import { AdminPackageModal } from '../../components/admin/AdminPackageModal.tsx';
+import { PackageWorkspaceModal } from '../../components/admin/PackageWorkspaceModal.tsx';
 import { Spinner } from '../../components/ui/Spinner.tsx';
 import { formatCurrency } from '../../lib/format.ts';
 
@@ -16,7 +26,42 @@ const STATUS_COLOR: Record<string, string> = {
   cancelled: 'text-muted border-dark-border bg-dark-surface2',
 };
 
-type StatusFilter = '' | 'active' | 'completed' | 'cancelled';
+type StatusFilter = CustomerPackageStatus | 'all';
+
+interface WorkspaceState {
+  pkg: CustomerPackage;
+  mode: 'details' | 'schedule';
+}
+
+function CreatePackageFab({ onCreate }: { onCreate: () => void }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      {open && <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+        {open && (
+          <button
+            onClick={() => {
+              setOpen(false);
+              onCreate();
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-full bg-dark-surface border border-gold text-gold text-sm font-medium shadow-lg cursor-pointer whitespace-nowrap hover:bg-gold/10 transition-colors"
+          >
+            + Pacote
+          </button>
+        )}
+        <button
+          onClick={() => setOpen((value) => !value)}
+          aria-label={open ? 'Fechar ações de pacote' : 'Abrir ações de pacote'}
+          className="w-14 h-14 rounded-full bg-gold text-dark font-bold text-2xl shadow-lg cursor-pointer flex items-center justify-center transition-transform hover:scale-105 border-none"
+        >
+          {open ? '×' : '+'}
+        </button>
+      </div>
+    </>
+  );
+}
 
 function ConfirmDeactivateModal({
   pkg,
@@ -36,6 +81,10 @@ function ConfirmDeactivateModal({
         <p className="text-muted text-sm mb-6">
           {pkg.customerName} — {pkg.usedCount}/{pkg.totalUses} usos —{' '}
           {formatCurrency(pkg.totalPriceCents)}
+        </p>
+        <p className="text-muted text-sm mb-6">
+          Os agendamentos confirmados futuros deste pacote serao cancelados. Atendimentos passados e
+          agendamentos que ja foram finalizados permanecem como estao.
         </p>
         <div className="flex gap-3">
           <button
@@ -60,11 +109,15 @@ function ConfirmDeactivateModal({
 
 export default function PackagesPage() {
   const navigate = useNavigate();
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('');
+  const queryClient = useQueryClient();
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [search, setSearch] = useState('');
+  const [showPackageModal, setShowPackageModal] = useState(false);
   const [deactivatingPkg, setDeactivatingPkg] = useState<CustomerPackage | null>(null);
+  const [workspace, setWorkspace] = useState<WorkspaceState | null>(null);
 
-  const { data: packages, isLoading } = useAdminPackages(statusFilter || undefined);
+  const { data: me } = useAdminMe();
+  const { data: packages, isLoading } = useAdminPackages(statusFilter === 'all' ? undefined : statusFilter);
   const deactivate = useAdminDeactivatePackage();
 
   const filtered = (packages ?? []).filter((pkg) => {
@@ -78,14 +131,40 @@ export default function PackagesPage() {
   });
 
   const filters: Array<{ label: string; value: StatusFilter }> = [
-    { label: 'Todos', value: '' },
     { label: 'Ativos', value: 'active' },
     { label: 'Concluídos', value: 'completed' },
     { label: 'Cancelados', value: 'cancelled' },
+    { label: 'Todos', value: 'all' },
   ];
+
+  function openWorkspace(pkg: CustomerPackage, mode: 'details' | 'schedule') {
+    setWorkspace({ pkg, mode });
+  }
+
+  function closeWorkspace() {
+    queryClient.invalidateQueries({ queryKey: adminPackageQueryKeys.all });
+    setWorkspace(null);
+  }
 
   return (
     <div className="relative z-10 max-w-[680px] mx-auto px-5 py-8 pb-20">
+      {workspace && (
+        <PackageWorkspaceModal
+          packageId={workspace.pkg.id}
+          initialPackage={workspace.pkg}
+          initialMode={workspace.mode}
+          barberId={me?.id ?? null}
+          onClose={closeWorkspace}
+        />
+      )}
+
+      {showPackageModal && (
+        <AdminPackageModal
+          onClose={() => setShowPackageModal(false)}
+          onCreated={(pkg) => setWorkspace({ pkg, mode: 'schedule' })}
+        />
+      )}
+
       {deactivatingPkg && (
         <ConfirmDeactivateModal
           pkg={deactivatingPkg}
@@ -98,6 +177,8 @@ export default function PackagesPage() {
           }}
         />
       )}
+
+      <CreatePackageFab onCreate={() => setShowPackageModal(true)} />
 
       <div className="flex items-center justify-between mb-8">
         <button
@@ -173,14 +254,32 @@ export default function PackagesPage() {
                 </span>
               </div>
 
-              {pkg.status === 'active' && (
+              <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => setDeactivatingPkg(pkg)}
-                  className="w-full py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer text-xs font-medium"
+                  onClick={() => openWorkspace(pkg, 'details')}
+                  className="flex-1 min-w-[120px] py-2 rounded-lg bg-dark-surface2 border border-dark-border text-muted hover:text-[#F0EDE8] hover:border-gold/40 transition-colors cursor-pointer text-xs font-medium"
                 >
-                  Desativar
+                  Ver detalhes
                 </button>
-              )}
+
+                {pkg.status === 'active' && pkg.usedCount < pkg.totalUses && (
+                  <button
+                    onClick={() => openWorkspace(pkg, 'schedule')}
+                    className="flex-1 min-w-[120px] py-2 rounded-lg bg-gold/10 border border-gold/30 text-gold hover:bg-gold/20 transition-colors cursor-pointer text-xs font-medium"
+                  >
+                    Agendar uso
+                  </button>
+                )}
+
+                {pkg.status === 'active' && (
+                  <button
+                    onClick={() => setDeactivatingPkg(pkg)}
+                    className="flex-1 min-w-[120px] py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors cursor-pointer text-xs font-medium"
+                  >
+                    Desativar
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

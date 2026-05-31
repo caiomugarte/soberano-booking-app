@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import { authGuard } from '../middleware/auth.middleware.js';
 import { PrismaSessionReportRepository } from '../../infrastructure/database/repositories/prisma-session-report.repository.js';
@@ -8,15 +8,35 @@ import { PrismaAppointmentRepository } from '../../infrastructure/database/repos
 import { PrismaCustomerRepository } from '../../infrastructure/database/repositories/prisma-customer.repository.js';
 import { PrismaRecurringAppointmentSeriesRepository } from '../../infrastructure/database/repositories/prisma-recurring-appointment-series.repository.js';
 import { PrismaServiceRepository } from '../../infrastructure/database/repositories/prisma-service.repository.js';
+import { PrismaNeuromodulationProtocolRepository } from '../../infrastructure/database/repositories/prisma-neuromodulation-protocol.repository.js';
 import { ChatwootClient } from '../../infrastructure/notifications/chatwoot.client.js';
 import { CreateRecurringSeriesUseCase } from '../../application/use-cases/booking/create-recurring-series.js';
 import { StopRecurringSeriesUseCase } from '../../application/use-cases/booking/stop-recurring-series.js';
+import { CreateNeuromodulationProtocolUseCase } from '../../application/use-cases/booking/create-neuromodulation-protocol.js';
+import { UpdateNeuromodulationProtocolUseCase } from '../../application/use-cases/booking/update-neuromodulation-protocol.js';
+import { ChangeNeuromodulationProtocolStatusUseCase } from '../../application/use-cases/booking/change-neuromodulation-protocol-status.js';
+import { GetNeuromodulationProtocolUseCase } from '../../application/use-cases/booking/get-neuromodulation-protocol.js';
+import { ListPatientNeuromodulationProtocolsUseCase } from '../../application/use-cases/booking/list-patient-neuromodulation-protocols.js';
+import { CreatePsychologySessionUseCase } from '../../application/use-cases/booking/create-psychology-session.js';
+import { UpdatePsychologySessionUseCase } from '../../application/use-cases/booking/update-psychology-session.js';
+import { DeletePsychologySessionUseCase } from '../../application/use-cases/booking/delete-psychology-session.js';
+import { CreatePatientUseCase } from '../../application/use-cases/patient/create-patient.js';
+import { UpdatePatientUseCase } from '../../application/use-cases/patient/update-patient.js';
+import {
+  normalizePsychologySessionType,
+  resolvePsychologySessionPrice,
+} from '../../application/use-cases/booking/psychology-session.utils.js';
+import { AppError } from '../../shared/errors.js';
 import { tenantConfigSchema } from '@soberano/shared';
 
 const MAX_DATA_LENGTH = 6_800_000;
-const SESSION_DURATION_MINUTES = 50;
 const CPF_INPUT_REGEX = /^[\d.\-\s]*$/;
-const sessionTypeSchema = z.enum(['individual', 'couple', 'family']);
+const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_INPUT_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+const careModeSchema = z.enum(['psychotherapy', 'neuromodulation']);
+const psychotherapyFrequencySchema = z.enum(['weekly', 'biweekly']);
+const sessionTypeSchema = z.enum(['psychotherapy', 'neuromodulation']);
 const appointmentStatusSchema = z.enum([
   'scheduled',
   'confirmed',
@@ -26,16 +46,34 @@ const appointmentStatusSchema = z.enum([
 ]);
 const paymentStatusSchema = z.enum(['pending', 'paid']);
 const paymentMethodSchema = z.enum(['card', 'pix', 'cash']);
-
-function addMinutes(time: string, minutes: number): string {
-  const [h, m] = time.split(':').map(Number);
-  const total = h * 60 + m + minutes;
-  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
-}
+const protocolStatusSchema = z.enum(['active', 'maintenance', 'finished']);
+const protocolCreditActionSchema = z.enum(['release', 'consume']);
+const receivableScopeSchema = z.enum(['all', 'operations-only']);
+const booleanQueryFlagSchema = z.preprocess((value) => {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return value;
+}, z.boolean().optional());
 
 function toDateStr(raw: Date | string): string {
   if (raw instanceof Date) return raw.toISOString().slice(0, 10);
   return String(raw).slice(0, 10);
+}
+
+function toDateTimeStr(raw: Date | string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  if (raw instanceof Date) return raw.toISOString();
+  return String(raw);
+}
+
+function getTodayInSaoPaulo(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+}
+
+function getEarlierDate(left: Date | undefined, right: Date | undefined): Date | undefined {
+  if (!left) return right;
+  if (!right) return left;
+  return left <= right ? left : right;
 }
 
 function normalizeCpf(value: string | null | undefined): string | null | undefined {
@@ -52,6 +90,90 @@ function normalizeEmail(value: string | null | undefined): string | null | undef
 
   const trimmed = value.trim().toLowerCase();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeOptionalText(value: string | null | undefined): string | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeBirthDate(value: string | null | undefined): Date | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  return new Date(`${value}T00:00:00`);
+}
+
+function mapPatient(raw: any) {
+  return {
+    id: raw.id,
+    name: raw.name,
+    phone: raw.phone ?? undefined,
+    email: raw.email ?? undefined,
+    cpf: raw.cpf ?? undefined,
+    notes: raw.notes ?? undefined,
+    careMode: raw.careMode,
+    psychotherapyPriceCents: raw.psychotherapyPriceCents ?? undefined,
+    psychotherapyFrequency: raw.psychotherapyFrequency ?? undefined,
+    birthDate: raw.birthDate ? toDateStr(raw.birthDate) : undefined,
+    address: raw.address ?? undefined,
+    createdAt: toDateTimeStr(raw.createdAt) ?? '',
+    updatedAt: toDateTimeStr(raw.updatedAt),
+  };
+}
+
+function mapToProtocol(raw: any) {
+  return {
+    id: raw.id,
+    patientId: raw.customerId,
+    totalSessions: raw.totalSessions,
+    reservedSessions: raw.reservedSessions,
+    consumedSessions: raw.consumedSessions,
+    remainingSessions: raw.remainingSessions,
+    totalPriceCents: raw.totalPriceCents,
+    status: raw.status,
+    paymentStatus: raw.paymentStatus,
+    paymentMethod: raw.paymentMethod ?? undefined,
+    paidAt: toDateTimeStr(raw.paidAt),
+    notes: raw.notes ?? undefined,
+    createdAt: toDateTimeStr(raw.createdAt) ?? '',
+    updatedAt: toDateTimeStr(raw.updatedAt) ?? '',
+  };
+}
+
+function mapToSession(raw: any) {
+  const type = normalizePsychologySessionType(raw.service?.slug ?? 'psychotherapy');
+  const protocolLinkType =
+    !raw.protocolId
+      ? 'standalone'
+      : raw.protocolCreditOutcome === 'maintenance'
+        ? 'maintenance'
+        : 'protocol';
+
+  return {
+    id: raw.id,
+    patientId: raw.customerId,
+    date: toDateStr(raw.date),
+    startTime: raw.startTime,
+    endTime: raw.endTime,
+    type,
+    status: raw.status,
+    value: raw.priceCents,
+    paymentStatus: raw.paymentStatus,
+    paymentMethod: raw.paymentMethod ?? undefined,
+    paidAt: toDateTimeStr(raw.paidAt),
+    notes: raw.appointmentNotes ?? undefined,
+    recurringSeriesId: raw.recurringSeriesId ?? undefined,
+    recurrenceIntervalWeeks: raw.recurringSeries?.intervalWeeks ?? undefined,
+    recurrenceStatus: raw.recurringSeries?.status ?? undefined,
+    recurrenceStopDate: raw.recurringSeries?.stopDate ? toDateStr(raw.recurringSeries.stopDate) : undefined,
+    protocolId: raw.protocolId ?? undefined,
+    protocolStatus: raw.protocol?.status ?? undefined,
+    protocolCreditOutcome: raw.protocolCreditOutcome ?? undefined,
+    protocolLinkType,
+  };
 }
 
 function getPatientConflictField(error: unknown): 'telefone' | 'CPF' | 'email' | null {
@@ -130,36 +252,25 @@ async function ensureEmailAvailable(params: {
   return null;
 }
 
-function mapToSession(raw: any) {
-  return {
-    id: raw.id,
-    patientId: raw.customerId,
-    date: toDateStr(raw.date),
-    startTime: raw.startTime,
-    endTime: raw.endTime,
-    type: raw.service?.slug ?? 'individual',
-    status: raw.status,
-    value: raw.priceCents,
-    paymentStatus: raw.paymentStatus,
-    paymentMethod: raw.paymentMethod ?? undefined,
-    paidAt: raw.paidAt ?? undefined,
-    notes: raw.appointmentNotes ?? undefined,
-    recurringSeriesId: raw.recurringSeriesId ?? undefined,
-    recurrenceIntervalWeeks: raw.recurringSeries?.intervalWeeks ?? undefined,
-    recurrenceStatus: raw.recurringSeries?.status ?? undefined,
-    recurrenceStopDate: raw.recurringSeries?.stopDate ? toDateStr(raw.recurringSeries.stopDate) : undefined,
-  };
+function sendAppError(reply: FastifyReply, error: unknown) {
+  if (error instanceof AppError) {
+    return reply.status(error.statusCode).send({
+      error: error.code,
+      message: error.message,
+    });
+  }
+
+  throw error;
 }
 
 export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
   app.addHook('preHandler', authGuard);
 
-  // ─── Patient CRUD ───────────────────────────────────────────────────────────
-
   app.get('/psychology/patients', async (request) => {
     const { search } = request.query as { search?: string };
     const customerRepo = new PrismaCustomerRepository(request.tenantPrisma);
-    return customerRepo.findAll(request.tenant.id, search);
+    const patients = await customerRepo.findAll(request.tenant.id, search);
+    return patients.map(mapPatient);
   });
 
   app.post('/psychology/patients', async (request, reply) => {
@@ -169,21 +280,25 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       email: z.string().email().max(255).optional(),
       cpf: z.string().max(20).regex(CPF_INPUT_REGEX, 'CPF inválido').optional(),
       notes: z.string().max(2000).optional(),
+      careMode: careModeSchema,
+      psychotherapyPriceCents: z.number().int().positive().nullable().optional(),
+      psychotherapyFrequency: psychotherapyFrequencySchema.nullable().optional(),
+      birthDate: z.string().regex(DATE_INPUT_REGEX, 'Data de nascimento inválida').nullable().optional(),
+      address: z.string().max(500).nullable().optional(),
     });
     const parsed = schema.safeParse(request.body);
-    if (!parsed.success) return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    }
+
     const customerRepo = new PrismaCustomerRepository(request.tenantPrisma);
-    const { cpf, email, ...rest } = parsed.data;
+    const { cpf, email, address, birthDate, notes, ...rest } = parsed.data;
     const normalizedCpf = normalizeCpf(cpf);
     const normalizedEmail = normalizeEmail(email);
-    const cpfConflict = await ensureCpfAvailable({
-      customerRepo,
-      cpf: normalizedCpf,
-    });
-    const emailConflict = await ensureEmailAvailable({
-      customerRepo,
-      email: normalizedEmail,
-    });
+    const normalizedAddress = normalizeOptionalText(address);
+    const normalizedNotes = normalizeOptionalText(notes);
+    const cpfConflict = await ensureCpfAvailable({ customerRepo, cpf: normalizedCpf });
+    const emailConflict = await ensureEmailAvailable({ customerRepo, email: normalizedEmail });
 
     if (cpfConflict ?? emailConflict) {
       return reply.status(409).send({
@@ -193,27 +308,40 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
     }
 
     try {
-      const customer = await customerRepo.create({
+      const useCase = new CreatePatientUseCase(customerRepo);
+      const patient = await useCase.execute({
         tenantId: request.tenant.id,
         ...rest,
         ...(normalizedEmail ? { email: normalizedEmail } : {}),
         ...(normalizedCpf ? { cpf: normalizedCpf } : {}),
+        ...(normalizedAddress !== undefined ? { address: normalizedAddress } : {}),
+        ...(normalizedNotes !== undefined ? { notes: normalizedNotes } : {}),
+        ...(birthDate !== undefined ? { birthDate: normalizeBirthDate(birthDate) } : {}),
       });
-      return reply.status(201).send(customer);
-    } catch (err: unknown) {
-      const field = getPatientConflictField(err);
+
+      return reply.status(201).send(mapPatient(patient));
+    } catch (error: unknown) {
+      if (error instanceof AppError) {
+        return sendAppError(reply, error);
+      }
+
+      const field = getPatientConflictField(error);
       if (field) {
         return reply.status(409).send({ error: 'CONFLICT', message: `Já existe um paciente com este ${field}.` });
       }
-      throw err;
+
+      throw error;
     }
   });
 
   app.get<{ Params: { id: string } }>('/psychology/patients/:id', async (request, reply) => {
     const customerRepo = new PrismaCustomerRepository(request.tenantPrisma);
-    const customer = await customerRepo.findById(request.params.id);
-    if (!customer) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Paciente não encontrado.' });
-    return customer;
+    const patient = await customerRepo.findById(request.params.id);
+    if (!patient) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Paciente não encontrado.' });
+    }
+
+    return mapPatient(patient);
   });
 
   app.patch<{ Params: { id: string } }>('/psychology/patients/:id', async (request, reply) => {
@@ -223,32 +351,39 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       email: z.string().email().max(255).nullable().optional(),
       cpf: z.string().max(20).regex(CPF_INPUT_REGEX, 'CPF inválido').nullable().optional(),
       notes: z.string().max(2000).nullable().optional(),
-    }).refine((d) => Object.values(d).some((v) => v !== undefined), {
+      careMode: careModeSchema.optional(),
+      psychotherapyPriceCents: z.number().int().positive().nullable().optional(),
+      psychotherapyFrequency: psychotherapyFrequencySchema.nullable().optional(),
+      birthDate: z.string().regex(DATE_INPUT_REGEX, 'Data de nascimento inválida').nullable().optional(),
+      address: z.string().max(500).nullable().optional(),
+    }).refine((data) => Object.values(data).some((value) => value !== undefined), {
       message: 'Informe ao menos um campo para atualizar.',
     });
     const parsed = schema.safeParse(request.body);
-    if (!parsed.success) return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
-    const customerRepo = new PrismaCustomerRepository(request.tenantPrisma);
-    const customer = await customerRepo.findById(request.params.id);
-    if (!customer) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Paciente não encontrado.' });
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    }
 
-    const { cpf, email, ...rest } = parsed.data;
+    const customerRepo = new PrismaCustomerRepository(request.tenantPrisma);
+    const patient = await customerRepo.findById(request.params.id);
+    if (!patient) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Paciente não encontrado.' });
+    }
+
+    const { cpf, email, birthDate, notes, address, ...rest } = parsed.data;
     const normalizedCpf = normalizeCpf(cpf);
     const normalizedEmail = normalizeEmail(email);
-    const updateData = {
-      ...rest,
-      ...(email !== undefined ? { email: normalizedEmail } : {}),
-      ...(cpf !== undefined ? { cpf: normalizedCpf } : {}),
-    };
+    const normalizedNotes = normalizeOptionalText(notes);
+    const normalizedAddress = normalizeOptionalText(address);
     const cpfConflict = await ensureCpfAvailable({
       customerRepo,
       cpf: normalizedCpf,
-      currentCustomerId: customer.id,
+      currentCustomerId: patient.id,
     });
     const emailConflict = await ensureEmailAvailable({
       customerRepo,
       email: normalizedEmail,
-      currentCustomerId: customer.id,
+      currentCustomerId: patient.id,
     });
 
     if (cpfConflict ?? emailConflict) {
@@ -259,35 +394,58 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
     }
 
     try {
-      return await customerRepo.update(request.params.id, updateData);
-    } catch (err: unknown) {
-      const field = getPatientConflictField(err);
+      const useCase = new UpdatePatientUseCase(customerRepo);
+      const updated = await useCase.execute({
+        patientId: request.params.id,
+        changes: {
+          ...rest,
+          ...(email !== undefined ? { email: normalizedEmail } : {}),
+          ...(cpf !== undefined ? { cpf: normalizedCpf } : {}),
+          ...(notes !== undefined ? { notes: normalizedNotes } : {}),
+          ...(address !== undefined ? { address: normalizedAddress } : {}),
+          ...(birthDate !== undefined ? { birthDate: normalizeBirthDate(birthDate) } : {}),
+        },
+      });
+
+      return mapPatient(updated);
+    } catch (error: unknown) {
+      if (error instanceof AppError) {
+        return sendAppError(reply, error);
+      }
+
+      const field = getPatientConflictField(error);
       if (field) {
         return reply.status(409).send({ error: 'CONFLICT', message: `Já existe um paciente com este ${field}.` });
       }
-      throw err;
+
+      throw error;
     }
   });
 
   app.delete<{ Params: { id: string } }>('/psychology/patients/:id', async (request, reply) => {
     const customerRepo = new PrismaCustomerRepository(request.tenantPrisma);
-    const customer = await customerRepo.findById(request.params.id);
-    if (!customer) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Paciente não encontrado.' });
+    const patient = await customerRepo.findById(request.params.id);
+    if (!patient) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Paciente não encontrado.' });
+    }
 
-    const [documentsCount, sessionsCount] = await request.tenantPrisma.$transaction([
+    const [documentsCount, sessionsCount, protocolsCount] = await request.tenantPrisma.$transaction([
       request.tenantPrisma.document.count({
         where: { customerId: request.params.id },
       }),
       request.tenantPrisma.appointment.count({
         where: { customerId: request.params.id },
       }),
+      request.tenantPrisma.neuromodulationProtocol.count({
+        where: { customerId: request.params.id },
+      }),
     ]);
 
-    if (documentsCount > 0 || sessionsCount > 0) {
+    if (documentsCount > 0 || sessionsCount > 0 || protocolsCount > 0) {
       return reply.status(409).send({
         error: 'PATIENT_HAS_DEPENDENCIES',
         message: buildPatientDeleteDependencyMessage({
-          documents: documentsCount,
+          documents: documentsCount + protocolsCount,
           sessions: sessionsCount,
         }),
       });
@@ -305,28 +463,205 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
     return reply.status(204).send();
   });
 
-  // ─── Session CRUD ────────────────────────────────────────────────────────────
+  app.get<{ Params: { id: string } }>('/psychology/patients/:id/protocols', async (request, reply) => {
+    const customerRepo = new PrismaCustomerRepository(request.tenantPrisma);
+    const patient = await customerRepo.findById(request.params.id);
+    if (!patient) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Paciente não encontrado.' });
+    }
 
-  app.get('/psychology/sessions', async (request) => {
-    const { from, to, patientId } = request.query as { from?: string; to?: string; patientId?: string };
+    const protocolRepo = new PrismaNeuromodulationProtocolRepository(request.tenantPrisma);
+    const useCase = new ListPatientNeuromodulationProtocolsUseCase(protocolRepo);
+    const protocols = await useCase.execute(request.params.id);
+    return protocols.map(mapToProtocol);
+  });
+
+  app.post<{ Params: { id: string } }>('/psychology/patients/:id/protocols', async (request, reply) => {
+    const schema = z.object({
+      totalSessions: z.number().int().min(1),
+      totalPriceCents: z.number().int().min(0),
+      status: protocolStatusSchema.optional(),
+      paymentStatus: paymentStatusSchema.optional(),
+      paymentMethod: paymentMethodSchema.nullish(),
+      paidAt: z.string().datetime({ offset: true }).nullish(),
+      notes: z.string().max(2000).nullish(),
+    });
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    }
+
+    const customerRepo = new PrismaCustomerRepository(request.tenantPrisma);
+    const protocolRepo = new PrismaNeuromodulationProtocolRepository(request.tenantPrisma);
+    const useCase = new CreateNeuromodulationProtocolUseCase(customerRepo, protocolRepo);
+
+    try {
+      const protocol = await useCase.execute({
+        tenantId: request.tenant.id,
+        providerId: request.providerId!,
+        customerId: request.params.id,
+        totalSessions: parsed.data.totalSessions,
+        totalPriceCents: parsed.data.totalPriceCents,
+        status: parsed.data.status,
+        paymentStatus: parsed.data.paymentStatus,
+        paymentMethod: parsed.data.paymentMethod ?? null,
+        paidAt: parsed.data.paidAt ? new Date(parsed.data.paidAt) : null,
+        notes: parsed.data.notes ?? null,
+      });
+
+      return reply.status(201).send(mapToProtocol(protocol));
+    } catch (error) {
+      return sendAppError(reply, error);
+    }
+  });
+
+  app.get<{ Params: { id: string } }>('/psychology/protocols/:id', async (request, reply) => {
+    const protocolRepo = new PrismaNeuromodulationProtocolRepository(request.tenantPrisma);
+    const useCase = new GetNeuromodulationProtocolUseCase(protocolRepo);
+
+    try {
+      const protocol = await useCase.execute(request.params.id);
+      return mapToProtocol(protocol);
+    } catch (error) {
+      return sendAppError(reply, error);
+    }
+  });
+
+  app.patch<{ Params: { id: string } }>('/psychology/protocols/:id', async (request, reply) => {
+    const schema = z.object({
+      totalSessions: z.number().int().min(1).optional(),
+      totalPriceCents: z.number().int().min(0).optional(),
+      status: protocolStatusSchema.optional(),
+      paymentStatus: paymentStatusSchema.optional(),
+      paymentMethod: paymentMethodSchema.nullish(),
+      paidAt: z.string().datetime({ offset: true }).nullish(),
+      notes: z.string().max(2000).nullish(),
+    }).refine((data) => Object.values(data).some((value) => value !== undefined), {
+      message: 'Informe ao menos um campo para atualizar.',
+    });
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    }
+
+    const customerRepo = new PrismaCustomerRepository(request.tenantPrisma);
+    const protocolRepo = new PrismaNeuromodulationProtocolRepository(request.tenantPrisma);
+    const useCase = new UpdateNeuromodulationProtocolUseCase(customerRepo, protocolRepo);
+
+    try {
+      const protocol = await useCase.execute({
+        protocolId: request.params.id,
+        totalSessions: parsed.data.totalSessions,
+        totalPriceCents: parsed.data.totalPriceCents,
+        status: parsed.data.status,
+        paymentStatus: parsed.data.paymentStatus,
+        paymentMethod: parsed.data.paymentMethod ?? null,
+        paidAt:
+          parsed.data.paidAt === undefined
+            ? undefined
+            : parsed.data.paidAt
+              ? new Date(parsed.data.paidAt)
+              : null,
+        notes: parsed.data.notes ?? null,
+      });
+
+      return mapToProtocol(protocol);
+    } catch (error) {
+      return sendAppError(reply, error);
+    }
+  });
+
+  app.patch<{ Params: { id: string } }>('/psychology/protocols/:id/status', async (request, reply) => {
+    const schema = z.object({
+      status: protocolStatusSchema,
+    });
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    }
+
+    const protocolRepo = new PrismaNeuromodulationProtocolRepository(request.tenantPrisma);
+    const useCase = new ChangeNeuromodulationProtocolStatusUseCase(protocolRepo);
+
+    try {
+      const protocol = await useCase.execute({
+        protocolId: request.params.id,
+        status: parsed.data.status,
+      });
+
+      return mapToProtocol(protocol);
+    } catch (error) {
+      return sendAppError(reply, error);
+    }
+  });
+
+  app.get('/psychology/sessions', async (request, reply) => {
+    const schema = z.object({
+      from: z.string().regex(DATE_INPUT_REGEX, 'Data inicial inválida').optional(),
+      to: z.string().regex(DATE_INPUT_REGEX, 'Data final inválida').optional(),
+      patientId: z.string().uuid('Paciente inválido').optional(),
+      paymentStatus: paymentStatusSchema.optional(),
+      excludeCancelled: booleanQueryFlagSchema,
+      dueOnly: booleanQueryFlagSchema,
+      receivableScope: receivableScopeSchema.optional(),
+    });
+    const parsed = schema.safeParse(request.query);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    }
+
+    const { from, to, patientId, paymentStatus, excludeCancelled, dueOnly, receivableScope } = parsed.data;
+    const dueCutoffDate = dueOnly ? new Date(`${getTodayInSaoPaulo()}T00:00:00`) : undefined;
+    const upperBound = getEarlierDate(
+      to ? new Date(`${to}T00:00:00`) : undefined,
+      dueCutoffDate,
+    );
     const appointments = await request.tenantPrisma.appointment.findMany({
       where: {
         providerId: request.providerId!,
-        ...(from ? { date: { gte: new Date(from + 'T00:00:00') } } : {}),
-        ...(to ? { date: { lte: new Date(to + 'T00:00:00') } } : {}),
+        ...(from || upperBound
+          ? {
+              date: {
+                ...(from ? { gte: new Date(`${from}T00:00:00`) } : {}),
+                ...(upperBound ? { lte: upperBound } : {}),
+              },
+            }
+          : {}),
         ...(patientId ? { customerId: patientId } : {}),
+        ...(paymentStatus ? { paymentStatus } : {}),
+        ...(excludeCancelled ? { status: { not: 'cancelled' } } : {}),
+        ...(receivableScope === 'operations-only'
+          ? {
+              OR: [
+                { protocolId: null },
+                { protocolCreditOutcome: 'maintenance' },
+              ],
+            }
+          : {}),
       },
-      include: { service: true, customer: true, recurringSeries: true },
+      include: {
+        service: true,
+        customer: true,
+        protocol: {
+          select: {
+            id: true,
+            status: true,
+            totalSessions: true,
+          },
+        },
+        recurringSeries: true,
+      },
       orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
     });
+
     return appointments.map(mapToSession);
   });
 
   app.post('/psychology/sessions', async (request, reply) => {
     const schema = z.object({
       patientId: z.string().uuid(),
-      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
-      startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Horário inválido'),
+      date: z.string().regex(DATE_INPUT_REGEX, 'Data inválida'),
+      startTime: z.string().regex(TIME_INPUT_REGEX, 'Horário inválido'),
       type: sessionTypeSchema,
       value: z.number().int().min(0).optional(),
       notes: z.string().max(2000).optional(),
@@ -334,78 +669,52 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       paymentStatus: paymentStatusSchema.optional(),
       paymentMethod: paymentMethodSchema.optional(),
       paidAt: z.string().datetime({ offset: true }).optional(),
-    }).superRefine((data, ctx) => {
-      const nextPaymentStatus = data.paymentStatus ?? 'pending';
-      if (nextPaymentStatus === 'paid' && !data.paymentMethod) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['paymentMethod'],
-          message: 'Selecione a forma de pagamento.',
-        });
-      }
+      protocolId: z.string().uuid().nullable().optional(),
     });
     const parsed = schema.safeParse(request.body);
-    if (!parsed.success) return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
-
-    const { patientId, date, startTime, type, value, notes, status, paymentStatus, paymentMethod, paidAt } = parsed.data;
-
-    const customer = await request.tenantPrisma.customer.findFirst({
-      where: { id: patientId, tenantId: request.tenant.id },
-    });
-    if (!customer) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Paciente não encontrado.' });
-
-    const service = await request.tenantPrisma.service.findFirst({
-      where: { tenantId: request.tenant.id, slug: type, isActive: true },
-    });
-    if (!service) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Serviço não encontrado.' });
-
-    const endTime = addMinutes(startTime, SESSION_DURATION_MINUTES);
-    const nextPaymentStatus = paymentStatus ?? 'pending';
-    const conflict = await request.tenantPrisma.appointment.findFirst({
-      where: {
-        providerId: request.providerId!,
-        date: new Date(`${date}T00:00:00`),
-        status: { not: 'cancelled' },
-        startTime: { lt: endTime },
-        endTime: { gt: startTime },
-      },
-    });
-
-    if (conflict) {
-      return reply.status(409).send({
-        error: 'CONFLICT',
-        message: 'Já existe uma sessão neste horário.',
-      });
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
     }
 
-    const apt = await request.tenantPrisma.appointment.create({
-      data: {
+    const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
+    const customerRepo = new PrismaCustomerRepository(request.tenantPrisma);
+    const protocolRepo = new PrismaNeuromodulationProtocolRepository(request.tenantPrisma);
+    const serviceRepo = new PrismaServiceRepository(request.tenantPrisma);
+    const useCase = new CreatePsychologySessionUseCase(
+      appointmentRepo,
+      customerRepo,
+      protocolRepo,
+      serviceRepo,
+    );
+
+    try {
+      const appointment = await useCase.execute({
         tenantId: request.tenant.id,
         providerId: request.providerId!,
-        serviceId: service.id,
-        customerId: patientId,
-        date: new Date(date + 'T00:00:00'),
-        startTime,
-        endTime,
-        priceCents: value ?? service.priceCents,
-        status: status ?? 'confirmed',
-        cancelToken: crypto.randomBytes(32).toString('hex'),
-        paymentStatus: nextPaymentStatus,
-        paymentMethod: nextPaymentStatus === 'paid' ? paymentMethod ?? null : null,
-        paidAt: nextPaymentStatus === 'paid' ? (paidAt ? new Date(paidAt) : new Date()) : null,
-        appointmentNotes: notes ?? null,
-      },
-      include: { service: true, customer: true, recurringSeries: true },
-    });
+        patientId: parsed.data.patientId,
+        date: parsed.data.date,
+        startTime: parsed.data.startTime,
+        type: parsed.data.type,
+        valueCents: parsed.data.value,
+        notes: parsed.data.notes ?? null,
+        status: parsed.data.status,
+        paymentStatus: parsed.data.paymentStatus,
+        paymentMethod: parsed.data.paymentMethod ?? null,
+        paidAt: parsed.data.paidAt ? new Date(parsed.data.paidAt) : null,
+        protocolId: parsed.data.protocolId ?? null,
+      });
 
-    return reply.status(201).send(mapToSession(apt));
+      return reply.status(201).send(mapToSession(appointment));
+    } catch (error) {
+      return sendAppError(reply, error);
+    }
   });
 
   app.post('/psychology/recurring-series', async (request, reply) => {
     const schema = z.object({
       patientId: z.string().uuid(),
-      startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
-      startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Horário inválido'),
+      startDate: z.string().regex(DATE_INPUT_REGEX, 'Data inválida'),
+      startTime: z.string().regex(TIME_INPUT_REGEX, 'Horário inválido'),
       type: sessionTypeSchema,
       intervalWeeks: z.number().int().min(1).max(52),
       value: z.number().int().min(0).optional(),
@@ -416,56 +725,76 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
     }
 
-    const { patientId, startDate, startTime, type, intervalWeeks, value, notes } = parsed.data;
+    if (parsed.data.type !== 'psychotherapy') {
+      return reply.status(422).send({
+        error: 'VALIDATION_ERROR',
+        message: 'A recorrência automática está disponível apenas para psicoterapia.',
+      });
+    }
 
-    const customer = await request.tenantPrisma.customer.findFirst({
-      where: { id: patientId, tenantId: request.tenant.id },
-    });
-    if (!customer) {
+    const customerRepo = new PrismaCustomerRepository(request.tenantPrisma);
+    const patient = await customerRepo.findById(parsed.data.patientId);
+    if (!patient) {
       return reply.status(404).send({ error: 'NOT_FOUND', message: 'Paciente não encontrado.' });
     }
 
-    const service = await request.tenantPrisma.service.findFirst({
-      where: { tenantId: request.tenant.id, slug: type, isActive: true },
-    });
+    if (patient.careMode !== 'psychotherapy') {
+      return reply.status(422).send({
+        error: 'VALIDATION_ERROR',
+        message: 'Somente pacientes de psicoterapia podem usar a recorrência automática.',
+      });
+    }
+
+    const serviceRepo = new PrismaServiceRepository(request.tenantPrisma);
+    const service = await serviceRepo.findBySlug('psychotherapy');
     if (!service) {
       return reply.status(404).send({ error: 'NOT_FOUND', message: 'Serviço não encontrado.' });
     }
 
     const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
     const recurringSeriesRepo = new PrismaRecurringAppointmentSeriesRepository(request.tenantPrisma);
-    const serviceRepo = new PrismaServiceRepository(request.tenantPrisma);
     const useCase = new CreateRecurringSeriesUseCase(
       appointmentRepo,
       recurringSeriesRepo,
       serviceRepo,
     );
 
-    const result = await useCase.execute({
-      tenantId: request.tenant.id,
-      providerId: request.providerId!,
-      customerId: patientId,
-      serviceId: service.id,
-      startDate,
-      startTime,
-      intervalWeeks,
-      priceCents: value,
-      notes,
+    const priceCents = resolvePsychologySessionPrice({
+      patient,
+      type: 'psychotherapy',
+      explicitValueCents: parsed.data.value,
+      service,
     });
 
-    return reply.status(201).send({
-      recurringSeriesId: result.series.id,
-      created: result.createdAppointments,
-      cadenceLabel: result.cadenceLabel,
-      protectedUntil: result.protectedUntil,
-    });
+    try {
+      const result = await useCase.execute({
+        tenantId: request.tenant.id,
+        providerId: request.providerId!,
+        customerId: parsed.data.patientId,
+        serviceId: service.id,
+        startDate: parsed.data.startDate,
+        startTime: parsed.data.startTime,
+        intervalWeeks: parsed.data.intervalWeeks,
+        priceCents,
+        notes: parsed.data.notes,
+      });
+
+      return reply.status(201).send({
+        recurringSeriesId: result.series.id,
+        created: result.createdAppointments,
+        cadenceLabel: result.cadenceLabel,
+        protectedUntil: result.protectedUntil,
+      });
+    } catch (error) {
+      return sendAppError(reply, error);
+    }
   });
 
   app.post('/psychology/sessions/batch', async (request, reply) => {
     const schema = z.object({
       patientId: z.string().uuid(),
-      startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
-      startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Horário inválido'),
+      startDate: z.string().regex(DATE_INPUT_REGEX, 'Data inválida'),
+      startTime: z.string().regex(TIME_INPUT_REGEX, 'Horário inválido'),
       type: sessionTypeSchema,
       weeks: z.number().int().min(1).max(52),
       value: z.number().int().min(0).optional(),
@@ -474,76 +803,94 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       paymentStatus: paymentStatusSchema.optional(),
       paymentMethod: paymentMethodSchema.optional(),
       paidAt: z.string().datetime({ offset: true }).optional(),
-    }).superRefine((data, ctx) => {
-      const nextPaymentStatus = data.paymentStatus ?? 'pending';
-      if (nextPaymentStatus === 'paid' && !data.paymentMethod) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ['paymentMethod'],
-          message: 'Selecione a forma de pagamento.',
-        });
-      }
     });
     const parsed = schema.safeParse(request.body);
-    if (!parsed.success) return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    }
 
-    const { patientId, startDate, startTime, type, weeks, value, notes, status, paymentStatus, paymentMethod, paidAt } = parsed.data;
+    if (parsed.data.type !== 'psychotherapy') {
+      return reply.status(422).send({
+        error: 'VALIDATION_ERROR',
+        message: 'A criação em lote é reservada para psicoterapia. Para neuromodulação, agende as sessões gradualmente.',
+      });
+    }
 
-    const customer = await request.tenantPrisma.customer.findFirst({
-      where: { id: patientId, tenantId: request.tenant.id },
+    const customerRepo = new PrismaCustomerRepository(request.tenantPrisma);
+    const patient = await customerRepo.findById(parsed.data.patientId);
+    if (!patient) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Paciente não encontrado.' });
+    }
+
+    if (patient.careMode !== 'psychotherapy') {
+      return reply.status(422).send({
+        error: 'VALIDATION_ERROR',
+        message: 'Somente pacientes de psicoterapia podem usar a criação em lote.',
+      });
+    }
+
+    const serviceRepo = new PrismaServiceRepository(request.tenantPrisma);
+    const service = await serviceRepo.findBySlug('psychotherapy');
+    if (!service) {
+      return reply.status(404).send({ error: 'NOT_FOUND', message: 'Serviço não encontrado.' });
+    }
+
+    const nextPaymentStatus = parsed.data.paymentStatus ?? 'pending';
+    if (nextPaymentStatus === 'paid' && !parsed.data.paymentMethod) {
+      return reply.status(422).send({
+        error: 'VALIDATION_ERROR',
+        message: 'Selecione a forma de pagamento.',
+      });
+    }
+
+    const priceCents = resolvePsychologySessionPrice({
+      patient,
+      type: 'psychotherapy',
+      explicitValueCents: parsed.data.value,
+      service,
     });
-    if (!customer) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Paciente não encontrado.' });
 
-    const service = await request.tenantPrisma.service.findFirst({
-      where: { tenantId: request.tenant.id, slug: type, isActive: true },
-    });
-    if (!service) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Serviço não encontrado.' });
+    const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
+    const createUseCase = new CreatePsychologySessionUseCase(
+      appointmentRepo,
+      customerRepo,
+      new PrismaNeuromodulationProtocolRepository(request.tenantPrisma),
+      serviceRepo,
+    );
 
-    const endTime = addMinutes(startTime, SESSION_DURATION_MINUTES);
-    const baseDate = new Date(startDate + 'T12:00:00');
-    const nextPaymentStatus = paymentStatus ?? 'pending';
+    const baseDate = new Date(`${parsed.data.startDate}T12:00:00`);
     let created = 0;
     let skipped = 0;
 
-    for (let i = 0; i < weeks; i++) {
-      const d = new Date(baseDate);
-      d.setDate(d.getDate() + i * 7);
-      const dateStr = d.toISOString().slice(0, 10);
+    for (let index = 0; index < parsed.data.weeks; index++) {
+      const date = new Date(baseDate);
+      date.setDate(date.getDate() + index * 7);
+      const dateStr = date.toISOString().slice(0, 10);
 
-      const conflict = await request.tenantPrisma.appointment.findFirst({
-        where: {
-          providerId: request.providerId!,
-          date: new Date(`${dateStr}T00:00:00`),
-          status: { not: 'cancelled' },
-          startTime: { lt: endTime },
-          endTime: { gt: startTime },
-        },
-      });
-
-      if (conflict) {
-        skipped++;
-        continue;
-      }
-
-      await request.tenantPrisma.appointment.create({
-        data: {
+      try {
+        await createUseCase.execute({
           tenantId: request.tenant.id,
           providerId: request.providerId!,
-          serviceId: service.id,
-          customerId: patientId,
-          date: new Date(dateStr + 'T00:00:00'),
-          startTime,
-          endTime,
-          priceCents: value ?? service.priceCents,
-          status: status ?? 'confirmed',
-          cancelToken: crypto.randomBytes(32).toString('hex'),
+          patientId: parsed.data.patientId,
+          date: dateStr,
+          startTime: parsed.data.startTime,
+          type: 'psychotherapy',
+          valueCents: priceCents,
+          notes: parsed.data.notes ?? null,
+          status: parsed.data.status ?? 'scheduled',
           paymentStatus: nextPaymentStatus,
-          paymentMethod: nextPaymentStatus === 'paid' ? paymentMethod ?? null : null,
-          paidAt: nextPaymentStatus === 'paid' ? (paidAt ? new Date(paidAt) : new Date()) : null,
-          appointmentNotes: notes ?? null,
-        },
-      });
-      created++;
+          paymentMethod: parsed.data.paymentMethod ?? null,
+          paidAt: parsed.data.paidAt ? new Date(parsed.data.paidAt) : null,
+        });
+        created++;
+      } catch (error) {
+        if (error instanceof AppError && error.code === 'VALIDATION_ERROR' && error.message === 'Já existe uma sessão neste horário.') {
+          skipped++;
+          continue;
+        }
+
+        return sendAppError(reply, error);
+      }
     }
 
     return reply.status(201).send({ created, skipped });
@@ -551,7 +898,7 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch<{ Params: { id: string } }>('/psychology/recurring-series/:id/stop', async (request, reply) => {
     const schema = z.object({
-      stopDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
+      stopDate: z.string().regex(DATE_INPUT_REGEX, 'Data inválida'),
     });
     const parsed = schema.safeParse(request.body);
     if (!parsed.success) {
@@ -565,170 +912,109 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       recurringSeriesRepo,
     );
 
-    const result = await useCase.execute({
-      seriesId: request.params.id,
-      providerId: request.providerId!,
-      stopDate: parsed.data.stopDate,
-    });
+    try {
+      const result = await useCase.execute({
+        seriesId: request.params.id,
+        providerId: request.providerId!,
+        stopDate: parsed.data.stopDate,
+      });
 
-    return reply.status(200).send({
-      recurringSeriesId: result.series.id,
-      stopDate: toDateStr(result.series.stopDate!),
-      removedAppointments: result.removedAppointments,
-    });
+      return reply.status(200).send({
+        recurringSeriesId: result.series.id,
+        stopDate: toDateStr(result.series.stopDate!),
+        removedAppointments: result.removedAppointments,
+      });
+    } catch (error) {
+      return sendAppError(reply, error);
+    }
   });
 
   app.patch<{ Params: { id: string } }>('/psychology/sessions/:id', async (request, reply) => {
     const schema = z.object({
       patientId: z.string().uuid().optional(),
-      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida').optional(),
-      startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Horário inválido').optional(),
+      date: z.string().regex(DATE_INPUT_REGEX, 'Data inválida').optional(),
+      startTime: z.string().regex(TIME_INPUT_REGEX, 'Horário inválido').optional(),
       type: sessionTypeSchema.optional(),
       value: z.number().int().min(0).optional(),
       notes: z.string().max(2000).nullable().optional(),
       status: appointmentStatusSchema.optional(),
       paymentStatus: paymentStatusSchema.optional(),
-      paymentMethod: paymentMethodSchema.optional(),
+      paymentMethod: paymentMethodSchema.nullish(),
       paidAt: z.string().datetime({ offset: true }).nullable().optional(),
-    }).refine((d) => Object.values(d).some((v) => v !== undefined), {
+      protocolId: z.string().uuid().nullable().optional(),
+      protocolCreditAction: protocolCreditActionSchema.optional(),
+    }).refine((data) => Object.values(data).some((value) => value !== undefined), {
       message: 'Informe ao menos um campo para atualizar.',
     });
     const parsed = schema.safeParse(request.body);
-    if (!parsed.success) return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    }
 
-    const appointment = await request.tenantPrisma.appointment.findFirst({
-      where: {
-        id: request.params.id,
+    const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
+    const customerRepo = new PrismaCustomerRepository(request.tenantPrisma);
+    const protocolRepo = new PrismaNeuromodulationProtocolRepository(request.tenantPrisma);
+    const serviceRepo = new PrismaServiceRepository(request.tenantPrisma);
+    const useCase = new UpdatePsychologySessionUseCase(
+      appointmentRepo,
+      customerRepo,
+      protocolRepo,
+      serviceRepo,
+    );
+
+    try {
+      const appointment = await useCase.execute({
+        appointmentId: request.params.id,
         providerId: request.providerId!,
-      },
-      include: { service: true, customer: true, recurringSeries: true },
-    });
-    if (!appointment) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Sessão não encontrada.' });
-
-    const { patientId, date, startTime, type, value, notes, status, paymentStatus, paymentMethod, paidAt } = parsed.data;
-
-    if (patientId) {
-      const customer = await request.tenantPrisma.customer.findFirst({
-        where: { id: patientId, tenantId: request.tenant.id },
-      });
-      if (!customer) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Paciente não encontrado.' });
-    }
-
-    let nextServiceId = appointment.serviceId;
-    if (type) {
-      const service = await request.tenantPrisma.service.findFirst({
-        where: { tenantId: request.tenant.id, slug: type, isActive: true },
-      });
-      if (!service) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Serviço não encontrado.' });
-      nextServiceId = service.id;
-    }
-
-    const nextDate = date ?? toDateStr(appointment.date);
-    const nextStartTime = startTime ?? appointment.startTime;
-    const nextStatus = status ?? appointment.status;
-    const nextEndTime =
-      date !== undefined || startTime !== undefined || type !== undefined
-        ? addMinutes(nextStartTime, SESSION_DURATION_MINUTES)
-        : appointment.endTime;
-
-    const shouldCheckConflict =
-      nextStatus !== 'cancelled' &&
-      (
-        date !== undefined ||
-        startTime !== undefined ||
-        type !== undefined ||
-        (appointment.status === 'cancelled' && status !== undefined && status !== 'cancelled')
-      );
-
-    if (shouldCheckConflict) {
-      const conflict = await request.tenantPrisma.appointment.findFirst({
-        where: {
-          providerId: request.providerId!,
-          date: new Date(nextDate + 'T00:00:00'),
-          status: { not: 'cancelled' },
-          id: { not: appointment.id },
-          startTime: { lt: nextEndTime },
-          endTime: { gt: nextStartTime },
-        },
+        patientId: parsed.data.patientId,
+        date: parsed.data.date,
+        startTime: parsed.data.startTime,
+        type: parsed.data.type,
+        valueCents: parsed.data.value,
+        notes: parsed.data.notes ?? null,
+        status: parsed.data.status,
+        paymentStatus: parsed.data.paymentStatus,
+        paymentMethod: parsed.data.paymentMethod ?? null,
+        paidAt:
+          parsed.data.paidAt === undefined
+            ? undefined
+            : parsed.data.paidAt
+              ? new Date(parsed.data.paidAt)
+              : null,
+        protocolId: parsed.data.protocolId,
+        protocolCreditAction: parsed.data.protocolCreditAction,
       });
 
-      if (conflict) {
-        return reply.status(409).send({
-          error: 'CONFLICT',
-          message: 'Já existe uma sessão neste horário.',
-        });
-      }
+      return mapToSession(appointment);
+    } catch (error) {
+      return sendAppError(reply, error);
     }
-
-    const nextPaymentStatus = paymentStatus ?? appointment.paymentStatus;
-    const nextPaymentMethod =
-      nextPaymentStatus === 'pending'
-        ? null
-        : paymentMethod !== undefined
-          ? paymentMethod
-          : appointment.paymentMethod ?? null;
-
-    if (nextPaymentStatus === 'paid' && !nextPaymentMethod) {
-      return reply.status(400).send({
-        error: 'VALIDATION_ERROR',
-        message: 'Selecione a forma de pagamento.',
-      });
-    }
-
-    let nextPaidAt: Date | null | undefined;
-    if (nextPaymentStatus === 'pending') {
-      nextPaidAt = null;
-    } else if (nextPaymentStatus === 'paid') {
-      nextPaidAt =
-        paidAt !== undefined
-          ? paidAt
-            ? new Date(paidAt)
-            : appointment.paidAt ?? new Date()
-          : appointment.paidAt ?? new Date();
-    } else if (paidAt !== undefined) {
-      nextPaidAt = paidAt ? new Date(paidAt) : null;
-    }
-
-    const updated = await request.tenantPrisma.appointment.update({
-      where: { id: request.params.id },
-      data: {
-        ...(patientId !== undefined ? { customerId: patientId } : {}),
-        ...(date !== undefined ? { date: new Date(nextDate + 'T00:00:00') } : {}),
-        ...(startTime !== undefined ? { startTime: nextStartTime } : {}),
-        ...(type !== undefined ? { serviceId: nextServiceId } : {}),
-        ...(nextEndTime !== appointment.endTime ? { endTime: nextEndTime } : {}),
-        ...(value !== undefined ? { priceCents: value } : {}),
-        ...(notes !== undefined ? { appointmentNotes: notes } : {}),
-        ...(status !== undefined ? { status: nextStatus } : {}),
-        ...(paymentStatus !== undefined ? { paymentStatus: nextPaymentStatus } : {}),
-        ...(paymentStatus !== undefined || paymentMethod !== undefined ? { paymentMethod: nextPaymentMethod } : {}),
-        ...(nextPaidAt !== undefined ? { paidAt: nextPaidAt } : {}),
-      },
-      include: { service: true, customer: true, recurringSeries: true },
-    });
-
-    return mapToSession(updated);
   });
 
   app.delete<{ Params: { id: string } }>('/psychology/sessions/:id', async (request, reply) => {
-    const appointment = await request.tenantPrisma.appointment.findFirst({
-      where: {
-        id: request.params.id,
-        providerId: request.providerId!,
-      },
+    const schema = z.object({
+      protocolCreditAction: protocolCreditActionSchema.optional(),
     });
-    if (!appointment) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Sessão não encontrada.' });
+    const parsed = schema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    }
 
-    await request.tenantPrisma.$transaction([
-      request.tenantPrisma.sessionReport.deleteMany({
-        where: { appointmentId: appointment.id },
-      }),
-      request.tenantPrisma.appointment.delete({
-        where: { id: appointment.id },
-      }),
-    ]);
+    const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
+    const protocolRepo = new PrismaNeuromodulationProtocolRepository(request.tenantPrisma);
+    const useCase = new DeletePsychologySessionUseCase(appointmentRepo, protocolRepo);
 
-    return reply.status(204).send();
+    try {
+      await useCase.execute({
+        appointmentId: request.params.id,
+        providerId: request.providerId!,
+        protocolCreditAction: parsed.data.protocolCreditAction,
+      });
+
+      return reply.status(204).send();
+    } catch (error) {
+      return sendAppError(reply, error);
+    }
   });
 
   app.post<{ Params: { id: string } }>('/psychology/sessions/:id/send-payment-reminder', async (request, reply) => {
@@ -761,8 +1047,6 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
     await chatwootClient.sendToPhone(session.customer.phone, session.customer.name, message);
     return reply.status(204).send();
   });
-
-  // ─── Session Reports ──────────────────────────────────────────────────────────
 
   app.post<{ Params: { sessionId: string } }>('/psychology/sessions/:sessionId/reports', async (request, reply) => {
     const { sessionId } = request.params;
@@ -806,10 +1090,9 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
     return reportRepo.findByAppointment(sessionId);
   });
 
-  app.get<{ Params: { patientId: string } }>('/psychology/patients/:patientId/reports', async (request, reply) => {
-    const { patientId } = request.params;
+  app.get<{ Params: { patientId: string } }>('/psychology/patients/:patientId/reports', async (request) => {
     const reportRepo = new PrismaSessionReportRepository(request.tenantPrisma);
-    return reportRepo.findByPatient(patientId);
+    return reportRepo.findByPatient(request.params.patientId);
   });
 
   app.get<{ Params: { id: string } }>('/psychology/reports/:id', async (request, reply) => {
@@ -841,8 +1124,6 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
     await reportRepo.deleteById(request.params.id);
     return reply.status(204).send();
   });
-
-  // ─── Documents ────────────────────────────────────────────────────────────────
 
   app.post<{ Params: { patientId: string } }>('/psychology/patients/:patientId/documents', async (request, reply) => {
     const { patientId } = request.params;
@@ -879,7 +1160,6 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
     const customer = await customerRepo.findById(patientId);
     if (!customer) return reply.status(404).send({ error: 'NOT_FOUND', message: 'Paciente não encontrado.' });
 
-    // Include data field so clients can download documents
     return request.tenantPrisma.document.findMany({
       where: { customerId: patientId },
       orderBy: { createdAt: 'desc' },

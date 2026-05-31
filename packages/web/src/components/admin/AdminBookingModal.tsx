@@ -30,6 +30,8 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
   const { data: packages } = useAdminCustomerPackages(lookupPhone);
   const createBooking = useAdminCreateBooking();
   const { data: slots } = useSlots(barberId, date || null);
+  const usablePackages = (packages ?? []).filter((pkg) => pkg.status === 'active' && pkg.usedCount < pkg.totalUses);
+  const usablePackageIds = usablePackages.map((pkg) => pkg.id).join('|');
 
   // Debounced lookup trigger
   useEffect(() => {
@@ -54,9 +56,20 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
   }, [lookupPhone]);
 
   useEffect(() => {
-    const active = (packages ?? []).filter((p) => p.status === 'active');
-    if (active.length === 1) setSelectedPackageId(active[0].id);
-  }, [packages]);
+    if (usablePackages.length === 0) {
+      setSelectedPackageId(null);
+      return;
+    }
+
+    if (usablePackages.length === 1) {
+      setSelectedPackageId(usablePackages[0].id);
+      return;
+    }
+
+    setSelectedPackageId((current) => (
+      usablePackages.some((pkg) => pkg.id === current) ? current : null
+    ));
+  }, [usablePackageIds]);
 
   // Close on success
   useEffect(() => {
@@ -137,13 +150,13 @@ export function AdminBookingModal({ barberId, onClose }: AdminBookingModalProps)
           onChange={(e) => setName(e.target.value)}
         />
 
-        {(packages ?? []).filter((p) => p.status === 'active').length > 0 && (
+        {usablePackages.length > 0 && (
           <div className="mb-5">
             <label className="block text-[11px] tracking-[0.12em] uppercase text-muted mb-2">
               Pacote
             </label>
             <div className="flex flex-wrap gap-1.5">
-              {(packages ?? []).filter((p) => p.status === 'active').map((p) => (
+              {usablePackages.map((p) => (
                 <button
                   key={p.id}
                   type="button"

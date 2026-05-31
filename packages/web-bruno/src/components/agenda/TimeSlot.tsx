@@ -28,6 +28,11 @@ const statusBg: Record<string, string> = {
   no_show: 'bg-amber-50/50',
 }
 
+const sessionTypeDot: Record<Appointment['type'], string> = {
+  psychotherapy: 'bg-sky-500',
+  neuromodulation: 'bg-rose-500',
+}
+
 export function TimeSlot({
   time,
   appointment,
@@ -68,7 +73,11 @@ export function TimeSlot({
         <AppointmentStatusBadge status={appointment.status} />
         <PaymentStatusBadge status={appointment.paymentStatus} />
       </div>
-      <span className="text-[10px] text-gray-400">
+      <span className="mt-0.5 inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white/80 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+        <span
+          aria-hidden="true"
+          className={`h-2 w-2 rounded-full ${sessionTypeDot[appointment.type]}`}
+        />
         {SESSION_TYPE_LABELS[appointment.type]}
       </span>
     </button>

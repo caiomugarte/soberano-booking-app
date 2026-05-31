@@ -8,6 +8,7 @@ import { Sidebar } from './components/ui/Sidebar'
 
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
+import AppointmentsPage from './pages/AppointmentsPage'
 import PatientsPage from './pages/PatientsPage'
 import PatientDetailPage from './pages/PatientDetailPage'
 import FinancialPage from './pages/FinancialPage'
@@ -80,6 +81,7 @@ export function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route element={<ProtectedRoute />}>
             <Route index element={<DashboardPage />} />
+            <Route path="agendamentos" element={<AppointmentsPage />} />
             <Route path="pacientes" element={<PatientsPage />} />
             <Route path="pacientes/:id" element={<PatientDetailPage />} />
             <Route path="financeiro" element={<FinancialPage />} />

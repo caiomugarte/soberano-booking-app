@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { usePatients, useCreatePatient } from '@/api/patients'
+import { usePatientProtocols } from '@/api/protocols'
 import {
   useCreateAppointment,
   useCreateRecurringAppointments,
@@ -19,11 +20,13 @@ import {
   STATUS_LABELS,
   TIME_SLOTS,
 } from '@/config/constants'
+import { isRevenueProtocolLink } from '@/lib/appointment-pricing'
 import { dateInputToIso, getTodayDateInputValue, toDateInputValue } from '@/lib/format'
 import type {
   Appointment,
   PaymentMethod,
   PaymentStatus,
+  ProtocolCreditAction,
   SessionType,
   AppointmentStatus,
 } from '@/schemas/appointment.schema'
@@ -80,7 +83,7 @@ export function AppointmentForm({
   const [patientId, setPatientId] = useState(appointment?.patientId ?? defaultPatientId ?? '')
   const [date, setDate] = useState(appointment?.date ?? defaultDate ?? '')
   const [startTime, setStartTime] = useState(appointment?.startTime ?? defaultTime ?? '')
-  const [type, setType] = useState<SessionType>(appointment?.type ?? 'individual')
+  const [type, setType] = useState<SessionType>(appointment?.type ?? 'psychotherapy')
   const [value, setValue] = useState(
     appointment ? String(appointment.value / 100) : '',
   )
@@ -88,6 +91,8 @@ export function AppointmentForm({
   const [recurring, setRecurring] = useState(false)
   const [intervalWeeks, setIntervalWeeks] = useState('1')
   const [status, setStatus] = useState<AppointmentStatus>(appointment?.status ?? 'scheduled')
+  const [protocolId, setProtocolId] = useState(appointment?.protocolId ?? '')
+  const [protocolCreditAction, setProtocolCreditAction] = useState<ProtocolCreditAction>('release')
   const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(
     appointment?.paymentStatus ?? 'pending',
   )
@@ -112,12 +117,18 @@ export function AppointmentForm({
   const [newName, setNewName] = useState('')
   const [newPhone, setNewPhone] = useState('')
   const [newEmail, setNewEmail] = useState('')
+  const [newCareMode, setNewCareMode] = useState<'psychotherapy' | 'neuromodulation'>('psychotherapy')
+  const [newPsychotherapyPrice, setNewPsychotherapyPrice] = useState('')
+  const [newPsychotherapyFrequency, setNewPsychotherapyFrequency] = useState('')
+  const [newBirthDate, setNewBirthDate] = useState('')
+  const [newAddress, setNewAddress] = useState('')
   const [createError, setCreateError] = useState('')
+  const { data: protocols = [] } = usePatientProtocols(patientId || undefined)
 
   useEffect(() => {
     if (!open) return
 
-    const selectedType = appointment?.type ?? 'individual'
+    const selectedType = appointment?.type ?? 'psychotherapy'
 
     setMode('session')
     setPatientId(appointment?.patientId ?? defaultPatientId ?? '')
@@ -129,6 +140,8 @@ export function AppointmentForm({
     setRecurring(false)
     setIntervalWeeks('1')
     setStatus(appointment?.status ?? 'scheduled')
+    setProtocolId(appointment?.protocolId ?? '')
+    setProtocolCreditAction('release')
     setPaymentStatus(appointment?.paymentStatus ?? 'pending')
     setPaymentMethod(appointment?.paymentMethod ?? '')
     setPaymentDate(getAppointmentPaymentDate(appointment))
@@ -145,10 +158,43 @@ export function AppointmentForm({
     setNewName('')
     setNewPhone('')
     setNewEmail('')
+    setNewCareMode('psychotherapy')
+    setNewPsychotherapyPrice('')
+    setNewPsychotherapyFrequency('')
+    setNewBirthDate('')
+    setNewAddress('')
     setCreateError('')
     setPatientSearch('')
     setPatientDropdownOpen(false)
   }, [appointment, defaultDate, defaultPatientId, defaultTime, open])
+
+  useEffect(() => {
+    if (isEditMode || !patientId) return
+
+    const patient = patients.find((item) => item.id === patientId)
+    if (!patient) return
+
+    setType(patient.careMode)
+    setProtocolId('')
+    if (patient.careMode === 'neuromodulation') {
+      setMode('session')
+      setRecurring(false)
+    }
+
+    if (patient.careMode === 'psychotherapy') {
+      if (patient.psychotherapyPriceCents) {
+        setValue(String(patient.psychotherapyPriceCents / 100))
+      }
+
+      if (patient.psychotherapyFrequency === 'weekly') {
+        setIntervalWeeks('1')
+      }
+
+      if (patient.psychotherapyFrequency === 'biweekly') {
+        setIntervalWeeks('2')
+      }
+    }
+  }, [isEditMode, patientId, patients])
 
   function handleSuccessfulSubmit(message?: string) {
     if (onSuccess) {
@@ -161,6 +207,17 @@ export function AppointmentForm({
 
   function handleTypeChange(newType: SessionType) {
     setType(newType)
+    if (newType === 'neuromodulation') {
+      setMode('session')
+      setRecurring(false)
+    }
+
+    const selectedPatient = patients.find((patient) => patient.id === patientId)
+    if (newType === 'psychotherapy' && selectedPatient?.psychotherapyPriceCents) {
+      setValue(String(selectedPatient.psychotherapyPriceCents / 100))
+      return
+    }
+
     if (servicesData) {
       const service = servicesData.services.find((s) => s.slug === newType)
       setValue(String((service?.priceCents ?? 0) / 100))
@@ -182,14 +239,37 @@ export function AppointmentForm({
   function handleCreatePatient(e: FormEvent) {
     e.preventDefault()
     setCreateError('')
+    const psychotherapyPriceCents =
+      newCareMode === 'psychotherapy' && newPsychotherapyPrice
+        ? Math.round(Number.parseFloat(newPsychotherapyPrice) * 100)
+        : undefined
+
+    if (newCareMode === 'psychotherapy') {
+      if (!Number.isFinite(psychotherapyPriceCents ?? NaN) || (psychotherapyPriceCents ?? 0) <= 0) {
+        setCreateError('Informe o valor acordado da psicoterapia.')
+        return
+      }
+
+      if (!newPsychotherapyFrequency) {
+        setCreateError('Selecione a frequência da psicoterapia.')
+        return
+      }
+    }
+
     const data = {
       name: newName,
       phone: newPhone || undefined,
       email: newEmail || undefined,
+      careMode: newCareMode,
+      psychotherapyPriceCents,
+      psychotherapyFrequency: newCareMode === 'psychotherapy' ? newPsychotherapyFrequency as 'weekly' | 'biweekly' : undefined,
+      birthDate: newBirthDate || undefined,
+      address: newAddress.trim() || undefined,
     }
     createPatient.mutate(data, {
       onSuccess: (created) => {
         setPatientId(created.id)
+        setType(created.careMode)
         setStep('appointment')
       },
       onError: (error) => {
@@ -209,7 +289,7 @@ export function AppointmentForm({
     }
 
     if (isEditMode && appointment) {
-      if (!date || !startTime || !value) {
+      if (!date || !startTime || (!isLinkedToRevenueProtocol && !value)) {
         setSubmitError('Preencha data, horário e valor para salvar a sessão.')
         return
       }
@@ -232,9 +312,14 @@ export function AppointmentForm({
             date,
             startTime,
             type,
-            value: Math.round(parseFloat(value || '0') * 100),
+            ...(isLinkedToRevenueProtocol ? {} : { value: Math.round(parseFloat(value || '0') * 100) }),
             notes: notes || null,
             status,
+            protocolId: protocolId || null,
+            protocolCreditAction:
+              appointment.protocolLinkType === 'protocol' && (status === 'cancelled' || protocolId !== (appointment.protocolId ?? ''))
+                ? protocolCreditAction
+                : undefined,
             paymentStatus,
             paymentMethod: paymentStatus === 'paid' ? paymentMethod || undefined : undefined,
             paidAt: paymentStatus === 'paid' ? dateInputToIso(paymentDate) : null,
@@ -283,7 +368,7 @@ export function AppointmentForm({
         },
       })
     } else {
-      if (!date || !startTime || !value) {
+      if (!date || !startTime || (!isLinkedToRevenueProtocol && !value)) {
         setSubmitError('Preencha data, horário e valor para criar a sessão.')
         return
       }
@@ -298,8 +383,10 @@ export function AppointmentForm({
         return
       }
 
-      const parsedValue = Math.round(parseFloat(value || '0') * 100)
-      if (!Number.isFinite(parsedValue) || parsedValue <= 0) {
+      const parsedValue = isLinkedToRevenueProtocol
+        ? undefined
+        : Math.round(parseFloat(value || '0') * 100)
+      if (!isLinkedToRevenueProtocol && (!Number.isFinite(parsedValue) || (parsedValue ?? 0) <= 0)) {
         setSubmitError('Informe um valor de sessão maior que zero.')
         return
       }
@@ -309,9 +396,10 @@ export function AppointmentForm({
         startTime,
         type,
         status: 'scheduled' as const,
-        value: parsedValue,
+        ...(parsedValue !== undefined ? { value: parsedValue } : {}),
         paymentStatus: recurring ? ('pending' as const) : paymentStatus,
         notes: notes || undefined,
+        protocolId: protocolId || undefined,
       }
 
       if (recurring) {
@@ -349,6 +437,7 @@ export function AppointmentForm({
           {
             ...baseData,
             date,
+            protocolId: baseData.protocolId,
             paymentMethod: baseData.paymentStatus === 'paid' ? paymentMethod || undefined : undefined,
             paidAt: baseData.paymentStatus === 'paid' ? dateInputToIso(paymentDate) : undefined,
           },
@@ -397,6 +486,13 @@ export function AppointmentForm({
   }, [])
 
   const selectedPatient = patients.find((p) => p.id === patientId)
+  const selectedProtocol = protocols.find((item) => item.id === protocolId)
+  const isNeuromodulationPatient = selectedPatient?.careMode === 'neuromodulation'
+  const isLinkedToRevenueProtocol = isRevenueProtocolLink({
+    protocolId: protocolId || undefined,
+    protocolStatus: selectedProtocol?.status,
+    protocolLinkType: appointment?.protocolLinkType,
+  })
   const filteredPatients = patientSearch
     ? patients.filter((p) => p.name.toLowerCase().includes(patientSearch.toLowerCase()))
     : patients
@@ -424,6 +520,56 @@ export function AppointmentForm({
               value={newEmail}
               onChange={(e) => setNewEmail(e.target.value)}
             />
+            <Input
+              label="Data de nascimento"
+              type="date"
+              value={newBirthDate}
+              onChange={(e) => setNewBirthDate(e.target.value)}
+            />
+            <Select
+              label="Modo de cuidado"
+              value={newCareMode}
+              onChange={(e) => {
+                const nextMode = e.target.value as 'psychotherapy' | 'neuromodulation'
+                setNewCareMode(nextMode)
+                if (nextMode === 'neuromodulation') {
+                  setNewPsychotherapyPrice('')
+                  setNewPsychotherapyFrequency('')
+                }
+              }}
+              options={[
+                { value: 'psychotherapy', label: 'Psicoterapia' },
+                { value: 'neuromodulation', label: 'Neuromodulação' },
+              ]}
+            />
+            {newCareMode === 'psychotherapy' && (
+              <>
+                <Input
+                  label="Valor acordado (R$)"
+                  type="number"
+                  step="0.01"
+                  value={newPsychotherapyPrice}
+                  onChange={(e) => setNewPsychotherapyPrice(e.target.value)}
+                  required
+                />
+                <Select
+                  label="Frequência"
+                  value={newPsychotherapyFrequency}
+                  onChange={(e) => setNewPsychotherapyFrequency(e.target.value)}
+                  options={[
+                    { value: 'weekly', label: 'Semanal' },
+                    { value: 'biweekly', label: 'Quinzenal' },
+                  ]}
+                  placeholder="Selecione a frequência"
+                  required
+                />
+              </>
+            )}
+            <Textarea
+              label="Endereço"
+              value={newAddress}
+              onChange={(e) => setNewAddress(e.target.value)}
+            />
           </Modal.Body>
           <Modal.Footer>
             <Button variant="ghost" type="button" onClick={() => setStep('appointment')}>
@@ -444,7 +590,7 @@ export function AppointmentForm({
       <Modal.Header>{isEditMode ? 'Editar Sessão' : 'Novo Agendamento'}</Modal.Header>
       <form onSubmit={handleSubmit}>
         <Modal.Body>
-          {!isEditMode && (
+          {!isEditMode && !isNeuromodulationPatient && (
             <div className="flex gap-2 rounded-lg bg-gray-100 p-1">
               <button
                 type="button"
@@ -561,7 +707,57 @@ export function AppointmentForm({
             value={type}
             onChange={(e) => handleTypeChange(e.target.value as SessionType)}
             options={typeOptions}
+            disabled={Boolean(selectedPatient)}
           />
+
+          {isNeuromodulationPatient && mode === 'session' && (
+            <div className="space-y-3 rounded-lg border border-primary-100 bg-primary-50 p-3">
+              <div>
+                <div className="text-sm font-medium text-primary-900">Vínculo com protocolo</div>
+                <p className="mt-1 text-xs text-primary-800">
+                  Escolha um protocolo ativo para reservar crédito, use manutenção para acompanhamento, ou deixe a sessão avulsa quando não houver consumo de protocolo.
+                </p>
+              </div>
+              <Select
+                label="Protocolo"
+                value={protocolId}
+                onChange={(e) => setProtocolId(e.target.value)}
+                options={[
+                  { value: '', label: 'Sessão avulsa (sem protocolo)' },
+                  ...protocols
+                    .filter((item) => item.status !== 'finished')
+                    .map((item) => ({
+                      value: item.id,
+                      label:
+                        item.status === 'maintenance'
+                          ? `Manutenção • ${item.remainingSessions} restantes`
+                          : `Protocolo ativo • ${item.remainingSessions} restantes`,
+                    })),
+                ]}
+              />
+              {selectedProtocol && (
+                <div className="grid grid-cols-3 gap-2 text-center text-xs text-primary-900">
+                  <div className="rounded-lg bg-white px-2 py-2">
+                    <div className="text-primary-700">Reservadas</div>
+                    <div className="mt-1 text-base font-semibold">{selectedProtocol.reservedSessions}</div>
+                  </div>
+                  <div className="rounded-lg bg-white px-2 py-2">
+                    <div className="text-primary-700">Consumidas</div>
+                    <div className="mt-1 text-base font-semibold">{selectedProtocol.consumedSessions}</div>
+                  </div>
+                  <div className="rounded-lg bg-white px-2 py-2">
+                    <div className="text-primary-700">Restantes</div>
+                    <div className="mt-1 text-base font-semibold">{selectedProtocol.remainingSessions}</div>
+                  </div>
+                </div>
+              )}
+              {!selectedProtocol && (
+                <p className="text-xs text-primary-800">
+                  Sem protocolo selecionado: esta sessão continua agendável, mas não consome crédito de neuromodulação.
+                </p>
+              )}
+            </div>
+          )}
 
           {mode === 'package' ? (
             <>
@@ -649,14 +845,20 @@ export function AppointmentForm({
                 placeholder="Selecione o horário"
                 required
               />
-              <Input
-                label="Valor (R$)"
-                type="number"
-                step="0.01"
-                value={value}
-                onChange={(e) => setValue(e.target.value)}
-                required
-              />
+              {isLinkedToRevenueProtocol ? (
+                <div className="rounded-lg border border-primary-100 bg-primary-50 p-3 text-sm text-primary-900">
+                  Sessão coberta pelo protocolo ativo. Não é necessário informar um valor operacional para este atendimento.
+                </div>
+              ) : (
+                <Input
+                  label="Valor (R$)"
+                  type="number"
+                  step="0.01"
+                  value={value}
+                  onChange={(e) => setValue(e.target.value)}
+                  required
+                />
+              )}
               {isEditMode ? (
                 <>
                   <Select
@@ -730,7 +932,18 @@ export function AppointmentForm({
                   )}
                 </div>
               )}
-              {!isEditMode && !recurring && (
+              {isEditMode && appointment?.protocolLinkType === 'protocol' && (status === 'cancelled' || protocolId !== (appointment.protocolId ?? '')) && (
+                <Select
+                  label="Crédito do protocolo"
+                  value={protocolCreditAction}
+                  onChange={(e) => setProtocolCreditAction(e.target.value as ProtocolCreditAction)}
+                  options={[
+                    { value: 'release', label: 'Liberar crédito de volta' },
+                    { value: 'consume', label: 'Consumir crédito mesmo assim' },
+                  ]}
+                />
+              )}
+              {!isEditMode && !recurring && !isLinkedToRevenueProtocol && (
                 <>
                   <Select
                     label="Pagamento"
@@ -767,6 +980,11 @@ export function AppointmentForm({
                     </>
                   )}
                 </>
+              )}
+              {!isEditMode && !recurring && isLinkedToRevenueProtocol && (
+                <div className="rounded-lg border border-primary-100 bg-primary-50 p-3 text-sm text-primary-900">
+                  Esta sessão está vinculada ao protocolo ativo. A receita será contabilizada na venda do protocolo, não nesta sessão operacional.
+                </div>
               )}
             </>
           )}

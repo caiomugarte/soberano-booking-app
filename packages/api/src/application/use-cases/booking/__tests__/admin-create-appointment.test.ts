@@ -44,7 +44,7 @@ const appointmentResult = {
 };
 
 const activePackage = {
-  id: 'pkg-1', tenantId: 'tenant-1', customerName: 'Maria', customerPhone: '11999998888',
+  id: 'pkg-1', tenantId: 'tenant-1', providerId: 'barber-1', customerName: 'Maria', customerPhone: '11999998888',
   totalUses: 5, usedCount: 1, totalPriceCents: 10000, status: 'active',
   createdAt: new Date(), updatedAt: new Date(),
 };
@@ -89,8 +89,9 @@ function makeUseCase(overrides?: {
 
   const packageRepo = overrides?.packageRepo
     ? ({
-        findByIdAndTenant: vi.fn().mockResolvedValue(activePackage),
+        findByIdForProvider: vi.fn().mockResolvedValue(activePackage),
         incrementUsedCount: vi.fn().mockResolvedValue({ ...activePackage, usedCount: 2 }),
+        reevaluateLifecycle: vi.fn().mockResolvedValue({ ...activePackage, usedCount: 2 }),
         ...overrides.packageRepo,
       } as unknown as CustomerPackageRepository)
     : undefined;
@@ -107,33 +108,58 @@ describe('AdminCreateAppointment — package credit', () => {
   it('creates appointment without touching packageRepo when packageId is absent', async () => {
     const { useCase, packageRepo } = makeUseCase({ packageRepo: {} });
     await useCase.execute(validInput);
-    expect((packageRepo as unknown as { findByIdAndTenant: ReturnType<typeof vi.fn> }).findByIdAndTenant).not.toHaveBeenCalled();
+    expect((packageRepo as unknown as { findByIdForProvider: ReturnType<typeof vi.fn> }).findByIdForProvider).not.toHaveBeenCalled();
     expect((packageRepo as unknown as { incrementUsedCount: ReturnType<typeof vi.fn> }).incrementUsedCount).not.toHaveBeenCalled();
+    expect((packageRepo as unknown as { reevaluateLifecycle: ReturnType<typeof vi.fn> }).reevaluateLifecycle).not.toHaveBeenCalled();
   });
 
-  it('calls incrementUsedCount after appointment creation when packageId is valid', async () => {
+  it('increments and reevaluates the package lifecycle after appointment creation when packageId is valid', async () => {
     const { useCase, packageRepo } = makeUseCase({ packageRepo: {} });
     await useCase.execute({ ...validInput, packageId: 'pkg-1' });
     expect((packageRepo as unknown as { incrementUsedCount: ReturnType<typeof vi.fn> }).incrementUsedCount).toHaveBeenCalledWith('pkg-1');
+    expect((packageRepo as unknown as { reevaluateLifecycle: ReturnType<typeof vi.fn> }).reevaluateLifecycle).toHaveBeenCalledWith('pkg-1');
   });
 
   it('throws ValidationError and does not create appointment when package status is completed', async () => {
     const { useCase, appointmentRepo } = makeUseCase({
       packageRepo: {
-        findByIdAndTenant: vi.fn().mockResolvedValue({ ...activePackage, status: 'completed' }),
+        findByIdForProvider: vi.fn().mockResolvedValue({ ...activePackage, status: 'completed' }),
       },
     });
     await expect(useCase.execute({ ...validInput, packageId: 'pkg-1' })).rejects.toBeInstanceOf(ValidationError);
     expect(appointmentRepo.create).not.toHaveBeenCalled();
   });
 
+  it('throws ValidationError and does not create appointment when package belongs to another provider', async () => {
+    const { useCase, appointmentRepo } = makeUseCase({
+      packageRepo: {
+        findByIdForProvider: vi.fn().mockResolvedValue(null),
+      },
+    });
+    await expect(useCase.execute({ ...validInput, packageId: 'pkg-other-provider' })).rejects.toBeInstanceOf(ValidationError);
+    expect(appointmentRepo.create).not.toHaveBeenCalled();
+  });
+
   it('throws ValidationError and does not create appointment when package is not found', async () => {
     const { useCase, appointmentRepo } = makeUseCase({
       packageRepo: {
-        findByIdAndTenant: vi.fn().mockResolvedValue(null),
+        findByIdForProvider: vi.fn().mockResolvedValue(null),
       },
     });
     await expect(useCase.execute({ ...validInput, packageId: 'pkg-missing' })).rejects.toBeInstanceOf(ValidationError);
+    expect(appointmentRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('throws ValidationError and does not create appointment when package has no remaining uses', async () => {
+    const { useCase, appointmentRepo } = makeUseCase({
+      packageRepo: {
+        findByIdForProvider: vi.fn().mockResolvedValue({
+          ...activePackage,
+          usedCount: activePackage.totalUses,
+        }),
+      },
+    });
+    await expect(useCase.execute({ ...validInput, packageId: 'pkg-1' })).rejects.toBeInstanceOf(ValidationError);
     expect(appointmentRepo.create).not.toHaveBeenCalled();
   });
 

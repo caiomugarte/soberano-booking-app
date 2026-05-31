@@ -24,5 +24,10 @@ Operational implication:
 - Custom `networks:` definitions inside the Coolify Compose stack can isolate
   the API from the destination network even when the app and DB are assigned to
   the same destination
+- If frontend nginx shows `connect() failed (111: Connection refused)` to
+  `http://api:3000` while the API logs show migrations completed and the
+  reminder/materialization jobs started, the API process likely booted
+  successfully and the frontend is resolving `api` to the wrong container or a
+  crash-looping API instance on the shared Docker network
 
 Updated: 2026-04-30

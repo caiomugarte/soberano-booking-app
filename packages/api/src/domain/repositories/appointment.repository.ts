@@ -1,4 +1,5 @@
 import type { AppointmentWithDetails } from '../entities/appointment.js';
+import type { NeuromodulationProtocolWithCounters, ProtocolPaymentMethod, ProtocolPaymentStatus } from '../entities/neuromodulation-protocol.js';
 
 export interface FinancialSummary {
   totalSessions: number;
@@ -6,6 +7,14 @@ export interface FinancialSummary {
   pendingCount: number;
   revenueCents: number;
   appointments: AppointmentWithDetails[];
+  protocolSales: Array<{
+    protocol: NeuromodulationProtocolWithCounters;
+    customer: {
+      id: string;
+      name: string;
+      phone: string | null;
+    };
+  }>;
 }
 
 export interface CreateAppointmentData {
@@ -14,6 +23,8 @@ export interface CreateAppointmentData {
   serviceId: string;
   customerId: string;
   packageId?: string;
+  protocolId?: string;
+  protocolCreditOutcome?: 'reserved' | 'consumed' | 'released' | 'maintenance' | null;
   recurringSeriesId?: string;
   date: Date;
   startTime: string;
@@ -55,6 +66,24 @@ export interface AppointmentRepository {
   updateCustomer(id: string, customerId: string): Promise<void>;
   updatePaymentStatus(id: string, paidAt: Date): Promise<AppointmentWithDetails>;
   getFinancialSummary(providerId: string, from: Date, to: Date): Promise<FinancialSummary>;
+  updateDetails(id: string, data: {
+    customerId?: string;
+    serviceId?: string;
+    protocolId?: string | null;
+    protocolCreditOutcome?: 'reserved' | 'consumed' | 'released' | 'maintenance' | null;
+    date?: Date;
+    startTime?: string;
+    endTime?: string;
+    priceCents?: number;
+    status?: string;
+    paymentStatus?: ProtocolPaymentStatus;
+    paymentMethod?: ProtocolPaymentMethod | null;
+    paidAt?: Date | null;
+    appointmentNotes?: string | null;
+    cancelToken?: string;
+    reminderSent?: boolean;
+    barberReminderSent?: boolean;
+  }): Promise<AppointmentWithDetails>;
   updateSchedule(id: string, data: {
     serviceId?: string;
     priceCents?: number;

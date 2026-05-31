@@ -5,6 +5,54 @@
 
 ---
 
+## Rescope Update — Provider-Owned Management Expansion
+
+This design originally covered the first package MVP: create a package, select it during manual booking, and list packages in a basic management page. The current request expands that scope and changes two important assumptions:
+
+1. Packages are no longer tenant-wide management records; they are provider-owned commercial agreements.
+2. Package status can no longer be derived from `usedCount >= totalUses` alone.
+
+### Recommended UX Direction
+
+Use one shared **package workspace modal** instead of inventing separate booking flows for each entry point:
+
+- `AdminPackageModal` remains the lightweight creation step
+- after successful creation, it hands the created package into the shared package workspace instead of simply closing
+- `PackagesPage` opens the same workspace from each package card for details and additional scheduling
+- `AdminBookingModal` keeps the inline package selector for the general booking flow
+
+This avoids duplicating scheduling logic in two places and gives the provider one consistent package-first management surface.
+
+### Recommended Shared Workspace Shape
+
+The existing `BookFromPackageModal.tsx` is the best starting point for refactoring into that shared workspace.
+
+The evolved modal should support two package-context modes:
+
+1. **Schedule mode**
+   - used immediately after package creation
+   - used from the Packages page when a package still has remaining usages
+   - allows sequential booking of one or more usages without leaving the package context
+2. **Details mode**
+   - shows package summary, remaining uses, and linked bookings
+   - exposes package-linked booking management actions from the same context
+   - can transition into schedule mode when the package still has remaining usages
+
+### Key Contract Gaps Confirmed During Recon
+
+The current codebase does not support the full request as a web-only change:
+
+- `CustomerPackage` has no `providerId`, so ownership cannot be enforced from the frontend alone
+- `GET /admin/packages` is tenant-scoped, not provider-scoped
+- package status is currently flipped to `completed` inside `incrementUsedCount()` as soon as all credits are allocated
+- the web layer does not have a package-specific booking details contract yet; existing appointment range data is provider-scoped, but not package-focused
+
+That means the UI can be redesigned now, but correct provider isolation and lifecycle behavior require API and schema updates.
+
+There is also no package-specific provider payment reminder today. Existing barber notifications cover only new bookings, customer-driven changes/cancellations, and the generic upcoming appointment reminder.
+
+---
+
 ## Architecture Overview
 
 Two independent entry points converge on the same backend resource (`/admin/packages`):
@@ -48,6 +96,8 @@ No new pages, no routing changes. Both flows are modal-based.
 | `POST /admin/appointments` | Add optional `packageId` field to existing `AdminBookingInput` type |
 | `POST /admin/packages` | New mutation; returns `CustomerPackage` |
 | `GET /admin/packages?phone=` | New query; returns `CustomerPackage[]` (active packages only) |
+| `GET /admin/packages` | Must become provider-scoped and support the Packages page default active-first view |
+| Package details contract | New or extended admin package endpoint needed for linked booking details |
 | `WhatsAppNotificationService.sendBookingConfirmation` | Package-linked admin bookings omit the self-service cancel/change link; non-package admin bookings keep the existing template |
 
 ---
@@ -59,12 +109,13 @@ No new pages, no routing changes. Both flows are modal-based.
 ```typescript
 export interface CustomerPackage {
   id: string
+  providerId: string
   customerName: string
   customerPhone: string | null
   totalUses: number
   usedCount: number
   totalPriceCents: number
-  status: 'active' | 'completed'
+  status: 'active' | 'completed' | 'cancelled'
   createdAt: string
 }
 ```
@@ -129,10 +180,21 @@ export interface AdminBookingInput {
   - `usesDisplay` — integer input, minimum 1
   - `priceDisplay` — decimal input with comma→dot normalization (same as existing price field)
   - Submit disabled until: `name.trim().length >= 2 && uses >= 1 && price > 0`
-  - On success: calls `onClose()`
+  - On success: hands the created package into the shared package workspace instead of dropping the provider back on the dashboard
   - On error: shows server error message inline below button
 - **Dependencies**: `useAdminCreatePackage`, `useAdminCustomerLookup`, `Input`, `Button`, `formatPhone`, `stripPhone`
 - **Reuses**: `AdminBookingModal` as structural reference
+
+### `PackageWorkspaceModal` (refactor from `BookFromPackageModal`)
+
+- **Purpose**: Shared package-context modal used both after package creation and from the Packages page
+- **Starting point**: `packages/web/src/components/admin/BookFromPackageModal.tsx`
+- **Responsibilities**:
+  - show package summary and remaining usage information
+  - schedule one or more usages in sequence
+  - list already linked package bookings
+  - expose package-linked booking management actions from the package context
+- **Why reuse this file**: it already owns the package-scoped scheduling payload (`packageId`) and sequential booking behavior, so it is the right foundation instead of creating a second custom scheduler from scratch
 
 ### `AdminBookingModal` (modified)
 
@@ -163,6 +225,22 @@ export interface AdminBookingInput {
   - `AdminCreateAppointment` uses the presence of `packageId` to choose the notification variant
   - `WhatsAppNotificationService.sendBookingConfirmation` accepts an option or variant to omit the final "Para cancelar ou alterar" block when the booking is package-linked
 
+### Package completion payment reminder rule
+
+- **Purpose**: Remind the provider to collect the package payment when the final package appointment is actually completed
+- **Trigger for this scope**:
+  - an admin package-linked appointment is marked `completed`
+  - package lifecycle reevaluation changes the package from `active` to `completed`
+- **Non-triggers**:
+  - package reaches `completed` after `no_show`
+  - package reaches `completed` after cancellation, deletion, or manual package deactivation
+  - the last appointment is only in the past but has not been explicitly marked `completed`
+- **Implementation direction**:
+  - keep the trigger inside the same package-aware lifecycle service/use case that already reevaluates package status after appointment mutations
+  - compare the package state before and after reevaluation so the reminder is sent only on the `active` → `completed` transition
+  - add a dedicated `WhatsAppNotificationService` method for this barber-facing reminder instead of overloading `notifyBarber()`
+  - include at least `customerName` and `totalPriceCents` in the message body
+
 ### `DashboardPage` (modified)
 
 - **Purpose**: Add "Novo Pacote" button and wire `AdminPackageModal`
@@ -181,6 +259,7 @@ export interface AdminBookingInput {
 | Network error on package creation | Show server `message` inline below submit button | Red text, same pattern as `AdminBookingModal` |
 | Package lookup fails | Silent — treat as empty list | No selector shown; booking proceeds as normal |
 | Booking submit with stale/invalid packageId | Server returns error | Error shown in existing booking error area |
+| Package details unavailable for current provider | Show package error state inside workspace | Provider does not see another provider's data |
 
 ---
 
@@ -193,6 +272,10 @@ export interface AdminBookingInput {
 | Multi-package behavior | None pre-selected | When there are 2+, the barber must choose explicitly — prevents silently consuming the wrong package |
 | `packageId` injection | Only when `selectedPackageId !== null` | Barber retains full control; no implicit side-effects |
 | New modal vs extending `AdminBookingModal` | New `AdminPackageModal` — separate concern | Package creation is not a booking; mixing would bloat the existing modal |
+| Package page booking UX | Reuse one shared package workspace modal | Keeps scheduling and details logic in one place across post-create and Packages page entry points |
+| Initial Packages page filter | `active` by default | Matches provider mental model and reduces information overload |
+| Package lifecycle label | Stay `active` while future linked bookings exist | Prevents premature completion state when all uses are merely allocated |
+| Provider payment reminder trigger | Only on package `active` → `completed` caused by a `completed` appointment | Avoids asking the barber to charge on `no_show`, cancellation, or manual deactivation |
 
 ---
 
@@ -208,6 +291,7 @@ Two changes to `schema.prisma`:
 model CustomerPackage {
   id              String   @id @default(uuid()) @db.Uuid
   tenantId        String   @map("tenant_id") @db.Uuid
+  providerId      String   @map("provider_id") @db.Uuid
   customerName    String   @map("customer_name") @db.VarChar(200)
   customerPhone   String?  @map("customer_phone") @db.VarChar(20)
   totalUses       Int      @map("total_uses")
@@ -218,9 +302,10 @@ model CustomerPackage {
   updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  provider     Provider      @relation(fields: [providerId], references: [id])
   appointments Appointment[]
 
-  @@index([tenantId, customerPhone, status])
+  @@index([tenantId, providerId, customerPhone, status])
   @@map("customer_packages")
 }
 ```
@@ -431,7 +516,7 @@ PackagesPage
   ├── Status filter pills (Todos / Ativos / Concluídos / Cancelados)
   ├── Search input (client-side filter on name/phone)
   └── PackageCard list
-        └── DeactivateModal (confirmation)
+        └── DeactivateModal (confirmation + future-cancellation warning)
 ```
 
 ### New Endpoint: `GET /admin/packages` — extended behavior
@@ -448,11 +533,16 @@ Backward compatible: all existing callers always pass `phone`.
 ### New Endpoint: `PATCH /admin/packages/:id/deactivate`
 
 ```
-→ findByIdAndTenant(id, tenant.id) → 404 if not found
+→ find package by provider scope → 404 if not found
 → if status !== 'active' → 400 VALIDATION_ERROR
-→ update status = 'cancelled'
+→ find linked appointments where status = confirmed and the booking is still in the future
+→ cancel those future appointments (status = cancelled, cancelledAt = now)
+→ leave past / already-finalized linked appointments unchanged
+→ update package status = 'cancelled'
 → 200 with updated package
 ```
+
+Implementation note: this is no longer a trivial repository update. To keep `admin.routes.ts` thin, the cascading cancellation should live in a dedicated application use case or package-aware service that receives the package and appointment repositories.
 
 ### New Repository Method
 
@@ -465,7 +555,7 @@ findAllByTenant(
 
 Implementation: `findMany({ where: { tenantId, ...(status ? { status } : {}) }, orderBy: { createdAt: 'desc' } })`
 
-Also needed: `deactivate(id: string): Promise<CustomerPackageEntity>` — sets `status = 'cancelled'`.
+Also needed: package deactivation logic that can load provider-owned packages, find future linked appointments, cancel only the eligible future bookings, and then persist `status = 'cancelled'`.
 
 ### New Hooks (frontend)
 
@@ -518,6 +608,20 @@ Package list (filtered)
     [Desativar] button (active only)
 DeactivateModal (confirmation)
 ```
+
+**Deactivate modal copy**:
+- warn that future linked appointments will be cancelled
+- explicitly state that appointments that already happened stay unchanged
+- no per-appointment count is required for this scope; generic copy keeps the flow small and avoids another summary endpoint
+
+**Reminder coupling**:
+- `packages/api/src/infrastructure/jobs/reminder.job.ts` only selects upcoming appointments with `status = 'confirmed'`
+- once package deactivation cancels the future linked bookings, no reminder-specific code change is needed to suppress later alerts
+- the package payment reminder is separate from the upcoming-appointment reminder job and should be fired inline from the package lifecycle mutation that closes the package
+
+**Credit policy note**:
+- automatic package credit restoration remains out of scope here
+- package deactivation cancels future bookings, but does not introduce a refund or used-count rollback rule
 
 **Status badge colors** (matching existing patterns):
 - `active`: `text-gold border-gold/30 bg-gold/10`

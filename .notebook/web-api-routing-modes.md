@@ -31,6 +31,6 @@ Shared pattern:
 Gotcha:
 - If a frontend package serves through nginx, `API_INTERNAL_URL` must be configured at runtime or nginx templating will produce a broken upstream even though the bundle itself is correct
 - `API_INTERNAL_URL=http://api:3000` also depends on Coolify attaching the frontend container to the same external Docker network as the API via `COOLIFY_SHARED_NETWORK`; otherwise nginx fails at startup with `host not found in upstream "api"`
-- The infra compose file now declares an explicit `api` alias on the shared `coolify` network so separate tenant frontend apps can resolve a stable hostname without depending on Coolify-generated container names
+- Current `docker-compose.infra.yaml` defaults the shared-network API alias to `api-internal`, not `api`. Frontend resources documented with `API_INTERNAL_URL=http://api:3000` will fail unless the API stack sets `API_INTERNAL_ALIAS=api` or the frontend targets `http://api-internal:3000`
 
-Updated: 2026-05-03
+Updated: 2026-05-29

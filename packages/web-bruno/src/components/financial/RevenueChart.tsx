@@ -26,8 +26,6 @@ import {
 import { ptBR } from 'date-fns/locale'
 import { Panel } from '@/components/ui/Panel'
 import { formatCurrency } from '@/lib/format'
-import { toDateInputValue } from '@/lib/format'
-import type { Appointment } from '@/schemas/appointment.schema'
 
 type ChartPeriod = 'weekly' | 'monthly' | 'annual'
 
@@ -38,7 +36,10 @@ const PERIOD_LABELS: Record<ChartPeriod, string> = {
 }
 
 interface RevenueChartProps {
-  paidAppointments: Appointment[]
+  entries: Array<{
+    revenueDate: string
+    value: number
+  }>
 }
 
 function CustomTooltip({
@@ -56,16 +57,13 @@ function CustomTooltip({
   )
 }
 
-function sumRevenue(appointments: Appointment[], from: string, to: string) {
-  return appointments
-    .filter((a) => {
-      const revenueDate = toDateInputValue(a.paidAt) || a.date
-      return revenueDate >= from && revenueDate <= to
-    })
-    .reduce((sum, a) => sum + a.value, 0)
+function sumRevenue(entries: RevenueChartProps['entries'], from: string, to: string) {
+  return entries
+    .filter((entry) => entry.revenueDate >= from && entry.revenueDate <= to)
+    .reduce((sum, entry) => sum + entry.value, 0)
 }
 
-export function RevenueChart({ paidAppointments }: RevenueChartProps) {
+export function RevenueChart({ entries }: RevenueChartProps) {
   const [period, setPeriod] = useState<ChartPeriod>('monthly')
   const [refDate, setRefDate] = useState(new Date())
 
@@ -81,15 +79,15 @@ export function RevenueChart({ paidAppointments }: RevenueChartProps) {
     if (period === 'weekly') {
       const wStart = startOfWeek(refDate, { weekStartsOn: 1 })
       const label = `${format(wStart, "d 'de' MMM", { locale: ptBR })} — ${format(endOfWeek(refDate, { weekStartsOn: 1 }), "d 'de' MMM yyyy", { locale: ptBR })}`
-      const entries = Array.from({ length: 7 }, (_, i) => {
+      const chartEntries = Array.from({ length: 7 }, (_, i) => {
         const day = addDays(wStart, i)
         const dayStr = format(day, 'yyyy-MM-dd')
         return {
           label: format(day, 'EEE d', { locale: ptBR }),
-          revenue: sumRevenue(paidAppointments, dayStr, dayStr),
+          revenue: sumRevenue(entries, dayStr, dayStr),
         }
       })
-      return { data: entries, periodLabel: label }
+      return { data: chartEntries, periodLabel: label }
     }
 
     if (period === 'monthly') {
@@ -97,7 +95,7 @@ export function RevenueChart({ paidAppointments }: RevenueChartProps) {
       const mEnd = endOfMonth(refDate)
       const label = format(refDate, "MMMM 'de' yyyy", { locale: ptBR })
       const weeks = eachWeekOfInterval({ start: mStart, end: mEnd }, { weekStartsOn: 1 })
-      const entries = weeks.map((weekDate) => {
+      const chartEntries = weeks.map((weekDate) => {
         const wkStartDate = weekDate < mStart ? mStart : weekDate
         const wkEndRaw = endOfWeek(weekDate, { weekStartsOn: 1 })
         const wkEndDate = wkEndRaw > mEnd ? mEnd : wkEndRaw
@@ -105,26 +103,26 @@ export function RevenueChart({ paidAppointments }: RevenueChartProps) {
         const wkEnd = format(wkEndDate, 'yyyy-MM-dd')
         return {
           label: `${format(wkStartDate, 'd MMM', { locale: ptBR })} - ${format(wkEndDate, 'd MMM', { locale: ptBR })}`,
-          revenue: sumRevenue(paidAppointments, wkStart, wkEnd),
+          revenue: sumRevenue(entries, wkStart, wkEnd),
         }
       })
-      return { data: entries, periodLabel: label }
+      return { data: chartEntries, periodLabel: label }
     }
 
     // annual
     const year = refDate.getFullYear()
     const label = String(year)
-    const entries = Array.from({ length: 12 }, (_, i) => {
+    const chartEntries = Array.from({ length: 12 }, (_, i) => {
       const monthDate = new Date(year, i)
       const moStart = format(startOfMonth(monthDate), 'yyyy-MM-dd')
       const moEnd = format(endOfMonth(monthDate), 'yyyy-MM-dd')
       return {
         label: format(monthDate, 'MMM', { locale: ptBR }),
-        revenue: sumRevenue(paidAppointments, moStart, moEnd),
+        revenue: sumRevenue(entries, moStart, moEnd),
       }
     })
-    return { data: entries, periodLabel: label }
-  }, [period, refDate, paidAppointments])
+    return { data: chartEntries, periodLabel: label }
+  }, [entries, period, refDate])
 
   return (
     <Panel>

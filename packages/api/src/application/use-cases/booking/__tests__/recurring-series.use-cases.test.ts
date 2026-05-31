@@ -43,6 +43,11 @@ const customer = {
   cpf: null,
   email: null,
   notes: null,
+  careMode: 'psychotherapy' as const,
+  psychotherapyPriceCents: 20000,
+  psychotherapyFrequency: 'weekly' as const,
+  birthDate: null,
+  address: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -54,6 +59,8 @@ function appointmentFactory(overrides: Partial<AppointmentWithDetails>): Appoint
     serviceId: service.id,
     customerId: customer.id,
     packageId: null,
+    protocolId: null,
+    protocolCreditOutcome: null,
     recurringSeriesId: null,
     date: overrides.date ?? new Date('2099-06-15T00:00:00'),
     startTime: overrides.startTime ?? '10:00',
@@ -74,6 +81,7 @@ function appointmentFactory(overrides: Partial<AppointmentWithDetails>): Appoint
     service,
     customer,
     package: null,
+    protocol: null,
     ...overrides,
   };
 }
@@ -97,8 +105,8 @@ function makeHarness() {
         priceCents: data.priceCents,
         status: (data.status as AppointmentWithDetails['status'] | undefined) ?? 'confirmed',
         cancelToken: data.cancelToken,
-        paymentStatus: data.paymentStatus ?? 'pending',
-        paymentMethod: data.paymentMethod ?? null,
+        paymentStatus: (data.paymentStatus as AppointmentWithDetails['paymentStatus'] | undefined) ?? 'pending',
+        paymentMethod: (data.paymentMethod as AppointmentWithDetails['paymentMethod'] | undefined) ?? null,
         paidAt: data.paidAt ?? null,
         appointmentNotes: data.appointmentNotes ?? null,
       });
@@ -149,7 +157,9 @@ function makeHarness() {
       pendingCount: 0,
       revenueCents: 0,
       appointments: [],
+      protocolSales: [],
     }),
+    updateDetails: async () => appointmentFactory({}),
     updateSchedule: async () => appointmentFactory({}),
   };
 
@@ -192,6 +202,7 @@ function makeHarness() {
   const serviceRepo: ServiceRepository = {
     findAllActive: async () => [service],
     findById: async () => service,
+    findBySlug: async () => service,
   };
 
   return {

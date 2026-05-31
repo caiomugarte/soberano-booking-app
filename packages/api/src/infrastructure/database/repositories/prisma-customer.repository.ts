@@ -58,7 +58,19 @@ export class PrismaCustomerRepository implements CustomerRepository {
     });
   }
 
-  async create(data: { tenantId: string; name: string; phone?: string; email?: string; cpf?: string; notes?: string }): Promise<CustomerEntity> {
+  async create(data: {
+    tenantId: string;
+    name: string;
+    phone?: string;
+    email?: string;
+    cpf?: string;
+    notes?: string | null;
+    careMode?: CustomerEntity['careMode'];
+    psychotherapyPriceCents?: number | null;
+    psychotherapyFrequency?: CustomerEntity['psychotherapyFrequency'];
+    birthDate?: Date | null;
+    address?: string | null;
+  }): Promise<CustomerEntity> {
     return this.db.customer.create({ data });
   }
 

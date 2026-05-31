@@ -1,13 +1,33 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { apiFetch } from './http-client'
+import { ApiError, apiFetch } from './http-client'
 import { format, addDays, startOfWeek } from 'date-fns'
 import type {
   Appointment,
   AppointmentFormData,
+  ProtocolCreditAction,
   SessionType,
 } from '@/schemas/appointment.schema'
 
 type CreateData = AppointmentFormData
+
+export type AppointmentReceivableScope = 'all' | 'operations-only'
+
+export type AppointmentListFilters = {
+  from?: string
+  to?: string
+  patientId?: string
+  paymentStatus?: Appointment['paymentStatus']
+  excludeCancelled?: boolean
+  dueOnly?: boolean
+  receivableScope?: AppointmentReceivableScope
+}
+
+export type PaymentReminderResult = {
+  appointmentId: string
+  success: boolean
+  code?: string
+  message?: string
+}
 
 type RecurringSeriesData = {
   patientId: string
@@ -37,12 +57,71 @@ export type AppointmentUpdateData = {
   paymentStatus?: Appointment['paymentStatus']
   paymentMethod?: Appointment['paymentMethod']
   paidAt?: Appointment['paidAt'] | null
+  protocolId?: Appointment['protocolId'] | null
+  protocolCreditAction?: ProtocolCreditAction
 }
 
-export function useAppointments() {
+function normalizeAppointmentFilters(filters: AppointmentListFilters = {}): AppointmentListFilters {
+  return {
+    ...(filters.from ? { from: filters.from } : {}),
+    ...(filters.to ? { to: filters.to } : {}),
+    ...(filters.patientId ? { patientId: filters.patientId } : {}),
+    ...(filters.paymentStatus ? { paymentStatus: filters.paymentStatus } : {}),
+    ...(filters.excludeCancelled ? { excludeCancelled: true } : {}),
+    ...(filters.dueOnly ? { dueOnly: true } : {}),
+    ...(filters.receivableScope ? { receivableScope: filters.receivableScope } : {}),
+  }
+}
+
+function buildAppointmentsQueryString(filters: AppointmentListFilters = {}): string {
+  const params = new URLSearchParams()
+
+  if (filters.from) params.set('from', filters.from)
+  if (filters.to) params.set('to', filters.to)
+  if (filters.patientId) params.set('patientId', filters.patientId)
+  if (filters.paymentStatus) params.set('paymentStatus', filters.paymentStatus)
+  if (filters.excludeCancelled) params.set('excludeCancelled', 'true')
+  if (filters.dueOnly) params.set('dueOnly', 'true')
+  if (filters.receivableScope) params.set('receivableScope', filters.receivableScope)
+
+  return params.toString()
+}
+
+function getAppointmentsQueryKey(filters: AppointmentListFilters = {}) {
+  return ['appointments', normalizeAppointmentFilters(filters)] as const
+}
+
+function getAppointmentsQueryPath(filters: AppointmentListFilters = {}) {
+  const queryString = buildAppointmentsQueryString(filters)
+  return `/api/psychology/sessions${queryString ? `?${queryString}` : ''}`
+}
+
+async function invalidateAppointmentContext(
+  qc: ReturnType<typeof useQueryClient>,
+  patientId?: string,
+) {
+  const tasks: Promise<unknown>[] = [
+    qc.invalidateQueries({ queryKey: ['appointments'] }),
+    qc.invalidateQueries({ queryKey: ['financial'] }),
+    qc.invalidateQueries({ queryKey: ['protocols'] }),
+  ]
+
+  if (patientId) {
+    tasks.push(
+      qc.invalidateQueries({ queryKey: ['patients', patientId] }),
+      qc.invalidateQueries({ queryKey: ['protocols', 'patient', patientId] }),
+    )
+  }
+
+  await Promise.all(tasks)
+}
+
+export function useAppointments(filters: AppointmentListFilters = {}) {
+  const normalizedFilters = normalizeAppointmentFilters(filters)
+
   return useQuery({
-    queryKey: ['appointments'],
-    queryFn: () => apiFetch<Appointment[]>('/api/psychology/sessions'),
+    queryKey: getAppointmentsQueryKey(normalizedFilters),
+    queryFn: () => apiFetch<Appointment[]>(getAppointmentsQueryPath(normalizedFilters)),
   })
 }
 
@@ -50,27 +129,28 @@ export function useWeekAppointments(weekStartDate: Date) {
   const weekStart = format(startOfWeek(weekStartDate, { weekStartsOn: 1 }), 'yyyy-MM-dd')
   const weekEnd = format(addDays(startOfWeek(weekStartDate, { weekStartsOn: 1 }), 6), 'yyyy-MM-dd')
 
-  return useQuery({
-    queryKey: ['appointments', 'week', weekStart],
-    queryFn: () =>
-      apiFetch<Appointment[]>(`/api/psychology/sessions?from=${weekStart}&to=${weekEnd}`),
-  })
+  return useAppointments({ from: weekStart, to: weekEnd })
 }
 
 export function usePatientAppointments(patientId: string | undefined) {
   return useQuery({
-    queryKey: ['appointments', 'patient', patientId],
-    queryFn: () =>
-      apiFetch<Appointment[]>(`/api/psychology/sessions?patientId=${patientId}`),
+    queryKey: getAppointmentsQueryKey({ patientId }),
+    queryFn: () => apiFetch<Appointment[]>(getAppointmentsQueryPath({ patientId })),
     enabled: !!patientId,
   })
 }
 
-export function useDateRangeAppointments(from: string, to: string) {
-  return useQuery({
-    queryKey: ['appointments', 'range', from, to],
-    queryFn: () =>
-      apiFetch<Appointment[]>(`/api/psychology/sessions?from=${from}&to=${to}`),
+export function useDateRangeAppointments(from: string, to: string, patientId?: string) {
+  return useAppointments({ from, to, patientId })
+}
+
+export function useDuePendingAppointments(patientId?: string) {
+  return useAppointments({
+    patientId,
+    paymentStatus: 'pending',
+    excludeCancelled: true,
+    dueOnly: true,
+    receivableScope: 'operations-only',
   })
 }
 
@@ -82,11 +162,8 @@ export function useCreateAppointment() {
         method: 'POST',
         body: JSON.stringify(data),
       }),
-    onSuccess: async () => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['appointments'] }),
-        qc.invalidateQueries({ queryKey: ['financial'] }),
-      ])
+    onSuccess: async (_, variables) => {
+      await invalidateAppointmentContext(qc, variables.patientId)
     },
   })
 }
@@ -99,11 +176,8 @@ export function useCreateRecurringAppointments() {
         method: 'POST',
         body: JSON.stringify(payload),
       }),
-    onSuccess: async () => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['appointments'] }),
-        qc.invalidateQueries({ queryKey: ['financial'] }),
-      ])
+    onSuccess: async (_, variables) => {
+      await invalidateAppointmentContext(qc, variables.patientId)
     },
   })
 }
@@ -120,10 +194,7 @@ export function useStopRecurringSeries() {
         },
       ),
     onSuccess: async () => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['appointments'] }),
-        qc.invalidateQueries({ queryKey: ['financial'] }),
-      ])
+      await invalidateAppointmentContext(qc)
     },
   })
 }
@@ -143,10 +214,7 @@ export function useCreateBatchAppointments() {
       return results.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []))
     },
     onSuccess: async () => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['appointments'] }),
-        qc.invalidateQueries({ queryKey: ['financial'] }),
-      ])
+      await invalidateAppointmentContext(qc)
     },
   })
 }
@@ -159,11 +227,8 @@ export function useUpdateAppointment() {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
-    onSuccess: async () => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['appointments'] }),
-        qc.invalidateQueries({ queryKey: ['financial'] }),
-      ])
+    onSuccess: async (_, variables) => {
+      await invalidateAppointmentContext(qc, variables.data.patientId)
     },
   })
 }
@@ -171,15 +236,13 @@ export function useUpdateAppointment() {
 export function useDeleteAppointment() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (id: string) =>
+    mutationFn: ({ id, protocolCreditAction }: { id: string; protocolCreditAction?: ProtocolCreditAction; patientId?: string }) =>
       apiFetch<void>(`/api/psychology/sessions/${id}`, {
         method: 'DELETE',
+        body: JSON.stringify(protocolCreditAction ? { protocolCreditAction } : {}),
       }),
-    onSuccess: async () => {
-      await Promise.all([
-        qc.invalidateQueries({ queryKey: ['appointments'] }),
-        qc.invalidateQueries({ queryKey: ['financial'] }),
-      ])
+    onSuccess: async (_, variables) => {
+      await invalidateAppointmentContext(qc, variables.patientId)
     },
   })
 }
@@ -188,5 +251,39 @@ export function useSendPaymentReminder() {
   return useMutation({
     mutationFn: (id: string) =>
       apiFetch<void>(`/api/psychology/sessions/${id}/send-payment-reminder`, { method: 'POST', body: '{}' }),
+  })
+}
+
+export function useSendBulkPaymentReminders() {
+  return useMutation({
+    mutationFn: async (appointmentIds: string[]) => {
+      return Promise.all(
+        appointmentIds.map(async (appointmentId): Promise<PaymentReminderResult> => {
+          try {
+            await apiFetch<void>(`/api/psychology/sessions/${appointmentId}/send-payment-reminder`, {
+              method: 'POST',
+              body: '{}',
+            })
+
+            return { appointmentId, success: true }
+          } catch (error) {
+            if (error instanceof ApiError) {
+              return {
+                appointmentId,
+                success: false,
+                code: error.code,
+                message: error.message,
+              }
+            }
+
+            return {
+              appointmentId,
+              success: false,
+              message: error instanceof Error ? error.message : 'Erro ao enviar lembrete',
+            }
+          }
+        }),
+      )
+    },
   })
 }

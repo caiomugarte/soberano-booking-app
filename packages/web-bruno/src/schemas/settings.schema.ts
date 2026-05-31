@@ -1,9 +1,8 @@
 import { z } from 'zod'
 
 export const SessionDefaultsSchema = z.object({
-  individual: z.number().int(),
-  couple: z.number().int(),
-  family: z.number().int(),
+  psychotherapy: z.number().int(),
+  neuromodulation: z.number().int(),
 })
 
 export const WorkingHoursSchema = z.object({

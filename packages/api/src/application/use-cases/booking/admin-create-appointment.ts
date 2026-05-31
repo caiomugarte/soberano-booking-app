@@ -7,6 +7,7 @@ import type { CustomerPackageRepository } from '../../../domain/repositories/cus
 import type { AppointmentWithDetails } from '../../../domain/entities/appointment.js';
 import { NotFoundError, SlotTakenError, ValidationError } from '../../../shared/errors.js';
 import { WhatsAppNotificationService } from '../../../infrastructure/notifications/whatsapp-notification.service.js';
+import { PackageLifecycleManager } from './package-lifecycle-manager.js';
 
 interface AdminCreateAppointmentInput {
   tenantId: string;
@@ -46,8 +47,10 @@ export class AdminCreateAppointment {
 
     let packagePriceCents: number | undefined;
     if (input.packageId && this.packageRepo) {
-      const pkg = await this.packageRepo.findByIdAndTenant(input.packageId, input.tenantId);
-      if (!pkg || pkg.status !== 'active') throw new ValidationError('Pacote inválido ou já utilizado.');
+      const pkg = await this.packageRepo.findByIdForProvider(input.packageId, input.tenantId, input.barberId);
+      if (!pkg || pkg.status !== 'active' || pkg.usedCount >= pkg.totalUses) {
+        throw new ValidationError('Pacote inválido, cancelado ou sem usos restantes.');
+      }
       packagePriceCents = Math.floor(pkg.totalPriceCents / pkg.totalUses);
     }
 
@@ -77,6 +80,14 @@ export class AdminCreateAppointment {
 
     if (input.packageId && this.packageRepo) {
       await this.packageRepo.incrementUsedCount(input.packageId);
+      const packageLifecycleManager = new PackageLifecycleManager(this.packageRepo, this.notificationService);
+      await packageLifecycleManager.syncForAppointment({
+        packageId: input.packageId,
+        tenantId: input.tenantId,
+        providerId: input.barberId,
+        event: 'appointment_created',
+        appointment,
+      });
     }
 
     const today = new Date();

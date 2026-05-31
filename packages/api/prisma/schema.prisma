@@ -25,6 +25,7 @@ model Tenant {
   sessionReports   SessionReport[]
   documents        Document[]
   customerPackages CustomerPackage[]
+  neuromodulationProtocols NeuromodulationProtocol[]
   recurringAppointmentSeries RecurringAppointmentSeries[]
 
   @@map("tenants")
@@ -50,7 +51,9 @@ model Provider {
   appointments   Appointment[]
   shifts         ProviderShift[]
   absences       ProviderAbsence[]
+  customerPackages CustomerPackage[]
   sessionReports SessionReport[]
+  neuromodulationProtocols NeuromodulationProtocol[]
   recurringAppointmentSeries RecurringAppointmentSeries[]
 
   @@unique([tenantId, slug])
@@ -117,12 +120,18 @@ model Customer {
   cpf       String?  @db.VarChar(14)
   email     String?  @db.VarChar(255)
   notes     String?  @db.Text
+  careMode  String   @default("psychotherapy") @map("care_mode") @db.VarChar(30)
+  psychotherapyPriceCents Int? @map("psychotherapy_price_cents")
+  psychotherapyFrequency String? @map("psychotherapy_frequency") @db.VarChar(20)
+  birthDate DateTime? @map("birth_date") @db.Date
+  address   String?  @db.Text
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
   appointments Appointment[]
   documents    Document[]
+  neuromodulationProtocols NeuromodulationProtocol[]
   recurringAppointmentSeries RecurringAppointmentSeries[]
 
   @@unique([tenantId, phone])
@@ -155,6 +164,8 @@ model Appointment {
   appointmentNotes String?   @map("appointment_notes") @db.Text
 
   packageId          String?   @map("package_id") @db.Uuid
+  protocolId         String?   @map("protocol_id") @db.Uuid
+  protocolCreditOutcome String? @map("protocol_credit_outcome") @db.VarChar(20)
   recurringSeriesId  String?   @map("recurring_series_id") @db.Uuid
 
   tenant           Tenant                     @relation(fields: [tenantId], references: [id])
@@ -162,6 +173,7 @@ model Appointment {
   service          Service                    @relation(fields: [serviceId], references: [id])
   customer         Customer                   @relation(fields: [customerId], references: [id])
   package          CustomerPackage?           @relation(fields: [packageId], references: [id])
+  protocol         NeuromodulationProtocol?   @relation(fields: [protocolId], references: [id])
   recurringSeries  RecurringAppointmentSeries? @relation(fields: [recurringSeriesId], references: [id])
   sessionReports   SessionReport[]
 
@@ -169,8 +181,35 @@ model Appointment {
   @@index([date, providerId])
   @@index([customerId])
   @@index([cancelToken])
+  @@index([protocolId])
   @@index([recurringSeriesId])
   @@map("appointments")
+}
+
+model NeuromodulationProtocol {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  providerId       String   @map("provider_id") @db.Uuid
+  customerId       String   @map("customer_id") @db.Uuid
+  totalSessions    Int      @map("total_sessions")
+  status           String   @default("active") @db.VarChar(20)
+  totalPriceCents  Int      @map("total_price_cents")
+  paymentStatus    String   @default("pending") @map("payment_status") @db.VarChar(20)
+  paymentMethod    String?  @map("payment_method") @db.VarChar(20)
+  paidAt           DateTime? @map("paid_at") @db.Timestamptz
+  manualConsumedCount Int   @default(0) @map("manual_consumed_count")
+  notes            String?  @db.Text
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  provider         Provider @relation(fields: [providerId], references: [id])
+  customer         Customer @relation(fields: [customerId], references: [id])
+  appointments     Appointment[]
+
+  @@index([tenantId, customerId, status])
+  @@index([providerId, status])
+  @@map("neuromodulation_protocols")
 }
 
 model RecurringAppointmentSeries {
@@ -225,6 +264,7 @@ model SessionReport {
 model CustomerPackage {
   id               String   @id @default(uuid()) @db.Uuid
   tenantId         String   @map("tenant_id") @db.Uuid
+  providerId       String   @map("provider_id") @db.Uuid
   customerName     String   @map("customer_name") @db.VarChar(200)
   customerPhone    String?  @map("customer_phone") @db.VarChar(20)
   totalUses        Int      @map("total_uses")
@@ -235,9 +275,11 @@ model CustomerPackage {
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  provider     Provider      @relation(fields: [providerId], references: [id])
   appointments Appointment[]
 
-  @@index([tenantId, customerPhone, status])
+  @@index([tenantId, providerId, customerPhone, status], map: "customer_packages_tenant_id_provider_id_customer_phone_stat_idx")
+  @@index([tenantId, providerId, status])
   @@map("customer_packages")
 }
 

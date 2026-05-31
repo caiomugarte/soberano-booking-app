@@ -1,0 +1,7 @@
+-- No-op.
+--
+-- Prisma generated an index rename here because PostgreSQL truncates long
+-- identifiers to 63 chars, but the provider-scoped package index is only
+-- created in the later 20260527173000_add_customer_package_provider_ownership
+-- migration. Creating the final short index name directly in that later
+-- migration keeps the history valid for fresh and production databases.

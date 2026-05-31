@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { usePatients } from '@/api/patients'
 import { Input } from '@/components/ui/Input'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { Badge } from '@/components/ui/Badge'
+import { CARE_MODE_LABELS } from '@/config/constants'
 import { formatPhone } from '@/lib/format'
 
 export function PatientList() {
@@ -34,7 +36,12 @@ export function PatientList() {
               className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3 text-left transition-shadow hover:shadow-md"
             >
               <div>
-                <div className="text-sm font-medium text-gray-800">{patient.name}</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="text-sm font-medium text-gray-800">{patient.name}</div>
+                  <Badge variant={patient.careMode === 'neuromodulation' ? 'amber' : 'blue'}>
+                    {CARE_MODE_LABELS[patient.careMode]}
+                  </Badge>
+                </div>
                 {patient.phone && (
                   <div className="text-xs text-gray-400">{formatPhone(patient.phone)}</div>
                 )}
