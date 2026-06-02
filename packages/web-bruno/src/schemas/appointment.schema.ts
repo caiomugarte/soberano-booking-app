@@ -18,6 +18,14 @@ export const ProtocolCreditActionSchema = z.enum(['release', 'consume'])
 
 export const SessionTypeSchema = z.enum(['psychotherapy', 'neuromodulation'])
 
+export const AppointmentHistoryFiltersSchema = z.object({
+  from: z.string().optional(),
+  to: z.string().optional(),
+  type: SessionTypeSchema.optional(),
+  status: AppointmentStatusSchema.optional(),
+  paymentStatus: PaymentStatusSchema.optional(),
+})
+
 export const AppointmentSchema = z.object({
   id: z.string().uuid(),
   patientId: z.string().uuid(),
@@ -51,6 +59,7 @@ export type ProtocolStatus = z.infer<typeof ProtocolStatusSchema>
 export type ProtocolCreditOutcome = z.infer<typeof ProtocolCreditOutcomeSchema>
 export type ProtocolLinkType = z.infer<typeof ProtocolLinkTypeSchema>
 export type ProtocolCreditAction = z.infer<typeof ProtocolCreditActionSchema>
+export type AppointmentHistoryFilters = z.infer<typeof AppointmentHistoryFiltersSchema>
 
 export const AppointmentFormSchema = AppointmentSchema.omit({
   id: true,

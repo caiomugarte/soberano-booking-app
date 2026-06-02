@@ -9,7 +9,7 @@ import {
   assertNoScheduleConflict,
   assertPaymentInput,
   assertProtocolCapacity,
-  assertSessionMatchesCareMode,
+  assertSessionMatchesCareProfile,
   buildEndTime,
   resolveProtocolOutcome,
   resolvePsychologySessionPrice,
@@ -46,7 +46,7 @@ export class CreatePsychologySessionUseCase {
       throw new NotFoundError('Paciente');
     }
 
-    assertSessionMatchesCareMode(patient, input.type);
+    assertSessionMatchesCareProfile(patient, input.type);
 
     if (input.type === 'psychotherapy' && input.protocolId) {
       throw new NotFoundError('Protocolo');

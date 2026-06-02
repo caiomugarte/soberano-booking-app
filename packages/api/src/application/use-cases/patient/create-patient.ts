@@ -9,9 +9,10 @@ export interface CreatePatientInput {
   email?: string;
   cpf?: string;
   notes?: string | null;
-  careMode: CustomerEntity['careMode'];
   psychotherapyPriceCents?: number | null;
   psychotherapyFrequency?: CustomerEntity['psychotherapyFrequency'];
+  neuromodulationEligible?: boolean;
+  parentsMeetingStatus?: CustomerEntity['parentsMeetingStatus'];
   birthDate?: Date | null;
   address?: string | null;
 }
@@ -21,9 +22,10 @@ export class CreatePatientUseCase {
 
   async execute(input: CreatePatientInput): Promise<CustomerEntity> {
     const profile = normalizePatientCareProfile({
-      careMode: input.careMode,
       psychotherapyPriceCents: input.psychotherapyPriceCents ?? null,
       psychotherapyFrequency: input.psychotherapyFrequency ?? null,
+      neuromodulationEligible: input.neuromodulationEligible ?? false,
+      parentsMeetingStatus: input.parentsMeetingStatus ?? null,
     });
 
     return this.customerRepo.create({
@@ -35,9 +37,10 @@ export class CreatePatientUseCase {
       notes: input.notes,
       birthDate: input.birthDate,
       address: input.address,
-      careMode: profile.careMode,
       psychotherapyPriceCents: profile.psychotherapyPriceCents,
       psychotherapyFrequency: profile.psychotherapyFrequency,
+      neuromodulationEligible: profile.neuromodulationEligible,
+      parentsMeetingStatus: profile.parentsMeetingStatus,
     });
   }
 }

@@ -1,3 +1,7 @@
+export type PsychotherapyFrequency = 'weekly' | 'biweekly';
+export type ParentsMeetingStatus = 'pending' | 'completed';
+export type PatientCareSummary = 'psychotherapy' | 'neuromodulation' | 'dual_track';
+
 export interface CustomerEntity {
   id: string;
   name: string;
@@ -5,9 +9,10 @@ export interface CustomerEntity {
   cpf: string | null;
   email: string | null;
   notes: string | null;
-  careMode: 'psychotherapy' | 'neuromodulation';
   psychotherapyPriceCents: number | null;
-  psychotherapyFrequency: 'weekly' | 'biweekly' | null;
+  psychotherapyFrequency: PsychotherapyFrequency | null;
+  neuromodulationEligible: boolean;
+  parentsMeetingStatus: ParentsMeetingStatus | null;
   birthDate: Date | null;
   address: string | null;
 }

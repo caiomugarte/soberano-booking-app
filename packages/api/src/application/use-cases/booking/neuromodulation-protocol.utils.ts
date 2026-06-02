@@ -12,8 +12,8 @@ export function assertNeuromodulationPatient(patient: CustomerEntity | null): as
     throw new ValidationError('Paciente não encontrado.');
   }
 
-  if (patient.careMode !== 'neuromodulation') {
-    throw new ValidationError('Apenas pacientes de neuromodulação podem receber protocolos.');
+  if (!patient.neuromodulationEligible) {
+    throw new ValidationError('Apenas pacientes elegíveis para neuromodulação podem receber protocolos.');
   }
 }
 

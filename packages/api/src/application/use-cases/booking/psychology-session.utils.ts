@@ -10,6 +10,7 @@ import type {
 import type { ServiceEntity } from '../../../domain/entities/service.js';
 import { ValidationError } from '../../../shared/errors.js';
 import { addMinutes, parseDateOnly } from './recurring-series.utils.js';
+import { hasPsychotherapyCareProfile } from '../patient/patient-profile.utils.js';
 
 export type PsychologySessionType = 'psychotherapy' | 'neuromodulation';
 export type ProtocolCreditAction = 'release' | 'consume';
@@ -57,9 +58,13 @@ export function resolvePsychologySessionPrice(input: {
   return input.service.priceCents;
 }
 
-export function assertSessionMatchesCareMode(patient: CustomerEntity, type: PsychologySessionType): void {
-  if (patient.careMode !== type) {
-    throw new ValidationError('A sessão deve seguir o modo de cuidado atual do paciente.');
+export function assertSessionMatchesCareProfile(patient: CustomerEntity, type: PsychologySessionType): void {
+  if (type === 'psychotherapy' && !hasPsychotherapyCareProfile(patient)) {
+    throw new ValidationError('Este paciente precisa de um acordo de psicoterapia para receber sessões de psicoterapia.');
+  }
+
+  if (type === 'neuromodulation' && !patient.neuromodulationEligible) {
+    throw new ValidationError('Este paciente ainda não está elegível para neuromodulação.');
   }
 }
 

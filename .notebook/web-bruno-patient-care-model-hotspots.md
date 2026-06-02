@@ -40,3 +40,21 @@
 - Historical appointment pricing is already snapshot-based through `appointments.price_cents`, so patient-agreement changes should affect defaulting logic only, not rewrite old rows.
 - Birthday reminders can reuse patient data once `birthDate` is added; no dedicated dashboard endpoint is strictly required if the existing patient query remains acceptable for Bruno's scale.
 - `UpdatePsychologySessionUseCase` must preserve `appointment.priceCents` when callers omit `valueCents`; otherwise editing an old psychotherapy session can silently pick up the patient's newer negotiated price.
+
+## 2026-06-02 V2 Implementation Update
+
+1. The exclusive patient `careMode` contract is gone from runtime code. Dual-track support now comes from:
+   - `packages/api/prisma/schema.prisma` (`neuromodulation_eligible`, `parents_meeting_status`)
+   - psychotherapy activity inferred from `psychotherapyPriceCents` + `psychotherapyFrequency`
+2. `packages/api/src/http/routes/psychology.routes.ts` now returns patient detail with:
+   - derived `careSummary`
+   - derived `isMinor`
+   - visible `parentsMeetingStatus`
+   - nested `financialSummary`
+3. Patient-history filtering stays on the existing sessions route, but the patient-detail flow now relies on query params:
+   - `patientId`, `from`, `to`, `type`, `status`, `paymentStatus`
+4. `packages/web-bruno/src/components/appointments/AppointmentForm.tsx` no longer locks session type to one exclusive patient mode:
+   - allowed types are derived from the patient profile
+   - psychotherapy defaults still prefill only when the selected type is psychotherapy
+   - protocol UI only appears when the chosen type is neuromodulation and the patient is eligible
+5. Patient deletion blockers now enumerate documents, sessions, recurring series, and protocols, and delete-time FK surprises are translated into the same `409 PATIENT_HAS_DEPENDENCIES` family instead of surfacing as a generic server error.

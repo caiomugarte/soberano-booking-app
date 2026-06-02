@@ -11,9 +11,10 @@ const psychotherapyPatient: CustomerEntity = {
   cpf: null,
   email: null,
   notes: null,
-  careMode: 'psychotherapy',
   psychotherapyPriceCents: 18000,
   psychotherapyFrequency: 'weekly',
+  neuromodulationEligible: false,
+  parentsMeetingStatus: null,
   birthDate: null,
   address: null,
 };
@@ -49,15 +50,15 @@ describe('UpdatePatientUseCase', () => {
     expect(customerRepo.update).toHaveBeenCalledWith(
       psychotherapyPatient.id,
       expect.objectContaining({
-        careMode: 'psychotherapy',
         psychotherapyPriceCents: 18000,
         psychotherapyFrequency: 'weekly',
+        neuromodulationEligible: false,
         address: 'Rua B, 456',
       }),
     );
   });
 
-  it('clears psychotherapy defaults when switching to neuromodulation', async () => {
+  it('enables dual-track care without clearing psychotherapy defaults', async () => {
     const customerRepo: CustomerRepository = {
       findByPhone: vi.fn(),
       findByCpf: vi.fn(),
@@ -70,9 +71,7 @@ describe('UpdatePatientUseCase', () => {
       create: vi.fn(),
       update: vi.fn().mockResolvedValue({
         ...psychotherapyPatient,
-        careMode: 'neuromodulation',
-        psychotherapyPriceCents: null,
-        psychotherapyFrequency: null,
+        neuromodulationEligible: true,
       }),
       deleteById: vi.fn(),
     };
@@ -81,17 +80,56 @@ describe('UpdatePatientUseCase', () => {
     const updated = await useCase.execute({
       patientId: psychotherapyPatient.id,
       changes: {
-        careMode: 'neuromodulation',
+        neuromodulationEligible: true,
       },
     });
 
-    expect(updated.careMode).toBe('neuromodulation');
+    expect(updated.neuromodulationEligible).toBe(true);
     expect(customerRepo.update).toHaveBeenCalledWith(
       psychotherapyPatient.id,
       expect.objectContaining({
-        careMode: 'neuromodulation',
-        psychotherapyPriceCents: null,
-        psychotherapyFrequency: null,
+        psychotherapyPriceCents: 18000,
+        psychotherapyFrequency: 'weekly',
+        neuromodulationEligible: true,
+      }),
+    );
+  });
+
+  it('persists the parents meeting workflow state for underage patients', async () => {
+    const customerRepo: CustomerRepository = {
+      findByPhone: vi.fn(),
+      findByCpf: vi.fn(),
+      findByEmail: vi.fn(),
+      findById: vi.fn().mockResolvedValue({
+        ...psychotherapyPatient,
+        birthDate: new Date('2012-06-15T00:00:00Z'),
+      }),
+      upsertByPhone: vi.fn(),
+      createWalkin: vi.fn(),
+      updateName: vi.fn(),
+      findAll: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn().mockResolvedValue({
+        ...psychotherapyPatient,
+        birthDate: new Date('2012-06-15T00:00:00Z'),
+        parentsMeetingStatus: 'completed',
+      }),
+      deleteById: vi.fn(),
+    };
+
+    const useCase = new UpdatePatientUseCase(customerRepo);
+    const updated = await useCase.execute({
+      patientId: psychotherapyPatient.id,
+      changes: {
+        parentsMeetingStatus: 'completed',
+      },
+    });
+
+    expect(updated.parentsMeetingStatus).toBe('completed');
+    expect(customerRepo.update).toHaveBeenCalledWith(
+      psychotherapyPatient.id,
+      expect.objectContaining({
+        parentsMeetingStatus: 'completed',
       }),
     );
   });
@@ -133,7 +171,7 @@ describe('UpdatePatientUseCase', () => {
     await expect(
       useCase.execute({
         patientId: 'missing',
-        changes: { careMode: 'neuromodulation' },
+        changes: { neuromodulationEligible: true },
       }),
     ).rejects.toBeInstanceOf(NotFoundError);
   });

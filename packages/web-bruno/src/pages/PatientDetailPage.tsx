@@ -7,12 +7,33 @@ import { PatientForm } from '@/components/patients/PatientForm'
 import { PatientHistory } from '@/components/patients/PatientHistory'
 import { PatientProtocolsPanel } from '@/components/protocols/PatientProtocolsPanel'
 import { Button } from '@/components/ui/Button'
+import { Badge } from '@/components/ui/Badge'
 import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import { Modal } from '@/components/ui/Modal'
 import { Panel } from '@/components/ui/Panel'
 import { Spinner } from '@/components/ui/Spinner'
-import { CARE_MODE_LABELS, FREQUENCY_LABELS } from '@/config/constants'
-import { formatCPF, formatDate, formatPhone } from '@/lib/format'
+import {
+  CARE_SUMMARY_LABELS,
+  FREQUENCY_LABELS,
+  PARENTS_MEETING_STATUS_LABELS,
+} from '@/config/constants'
+import { formatCPF, formatCurrency, formatDate, formatPhone } from '@/lib/format'
+import { hasPsychotherapyTrack } from '@/lib/patient-care'
+
+function FinancialStat({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
+  return (
+    <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+      <div className="text-xs text-gray-500">{label}</div>
+      <div className="mt-1 text-sm font-semibold text-gray-800">{value}</div>
+    </div>
+  )
+}
 
 export default function PatientDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -27,6 +48,7 @@ export default function PatientDetailPage() {
 
   const deleteError = deletePatient.error instanceof Error ? deletePatient.error.message : null
   const patientName = patient?.name ?? deletedPatientName
+  const psychotherapyActive = hasPsychotherapyTrack(patient)
 
   function openDeleteDialog() {
     deletePatient.reset()
@@ -78,6 +100,10 @@ export default function PatientDetailPage() {
                 ← Voltar
               </button>
               <h1 className="min-w-0 text-xl font-bold text-gray-800">{patient.name}</h1>
+              <Badge variant={patient.careSummary === 'dual_track' ? 'emerald' : patient.careSummary === 'neuromodulation' ? 'amber' : 'blue'}>
+                {CARE_SUMMARY_LABELS[patient.careSummary]}
+              </Badge>
+              {patient.isMinor && <Badge variant="amber">Menor de idade</Badge>}
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap lg:justify-end">
               <Button className="w-full sm:w-auto" variant="secondary" size="sm" onClick={() => setAppointmentOpen(true)}>
@@ -92,7 +118,7 @@ export default function PatientDetailPage() {
             </div>
           </div>
 
-          <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-3">
             <Panel>
               <Panel.Header>Informações</Panel.Header>
               <Panel.Body className="space-y-2 text-sm">
@@ -115,13 +141,19 @@ export default function PatientDetailPage() {
                   </div>
                 )}
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="text-gray-500">Modo de cuidado</span>
-                  <span>{CARE_MODE_LABELS[patient.careMode]}</span>
+                  <span className="text-gray-500">Perfil de cuidado</span>
+                  <span>{CARE_SUMMARY_LABELS[patient.careSummary]}</span>
                 </div>
                 {patient.birthDate && (
                   <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-gray-500">Nascimento</span>
                     <span>{formatDate(patient.birthDate)}</span>
+                  </div>
+                )}
+                {(patient.isMinor || patient.parentsMeetingStatus) && (
+                  <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                    <span className="text-gray-500">Reunião com responsáveis</span>
+                    <span>{PARENTS_MEETING_STATUS_LABELS[patient.parentsMeetingStatus ?? 'pending']}</span>
                   </div>
                 )}
                 {patient.address && (
@@ -130,13 +162,13 @@ export default function PatientDetailPage() {
                     <span className="max-w-sm text-right">{patient.address}</span>
                   </div>
                 )}
-                {patient.careMode === 'psychotherapy' && patient.psychotherapyPriceCents && (
+                {psychotherapyActive && patient.psychotherapyPriceCents && (
                   <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-gray-500">Valor acordado</span>
-                    <span>R$ {(patient.psychotherapyPriceCents / 100).toFixed(2).replace('.', ',')}</span>
+                    <span>{formatCurrency(patient.psychotherapyPriceCents)}</span>
                   </div>
                 )}
-                {patient.careMode === 'psychotherapy' && patient.psychotherapyFrequency && (
+                {psychotherapyActive && patient.psychotherapyFrequency && (
                   <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-gray-500">Frequência</span>
                     <span>{FREQUENCY_LABELS[patient.psychotherapyFrequency]}</span>
@@ -145,11 +177,37 @@ export default function PatientDetailPage() {
               </Panel.Body>
             </Panel>
 
+            {patient.financialSummary && (
+              <Panel>
+                <Panel.Header>Financeiro</Panel.Header>
+                <Panel.Body className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-gray-800">Recebíveis de sessões</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <FinancialStat label="Pagas" value={`${patient.financialSummary.sessionReceivables.paidCount}`} />
+                      <FinancialStat label="Pendentes" value={`${patient.financialSummary.sessionReceivables.pendingCount}`} />
+                      <FinancialStat label="Total pago" value={formatCurrency(patient.financialSummary.sessionReceivables.paidTotalCents)} />
+                      <FinancialStat label="Total pendente" value={formatCurrency(patient.financialSummary.sessionReceivables.pendingTotalCents)} />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="text-sm font-medium text-gray-800">Vendas de protocolo</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <FinancialStat label="Pagos" value={`${patient.financialSummary.protocolSales.paidCount}`} />
+                      <FinancialStat label="Pendentes" value={`${patient.financialSummary.protocolSales.pendingCount}`} />
+                      <FinancialStat label="Total pago" value={formatCurrency(patient.financialSummary.protocolSales.paidTotalCents)} />
+                      <FinancialStat label="Total pendente" value={formatCurrency(patient.financialSummary.protocolSales.pendingTotalCents)} />
+                    </div>
+                  </div>
+                </Panel.Body>
+              </Panel>
+            )}
+
             {patient.notes && (
               <Panel>
                 <Panel.Header>Notas</Panel.Header>
                 <Panel.Body>
-                  <p className="text-sm text-gray-600 whitespace-pre-wrap">{patient.notes}</p>
+                  <p className="whitespace-pre-wrap text-sm text-gray-600">{patient.notes}</p>
                 </Panel.Body>
               </Panel>
             )}
@@ -159,7 +217,7 @@ export default function PatientDetailPage() {
             <PatientDocuments patientId={patient.id} />
           </div>
 
-          {patient.careMode === 'neuromodulation' && (
+          {patient.neuromodulationEligible && (
             <div className="mb-6">
               <PatientProtocolsPanel patientId={patient.id} />
             </div>

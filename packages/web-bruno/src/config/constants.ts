@@ -38,14 +38,20 @@ export const SESSION_TYPE_LABELS: Record<string, string> = {
   neuromodulation: 'Neuromodulação',
 }
 
-export const CARE_MODE_LABELS: Record<string, string> = {
+export const CARE_SUMMARY_LABELS: Record<string, string> = {
   psychotherapy: 'Psicoterapia',
   neuromodulation: 'Neuromodulação',
+  dual_track: 'Psicoterapia + Neuromodulação',
 }
 
 export const FREQUENCY_LABELS: Record<string, string> = {
   weekly: 'Semanal',
   biweekly: 'Quinzenal',
+}
+
+export const PARENTS_MEETING_STATUS_LABELS: Record<string, string> = {
+  pending: 'Pendente',
+  completed: 'Concluída',
 }
 
 export const PROTOCOL_STATUS_LABELS: Record<string, string> = {

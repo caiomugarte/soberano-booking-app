@@ -18,7 +18,6 @@ export class UpdatePatientUseCase {
     }
 
     const mergedProfile = normalizePatientCareProfile({
-      careMode: input.changes.careMode ?? currentPatient.careMode,
       psychotherapyPriceCents:
         input.changes.psychotherapyPriceCents !== undefined
           ? input.changes.psychotherapyPriceCents
@@ -27,13 +26,20 @@ export class UpdatePatientUseCase {
         input.changes.psychotherapyFrequency !== undefined
           ? input.changes.psychotherapyFrequency
           : currentPatient.psychotherapyFrequency,
+      neuromodulationEligible:
+        input.changes.neuromodulationEligible ?? currentPatient.neuromodulationEligible,
+      parentsMeetingStatus:
+        input.changes.parentsMeetingStatus !== undefined
+          ? input.changes.parentsMeetingStatus
+          : currentPatient.parentsMeetingStatus,
     });
 
     return this.customerRepo.update(input.patientId, {
       ...input.changes,
-      careMode: mergedProfile.careMode,
       psychotherapyPriceCents: mergedProfile.psychotherapyPriceCents,
       psychotherapyFrequency: mergedProfile.psychotherapyFrequency,
+      neuromodulationEligible: mergedProfile.neuromodulationEligible,
+      parentsMeetingStatus: mergedProfile.parentsMeetingStatus,
     });
   }
 }

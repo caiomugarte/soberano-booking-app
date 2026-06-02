@@ -13,7 +13,8 @@
 | web-bruno-api-migration | Tasks ready — ready to execute | `.specs/features/web-bruno-api-migration/tasks.md` |
 | web-bruno-recurring-session-series | Tasks draft — awaiting approval | `.specs/features/web-bruno-recurring-session-series/tasks.md` |
 | web-bruno-agenda-event-management | Tasks draft — payment-date control added, awaiting approval | `.specs/features/web-bruno-agenda-event-management/tasks.md` |
-| web-bruno-patient-care-model | Tasks draft — patient profile, defaulting, and birthday reminder sequenced | `.specs/features/web-bruno-patient-care-model/tasks.md` |
+| web-bruno-patient-care-model | Superseded by `web-bruno-patient-care-model-v2`; original tasks describe the exclusive-care-mode baseline | `.specs/features/web-bruno-patient-care-model/tasks.md` |
+| web-bruno-patient-care-model-v2 | Tasks draft — dual-track patient profile, delete safety, history filters, and patient financial detail sequenced | `.specs/features/web-bruno-patient-care-model-v2/tasks.md` |
 | web-bruno-neuromodulation-protocols | Tasks draft — blocked by patient care model foundation, awaiting approval | `.specs/features/web-bruno-neuromodulation-protocols/tasks.md` |
 | web-bruno-operations-hub | Tasks draft — depends on patient care model and protocol receivable rules, awaiting approval | `.specs/features/web-bruno-operations-hub/tasks.md` |
 | psychology-patient-dedup | Tasks draft — awaiting approval | `.specs/features/psychology-patient-dedup/tasks.md` |
@@ -44,6 +45,7 @@
 | 2026-05-05 | Psychology payment-date control stays inside `web-bruno-agenda-event-management` | It extends the same paid-state workflow and requires financial attribution by `paidAt`, not only by the session date |
 | 2026-05-18 | Bruno psychology changes split into three linked specs | Separating patient/domain foundation, neuromodulation protocols, and operations keeps later execution atomic and reduces cross-package ambiguity |
 | 2026-05-18 | Neuromodulation revenue belongs to the protocol sale, not to later operational session rows | Bruno sells long protocols first and books dates over time, so financial attribution must follow the protocol agreement |
+| 2026-06-02 | `web-bruno-patient-care-model-v2` replaces the original patient-care-model execution track | The codebase already implements the exclusive `careMode` assumption, but Bruno now needs dual-track patients plus patient-detail operational improvements before further execution |
 
 ## Blockers
 

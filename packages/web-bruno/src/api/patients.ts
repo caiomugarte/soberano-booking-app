@@ -9,9 +9,10 @@ type PatientUpdateData = {
   email?: string | null
   cpf?: string | null
   notes?: string | null
-  careMode?: Patient['careMode']
   psychotherapyPriceCents?: Patient['psychotherapyPriceCents'] | null
   psychotherapyFrequency?: Patient['psychotherapyFrequency'] | null
+  neuromodulationEligible?: Patient['neuromodulationEligible']
+  parentsMeetingStatus?: Patient['parentsMeetingStatus'] | null
   birthDate?: Patient['birthDate'] | null
   address?: Patient['address'] | null
 }
