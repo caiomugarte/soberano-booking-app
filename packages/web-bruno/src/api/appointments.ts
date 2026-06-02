@@ -64,6 +64,8 @@ function normalizeAppointmentFilters(filters: AppointmentListFilters = {}): Appo
     ...(filters.from ? { from: filters.from } : {}),
     ...(filters.to ? { to: filters.to } : {}),
     ...(filters.patientId ? { patientId: filters.patientId } : {}),
+    ...(filters.type ? { type: filters.type } : {}),
+    ...(filters.status ? { status: filters.status } : {}),
     ...(filters.paymentStatus ? { paymentStatus: filters.paymentStatus } : {}),
     ...(filters.excludeCancelled ? { excludeCancelled: true } : {}),
     ...(filters.dueOnly ? { dueOnly: true } : {}),
