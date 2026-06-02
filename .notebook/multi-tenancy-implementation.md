@@ -38,6 +38,17 @@ For any model in the set:
 
 Global `prisma` (not tenant-scoped) is used only for: `Tenant` lookups and cross-tenant bootstrap (e.g., internal routes resolving provider's tenantId).
 
+### Gotcha: partial tenant-scoped model list causes silent cross-tenant corruption
+
+If a model has a `tenantId` column but is missing from `TENANT_SCOPED_MODELS`, reads and writes through `request.tenantPrisma` are not isolated for that model.
+
+This is especially dangerous for recurring-series materialization:
+- `RecurringAppointmentSeries.findActive()` can return active series from every tenant
+- the per-tenant job then creates `Appointment` rows with the current tenant id but foreign keys from another tenant's series
+- patient history and direct appointment counts go empty for the original tenant, while delete blockers can still see the series row
+
+The tenant-scoped set must include all tenant-backed operational models, including `Document`, `SessionReport`, `NeuromodulationProtocol`, `RecurringAppointmentSeries`, and `CustomerPackage`.
+
 ## Repository Pattern (Per-Request)
 
 Route handlers instantiate repositories per-request with the scoped client:
