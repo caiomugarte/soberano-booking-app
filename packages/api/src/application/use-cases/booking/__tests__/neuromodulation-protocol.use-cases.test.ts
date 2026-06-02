@@ -78,6 +78,8 @@ describe('Neuromodulation protocol use cases', () => {
       findCurrentByCustomerId: vi.fn().mockResolvedValue(null),
       update: vi.fn(),
       getUsageSnapshot: vi.fn(),
+      countLinkedAppointments: vi.fn(),
+      deleteById: vi.fn(),
     }
 
     const useCase = new CreateNeuromodulationProtocolUseCase(customerRepo, protocolRepo)
@@ -117,6 +119,8 @@ describe('Neuromodulation protocol use cases', () => {
         consumedSessions: 10,
         remainingSessions: 24,
       }),
+      countLinkedAppointments: vi.fn(),
+      deleteById: vi.fn(),
     }
 
     const useCase = new UpdateNeuromodulationProtocolUseCase(customerRepo, protocolRepo)
@@ -140,6 +144,8 @@ describe('Neuromodulation protocol use cases', () => {
       findCurrentByCustomerId: vi.fn().mockResolvedValue(null),
       update: vi.fn(),
       getUsageSnapshot: vi.fn(),
+      countLinkedAppointments: vi.fn(),
+      deleteById: vi.fn(),
     }
 
     const useCase = new ChangeNeuromodulationProtocolStatusUseCase(protocolRepo)

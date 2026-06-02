@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { useChangeProtocolStatus, usePatientProtocols } from '@/api/protocols'
+import { useChangeProtocolStatus, useDeleteProtocol, usePatientProtocols } from '@/api/protocols'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
+import { ConfirmationDialog } from '@/components/ui/ConfirmationDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Panel } from '@/components/ui/Panel'
 import { ProtocolForm } from './ProtocolForm'
@@ -37,8 +38,10 @@ function CounterCard({
 export function PatientProtocolsPanel({ patientId }: PatientProtocolsPanelProps) {
   const { data: protocols = [] } = usePatientProtocols(patientId)
   const changeProtocolStatus = useChangeProtocolStatus()
+  const deleteProtocol = useDeleteProtocol()
   const [editingProtocol, setEditingProtocol] = useState<Protocol | null>(null)
   const [formOpen, setFormOpen] = useState(false)
+  const [protocolToDelete, setProtocolToDelete] = useState<Protocol | null>(null)
 
   const { currentProtocols, finishedProtocols } = useMemo(() => ({
     currentProtocols: protocols.filter((protocol) => protocol.status !== 'finished'),
@@ -53,6 +56,17 @@ export function PatientProtocolsPanel({ patientId }: PatientProtocolsPanelProps)
   function openEdit(protocol: Protocol) {
     setEditingProtocol(protocol)
     setFormOpen(true)
+  }
+
+  function handleDeleteProtocol() {
+    if (!protocolToDelete) return
+
+    deleteProtocol.mutate(
+      { id: protocolToDelete.id, patientId },
+      {
+        onSuccess: () => setProtocolToDelete(null),
+      },
+    )
   }
 
   return (
@@ -133,15 +147,24 @@ export function PatientProtocolsPanel({ patientId }: PatientProtocolsPanelProps)
                   <div className="text-sm font-medium text-gray-700">Histórico finalizado</div>
                   {finishedProtocols.map((protocol) => (
                     <div key={protocol.id} className="rounded-xl border border-dashed border-gray-200 p-4">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Badge variant="gray">{PROTOCOL_STATUS_LABELS[protocol.status]}</Badge>
-                        <span className="text-sm text-gray-500">
-                          {formatCurrency(protocol.totalPriceCents)} • {protocol.consumedSessions} consumidas
-                        </span>
-                      </div>
-                      <div className="mt-2 text-xs text-gray-500">
-                        Criado em {formatDate(protocol.createdAt)}
-                        {protocol.paidAt ? ` • pago em ${formatDate(protocol.paidAt)}` : ''}
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="gray">{PROTOCOL_STATUS_LABELS[protocol.status]}</Badge>
+                            <span className="text-sm text-gray-500">
+                              {formatCurrency(protocol.totalPriceCents)} • {protocol.consumedSessions} consumidas
+                            </span>
+                          </div>
+                          <div className="mt-2 text-xs text-gray-500">
+                            Criado em {formatDate(protocol.createdAt)}
+                            {protocol.paidAt ? ` • pago em ${formatDate(protocol.paidAt)}` : ''}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-2 sm:justify-end">
+                          <Button variant="danger" size="sm" onClick={() => setProtocolToDelete(protocol)}>
+                            Excluir
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -157,6 +180,24 @@ export function PatientProtocolsPanel({ patientId }: PatientProtocolsPanelProps)
         onClose={() => setFormOpen(false)}
         patientId={patientId}
         protocol={editingProtocol}
+      />
+
+      <ConfirmationDialog
+        open={protocolToDelete !== null}
+        onClose={() => {
+          if (deleteProtocol.isPending) return
+          setProtocolToDelete(null)
+        }}
+        onConfirm={handleDeleteProtocol}
+        title="Excluir protocolo"
+        description={
+          protocolToDelete
+            ? 'Tem certeza que deseja excluir este protocolo finalizado? Essa ação só é permitida quando não existem sessões vinculadas.'
+            : ''
+        }
+        confirmLabel="Excluir protocolo"
+        isPending={deleteProtocol.isPending}
+        error={deleteProtocol.error instanceof Error ? deleteProtocol.error.message : null}
       />
     </>
   )

@@ -15,6 +15,7 @@ import { StopRecurringSeriesUseCase } from '../../application/use-cases/booking/
 import { CreateNeuromodulationProtocolUseCase } from '../../application/use-cases/booking/create-neuromodulation-protocol.js';
 import { UpdateNeuromodulationProtocolUseCase } from '../../application/use-cases/booking/update-neuromodulation-protocol.js';
 import { ChangeNeuromodulationProtocolStatusUseCase } from '../../application/use-cases/booking/change-neuromodulation-protocol-status.js';
+import { DeleteNeuromodulationProtocolUseCase } from '../../application/use-cases/booking/delete-neuromodulation-protocol.js';
 import { GetNeuromodulationProtocolUseCase } from '../../application/use-cases/booking/get-neuromodulation-protocol.js';
 import { ListPatientNeuromodulationProtocolsUseCase } from '../../application/use-cases/booking/list-patient-neuromodulation-protocols.js';
 import { CreatePsychologySessionUseCase } from '../../application/use-cases/booking/create-psychology-session.js';
@@ -711,6 +712,22 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       });
 
       return mapToProtocol(protocol);
+    } catch (error) {
+      return sendAppError(reply, error);
+    }
+  });
+
+  app.delete<{ Params: { id: string } }>('/psychology/protocols/:id', async (request, reply) => {
+    const protocolRepo = new PrismaNeuromodulationProtocolRepository(request.tenantPrisma);
+    const useCase = new DeleteNeuromodulationProtocolUseCase(protocolRepo);
+
+    try {
+      await useCase.execute({
+        protocolId: request.params.id,
+        providerId: request.providerId!,
+      });
+
+      return reply.status(204).send();
     } catch (error) {
       return sendAppError(reply, error);
     }

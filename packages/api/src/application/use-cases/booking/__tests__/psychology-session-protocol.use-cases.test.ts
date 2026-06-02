@@ -159,6 +159,8 @@ describe('Psychology session protocol credit use cases', () => {
         consumedSessions: 0,
         remainingSessions: 10,
       }),
+      countLinkedAppointments: vi.fn(),
+      deleteById: vi.fn(),
     }
     const serviceRepo: ServiceRepository = {
       findAllActive: vi.fn(),
