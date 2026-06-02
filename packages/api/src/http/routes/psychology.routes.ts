@@ -26,16 +26,23 @@ import {
   normalizePsychologySessionType,
   resolvePsychologySessionPrice,
 } from '../../application/use-cases/booking/psychology-session.utils.js';
+import {
+  getPatientCareSummary,
+  hasPsychotherapyCareProfile,
+  isPatientMinorOnBusinessDate,
+  resolveParentsMeetingStatus,
+} from '../../application/use-cases/patient/patient-profile.utils.js';
 import { AppError } from '../../shared/errors.js';
 import { tenantConfigSchema } from '@soberano/shared';
+import type { PatientFinancialSummary } from '../../domain/repositories/appointment.repository.js';
 
 const MAX_DATA_LENGTH = 6_800_000;
 const CPF_INPUT_REGEX = /^[\d.\-\s]*$/;
 const DATE_INPUT_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_INPUT_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-const careModeSchema = z.enum(['psychotherapy', 'neuromodulation']);
 const psychotherapyFrequencySchema = z.enum(['weekly', 'biweekly']);
+const parentsMeetingStatusSchema = z.enum(['pending', 'completed']);
 const sessionTypeSchema = z.enum(['psychotherapy', 'neuromodulation']);
 const appointmentStatusSchema = z.enum([
   'scheduled',
@@ -67,7 +74,18 @@ function toDateTimeStr(raw: Date | string | null | undefined): string | undefine
 }
 
 function getTodayInSaoPaulo(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date());
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+
+  const year = parts.find((part) => part.type === 'year')?.value ?? '0000';
+  const month = parts.find((part) => part.type === 'month')?.value ?? '00';
+  const day = parts.find((part) => part.type === 'day')?.value ?? '00';
+
+  return `${year}-${month}-${day}`;
 }
 
 function getEarlierDate(left: Date | undefined, right: Date | undefined): Date | undefined {
@@ -106,7 +124,10 @@ function normalizeBirthDate(value: string | null | undefined): Date | null | und
   return new Date(`${value}T00:00:00`);
 }
 
-function mapPatient(raw: any) {
+function mapPatient(raw: any, options?: { businessDate?: string; financialSummary?: PatientFinancialSummary }) {
+  const businessDate = options?.businessDate ?? getTodayInSaoPaulo();
+  const isMinor = isPatientMinorOnBusinessDate(raw.birthDate ?? null, businessDate);
+
   return {
     id: raw.id,
     name: raw.name,
@@ -114,11 +135,20 @@ function mapPatient(raw: any) {
     email: raw.email ?? undefined,
     cpf: raw.cpf ?? undefined,
     notes: raw.notes ?? undefined,
-    careMode: raw.careMode,
+    careSummary: getPatientCareSummary(raw),
     psychotherapyPriceCents: raw.psychotherapyPriceCents ?? undefined,
     psychotherapyFrequency: raw.psychotherapyFrequency ?? undefined,
+    neuromodulationEligible: raw.neuromodulationEligible,
+    isMinor,
+    parentsMeetingStatus:
+      resolveParentsMeetingStatus({
+        birthDate: raw.birthDate ?? null,
+        parentsMeetingStatus: raw.parentsMeetingStatus ?? null,
+        businessDate,
+      }) ?? undefined,
     birthDate: raw.birthDate ? toDateStr(raw.birthDate) : undefined,
     address: raw.address ?? undefined,
+    financialSummary: options?.financialSummary,
     createdAt: toDateTimeStr(raw.createdAt) ?? '',
     updatedAt: toDateTimeStr(raw.updatedAt),
   };
@@ -208,6 +238,9 @@ function formatPatientDeleteDependencyLabel(count: number, singular: string, plu
 function buildPatientDeleteDependencyMessage(counts: {
   documents: number;
   sessions: number;
+  recurringSeries: number;
+  protocols: number;
+  other?: number;
 }): string {
   const dependencies: string[] = [];
 
@@ -219,7 +252,27 @@ function buildPatientDeleteDependencyMessage(counts: {
     dependencies.push(formatPatientDeleteDependencyLabel(counts.sessions, 'sessão', 'sessões'));
   }
 
+  if (counts.recurringSeries > 0) {
+    dependencies.push(formatPatientDeleteDependencyLabel(counts.recurringSeries, 'série recorrente', 'séries recorrentes'));
+  }
+
+  if (counts.protocols > 0) {
+    dependencies.push(formatPatientDeleteDependencyLabel(counts.protocols, 'protocolo', 'protocolos'));
+  }
+
+  if (counts.other && counts.other > 0) {
+    dependencies.push(formatPatientDeleteDependencyLabel(counts.other, 'outro vínculo', 'outros vínculos'));
+  }
+
   return `Este paciente não pode ser excluído porque existem registros vinculados ao cadastro: ${dependencies.join(', ')}. Remova esses registros antes de excluir o paciente.`;
+}
+
+function isForeignKeyConstraintError(error: unknown): boolean {
+  if (!error || typeof error !== 'object' || !('code' in error)) {
+    return false;
+  }
+
+  return error.code === 'P2003' || error.code === 'P2014';
 }
 
 async function ensureCpfAvailable(params: {
@@ -270,7 +323,7 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
     const { search } = request.query as { search?: string };
     const customerRepo = new PrismaCustomerRepository(request.tenantPrisma);
     const patients = await customerRepo.findAll(request.tenant.id, search);
-    return patients.map(mapPatient);
+    return patients.map((patient) => mapPatient(patient));
   });
 
   app.post('/psychology/patients', async (request, reply) => {
@@ -280,9 +333,10 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       email: z.string().email().max(255).optional(),
       cpf: z.string().max(20).regex(CPF_INPUT_REGEX, 'CPF inválido').optional(),
       notes: z.string().max(2000).optional(),
-      careMode: careModeSchema,
       psychotherapyPriceCents: z.number().int().positive().nullable().optional(),
       psychotherapyFrequency: psychotherapyFrequencySchema.nullable().optional(),
+      neuromodulationEligible: z.boolean().optional(),
+      parentsMeetingStatus: parentsMeetingStatusSchema.nullable().optional(),
       birthDate: z.string().regex(DATE_INPUT_REGEX, 'Data de nascimento inválida').nullable().optional(),
       address: z.string().max(500).nullable().optional(),
     });
@@ -341,7 +395,16 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send({ error: 'NOT_FOUND', message: 'Paciente não encontrado.' });
     }
 
-    return mapPatient(patient);
+    const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
+    const financialSummary = await appointmentRepo.getPatientFinancialSummary(
+      request.providerId!,
+      request.params.id,
+    );
+
+    return mapPatient(patient, {
+      businessDate: getTodayInSaoPaulo(),
+      financialSummary,
+    });
   });
 
   app.patch<{ Params: { id: string } }>('/psychology/patients/:id', async (request, reply) => {
@@ -351,9 +414,10 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       email: z.string().email().max(255).nullable().optional(),
       cpf: z.string().max(20).regex(CPF_INPUT_REGEX, 'CPF inválido').nullable().optional(),
       notes: z.string().max(2000).nullable().optional(),
-      careMode: careModeSchema.optional(),
       psychotherapyPriceCents: z.number().int().positive().nullable().optional(),
       psychotherapyFrequency: psychotherapyFrequencySchema.nullable().optional(),
+      neuromodulationEligible: z.boolean().optional(),
+      parentsMeetingStatus: parentsMeetingStatusSchema.nullable().optional(),
       birthDate: z.string().regex(DATE_INPUT_REGEX, 'Data de nascimento inválida').nullable().optional(),
       address: z.string().max(500).nullable().optional(),
     }).refine((data) => Object.values(data).some((value) => value !== undefined), {
@@ -429,11 +493,14 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send({ error: 'NOT_FOUND', message: 'Paciente não encontrado.' });
     }
 
-    const [documentsCount, sessionsCount, protocolsCount] = await request.tenantPrisma.$transaction([
+    const [documentsCount, sessionsCount, recurringSeriesCount, protocolsCount] = await request.tenantPrisma.$transaction([
       request.tenantPrisma.document.count({
         where: { customerId: request.params.id },
       }),
       request.tenantPrisma.appointment.count({
+        where: { customerId: request.params.id },
+      }),
+      request.tenantPrisma.recurringAppointmentSeries.count({
         where: { customerId: request.params.id },
       }),
       request.tenantPrisma.neuromodulationProtocol.count({
@@ -441,24 +508,51 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       }),
     ]);
 
-    if (documentsCount > 0 || sessionsCount > 0 || protocolsCount > 0) {
+    if (documentsCount > 0 || sessionsCount > 0 || recurringSeriesCount > 0 || protocolsCount > 0) {
       return reply.status(409).send({
         error: 'PATIENT_HAS_DEPENDENCIES',
         message: buildPatientDeleteDependencyMessage({
-          documents: documentsCount + protocolsCount,
+          documents: documentsCount,
           sessions: sessionsCount,
+          recurringSeries: recurringSeriesCount,
+          protocols: protocolsCount,
         }),
+        blockers: {
+          documents: documentsCount,
+          sessions: sessionsCount,
+          recurringSeries: recurringSeriesCount,
+          protocols: protocolsCount,
+        },
       });
     }
 
-    await request.tenantPrisma.$transaction([
-      request.tenantPrisma.recurringAppointmentSeries.deleteMany({
-        where: { customerId: request.params.id },
-      }),
-      request.tenantPrisma.customer.delete({
+    try {
+      await request.tenantPrisma.customer.delete({
         where: { id: request.params.id },
-      }),
-    ]);
+      });
+    } catch (error) {
+      if (isForeignKeyConstraintError(error)) {
+        return reply.status(409).send({
+          error: 'PATIENT_HAS_DEPENDENCIES',
+          message: buildPatientDeleteDependencyMessage({
+            documents: 0,
+            sessions: 0,
+            recurringSeries: 0,
+            protocols: 0,
+            other: 1,
+          }),
+          blockers: {
+            documents: 0,
+            sessions: 0,
+            recurringSeries: 0,
+            protocols: 0,
+            other: 1,
+          },
+        });
+      }
+
+      throw error;
+    }
 
     return reply.status(204).send();
   });
@@ -600,6 +694,8 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       from: z.string().regex(DATE_INPUT_REGEX, 'Data inicial inválida').optional(),
       to: z.string().regex(DATE_INPUT_REGEX, 'Data final inválida').optional(),
       patientId: z.string().uuid('Paciente inválido').optional(),
+      type: sessionTypeSchema.optional(),
+      status: appointmentStatusSchema.optional(),
       paymentStatus: paymentStatusSchema.optional(),
       excludeCancelled: booleanQueryFlagSchema,
       dueOnly: booleanQueryFlagSchema,
@@ -610,12 +706,33 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
     }
 
-    const { from, to, patientId, paymentStatus, excludeCancelled, dueOnly, receivableScope } = parsed.data;
+    const { from, to, patientId, type, status, paymentStatus, excludeCancelled, dueOnly, receivableScope } = parsed.data;
     const dueCutoffDate = dueOnly ? new Date(`${getTodayInSaoPaulo()}T00:00:00`) : undefined;
     const upperBound = getEarlierDate(
       to ? new Date(`${to}T00:00:00`) : undefined,
       dueCutoffDate,
     );
+    const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
+
+    if (patientId) {
+      const appointments = await appointmentRepo.findPatientHistory(request.providerId!, patientId, {
+        ...(from ? { from: new Date(`${from}T00:00:00`) } : {}),
+        ...(upperBound ? { to: upperBound } : {}),
+        ...(type ? { type } : {}),
+        ...(status ? { status } : {}),
+        ...(paymentStatus ? { paymentStatus } : {}),
+      });
+
+      return appointments
+        .filter((appointment) => (excludeCancelled ? appointment.status !== 'cancelled' : true))
+        .filter((appointment) =>
+          receivableScope === 'operations-only'
+            ? !appointment.protocolId || appointment.protocolCreditOutcome === 'maintenance'
+            : true,
+        )
+        .map(mapToSession);
+    }
+
     const appointments = await request.tenantPrisma.appointment.findMany({
       where: {
         providerId: request.providerId!,
@@ -627,8 +744,26 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
               },
             }
           : {}),
-        ...(patientId ? { customerId: patientId } : {}),
         ...(paymentStatus ? { paymentStatus } : {}),
+        ...(status ? { status } : {}),
+        ...(type === 'psychotherapy'
+          ? {
+              service: {
+                slug: {
+                  in: ['individual', 'couple', 'family', 'casal', 'familiar', 'psychotherapy'],
+                },
+              },
+            }
+          : {}),
+        ...(type === 'neuromodulation'
+          ? {
+              service: {
+                slug: {
+                  notIn: ['individual', 'couple', 'family', 'casal', 'familiar', 'psychotherapy'],
+                },
+              },
+            }
+          : {}),
         ...(excludeCancelled ? { status: { not: 'cancelled' } } : {}),
         ...(receivableScope === 'operations-only'
           ? {
@@ -738,7 +873,7 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send({ error: 'NOT_FOUND', message: 'Paciente não encontrado.' });
     }
 
-    if (patient.careMode !== 'psychotherapy') {
+    if (!hasPsychotherapyCareProfile(patient)) {
       return reply.status(422).send({
         error: 'VALIDATION_ERROR',
         message: 'Somente pacientes de psicoterapia podem usar a recorrência automática.',
@@ -822,7 +957,7 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send({ error: 'NOT_FOUND', message: 'Paciente não encontrado.' });
     }
 
-    if (patient.careMode !== 'psychotherapy') {
+    if (!hasPsychotherapyCareProfile(patient)) {
       return reply.status(422).send({
         error: 'VALIDATION_ERROR',
         message: 'Somente pacientes de psicoterapia podem usar a criação em lote.',

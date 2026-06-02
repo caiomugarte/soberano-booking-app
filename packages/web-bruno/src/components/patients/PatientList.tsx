@@ -4,8 +4,14 @@ import { usePatients } from '@/api/patients'
 import { Input } from '@/components/ui/Input'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Badge } from '@/components/ui/Badge'
-import { CARE_MODE_LABELS } from '@/config/constants'
+import { CARE_SUMMARY_LABELS } from '@/config/constants'
 import { formatPhone } from '@/lib/format'
+
+function getCareSummaryBadgeVariant(careSummary: 'psychotherapy' | 'neuromodulation' | 'dual_track') {
+  if (careSummary === 'neuromodulation') return 'amber'
+  if (careSummary === 'dual_track') return 'emerald'
+  return 'blue'
+}
 
 export function PatientList() {
   const [search, setSearch] = useState('')
@@ -38,9 +44,12 @@ export function PatientList() {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <div className="text-sm font-medium text-gray-800">{patient.name}</div>
-                  <Badge variant={patient.careMode === 'neuromodulation' ? 'amber' : 'blue'}>
-                    {CARE_MODE_LABELS[patient.careMode]}
+                  <Badge variant={getCareSummaryBadgeVariant(patient.careSummary)}>
+                    {CARE_SUMMARY_LABELS[patient.careSummary]}
                   </Badge>
+                  {patient.isMinor && (
+                    <Badge variant="amber">Menor de idade</Badge>
+                  )}
                 </div>
                 {patient.phone && (
                   <div className="text-xs text-gray-400">{formatPhone(patient.phone)}</div>

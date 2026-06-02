@@ -8,7 +8,7 @@ import {
   assertNoScheduleConflict,
   assertPaymentInput,
   assertProtocolCapacity,
-  assertSessionMatchesCareMode,
+  assertSessionMatchesCareProfile,
   buildEndTime,
   normalizePsychologySessionType,
   resolveProtocolOutcome,
@@ -59,7 +59,7 @@ export class UpdatePsychologySessionUseCase {
 
     const currentType = normalizePsychologySessionType(appointment.service.slug);
     const nextType = input.type ?? currentType;
-    assertSessionMatchesCareMode(patient, nextType);
+    assertSessionMatchesCareProfile(patient, nextType);
 
     if (nextType === 'psychotherapy' && input.protocolId) {
       throw new ValidationError('Sessões de psicoterapia não podem ser vinculadas a protocolos.');

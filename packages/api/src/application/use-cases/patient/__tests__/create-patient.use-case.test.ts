@@ -21,9 +21,10 @@ describe('CreatePatientUseCase', () => {
         cpf: data.cpf ?? null,
         email: data.email ?? null,
         notes: data.notes ?? null,
-        careMode: data.careMode ?? 'psychotherapy',
         psychotherapyPriceCents: data.psychotherapyPriceCents ?? null,
         psychotherapyFrequency: data.psychotherapyFrequency ?? null,
+        neuromodulationEligible: data.neuromodulationEligible ?? false,
+        parentsMeetingStatus: data.parentsMeetingStatus ?? null,
         birthDate: data.birthDate ?? null,
         address: data.address ?? null,
       })),
@@ -35,21 +36,19 @@ describe('CreatePatientUseCase', () => {
     const created = await useCase.execute({
       tenantId: 'tenant-1',
       name: 'Maria',
-      careMode: 'psychotherapy',
       psychotherapyPriceCents: 18000,
       psychotherapyFrequency: 'weekly',
       birthDate: new Date('1990-06-15T00:00:00Z'),
       address: 'Rua A, 123',
     });
 
-    expect(created.careMode).toBe('psychotherapy');
     expect(created.psychotherapyPriceCents).toBe(18000);
     expect(created.psychotherapyFrequency).toBe('weekly');
     expect(customerRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        careMode: 'psychotherapy',
         psychotherapyPriceCents: 18000,
         psychotherapyFrequency: 'weekly',
+        neuromodulationEligible: false,
       }),
     );
   });
@@ -65,13 +64,12 @@ describe('CreatePatientUseCase', () => {
       useCase.execute({
         tenantId: 'tenant-1',
         name: 'Paciente',
-        careMode: 'psychotherapy',
         psychotherapyFrequency: 'weekly',
       }),
     ).rejects.toBeInstanceOf(ValidationError);
   });
 
-  it('allows neuromodulation patients without psychotherapy commercial fields', async () => {
+  it('allows dual-track patients to keep psychotherapy data and neuromodulation eligibility together', async () => {
     const customerRepo: CustomerRepository = {
       findByPhone: vi.fn(),
       findByCpf: vi.fn(),
@@ -88,9 +86,10 @@ describe('CreatePatientUseCase', () => {
         cpf: data.cpf ?? null,
         email: data.email ?? null,
         notes: data.notes ?? null,
-        careMode: data.careMode ?? 'psychotherapy',
         psychotherapyPriceCents: data.psychotherapyPriceCents ?? null,
         psychotherapyFrequency: data.psychotherapyFrequency ?? null,
+        neuromodulationEligible: data.neuromodulationEligible ?? false,
+        parentsMeetingStatus: data.parentsMeetingStatus ?? null,
         birthDate: data.birthDate ?? null,
         address: data.address ?? null,
       })),
@@ -101,19 +100,54 @@ describe('CreatePatientUseCase', () => {
     const useCase = new CreatePatientUseCase(customerRepo);
     const created = await useCase.execute({
       tenantId: 'tenant-1',
-      name: 'Paciente Neuro',
-      careMode: 'neuromodulation',
+      name: 'Paciente Dual',
+      psychotherapyPriceCents: 21000,
+      psychotherapyFrequency: 'biweekly',
+      neuromodulationEligible: true,
+      parentsMeetingStatus: 'pending',
     });
 
-    expect(created.careMode).toBe('neuromodulation');
-    expect(created.psychotherapyPriceCents).toBeNull();
-    expect(created.psychotherapyFrequency).toBeNull();
+    expect(created.psychotherapyPriceCents).toBe(21000);
+    expect(created.psychotherapyFrequency).toBe('biweekly');
+    expect(created.neuromodulationEligible).toBe(true);
+    expect(created.parentsMeetingStatus).toBe('pending');
     expect(customerRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        careMode: 'neuromodulation',
-        psychotherapyPriceCents: null,
-        psychotherapyFrequency: null,
+        psychotherapyPriceCents: 21000,
+        psychotherapyFrequency: 'biweekly',
+        neuromodulationEligible: true,
+        parentsMeetingStatus: 'pending',
       }),
     );
+  });
+
+  it('allows neuromodulation-only patients without psychotherapy commercial fields', async () => {
+    const customerRepo = {
+      create: vi.fn().mockResolvedValue({
+        id: 'patient-3',
+        name: 'Paciente Neuro',
+        phone: null,
+        cpf: null,
+        email: null,
+        notes: null,
+        psychotherapyPriceCents: null,
+        psychotherapyFrequency: null,
+        neuromodulationEligible: true,
+        parentsMeetingStatus: null,
+        birthDate: null,
+        address: null,
+      }),
+    } as unknown as CustomerRepository;
+
+    const useCase = new CreatePatientUseCase(customerRepo);
+    const created = await useCase.execute({
+      tenantId: 'tenant-1',
+      name: 'Paciente Neuro',
+      neuromodulationEligible: true,
+    });
+
+    expect(created.psychotherapyPriceCents).toBeNull();
+    expect(created.psychotherapyFrequency).toBeNull();
+    expect(created.neuromodulationEligible).toBe(true);
   });
 });

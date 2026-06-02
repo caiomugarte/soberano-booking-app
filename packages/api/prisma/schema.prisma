@@ -120,9 +120,10 @@ model Customer {
   cpf       String?  @db.VarChar(14)
   email     String?  @db.VarChar(255)
   notes     String?  @db.Text
-  careMode  String   @default("psychotherapy") @map("care_mode") @db.VarChar(30)
   psychotherapyPriceCents Int? @map("psychotherapy_price_cents")
   psychotherapyFrequency String? @map("psychotherapy_frequency") @db.VarChar(20)
+  neuromodulationEligible Boolean @default(false) @map("neuromodulation_eligible")
+  parentsMeetingStatus String? @map("parents_meeting_status") @db.VarChar(20)
   birthDate DateTime? @map("birth_date") @db.Date
   address   String?  @db.Text
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz

@@ -1,10 +1,17 @@
 import { TENANT_SLUG } from '@/config/env.ts'
 
+type ApiErrorPayload = {
+  error: string
+  message: string
+  [key: string]: unknown
+}
+
 export class ApiError extends Error {
   constructor(
     public code: string,
     message: string,
     public status: number,
+    public details?: ApiErrorPayload,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -70,8 +77,8 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
   if (!res.ok) {
     const body = await res
       .json()
-      .catch(() => ({ error: 'UNKNOWN', message: 'Erro desconhecido' })) as { error: string; message: string }
-    throw new ApiError(body.error, body.message, res.status)
+      .catch(() => ({ error: 'UNKNOWN', message: 'Erro desconhecido' })) as ApiErrorPayload
+    throw new ApiError(body.error, body.message, res.status, body)
   }
 
   if (res.status === 204) return undefined as T

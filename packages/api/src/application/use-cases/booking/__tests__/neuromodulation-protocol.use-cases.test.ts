@@ -15,9 +15,10 @@ const neuromodulationPatient: CustomerEntity = {
   cpf: null,
   email: null,
   notes: null,
-  careMode: 'neuromodulation',
   psychotherapyPriceCents: null,
   psychotherapyFrequency: null,
+  neuromodulationEligible: true,
+  parentsMeetingStatus: null,
   birthDate: null,
   address: null,
 }
@@ -25,9 +26,9 @@ const neuromodulationPatient: CustomerEntity = {
 const psychotherapyPatient: CustomerEntity = {
   ...neuromodulationPatient,
   id: 'patient-2',
-  careMode: 'psychotherapy',
   psychotherapyPriceCents: 18000,
   psychotherapyFrequency: 'weekly',
+  neuromodulationEligible: false,
 }
 
 const activeProtocol: NeuromodulationProtocolEntity = {

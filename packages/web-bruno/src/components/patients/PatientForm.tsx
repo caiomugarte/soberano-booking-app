@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { useCreatePatient, useUpdatePatient } from '@/api/patients'
+import { hasPsychotherapyTrack, isMinorFromBirthDate } from '@/lib/patient-care'
 import type { Patient } from '@/schemas/patient.schema'
 
 interface PatientFormProps {
@@ -22,10 +23,12 @@ function getPatientFormValues(patient?: Patient | null) {
     email: patient?.email ?? '',
     cpf: patient?.cpf ?? '',
     notes: patient?.notes ?? '',
-    careMode: patient?.careMode ?? 'psychotherapy',
+    psychotherapyEnabled: hasPsychotherapyTrack(patient),
+    neuromodulationEligible: patient?.neuromodulationEligible ?? false,
     psychotherapyPrice: patient?.psychotherapyPriceCents ? String(patient.psychotherapyPriceCents / 100) : '',
     psychotherapyFrequency: patient?.psychotherapyFrequency ?? '',
     birthDate: patient?.birthDate ?? '',
+    parentsMeetingStatus: patient?.parentsMeetingStatus ?? (patient?.isMinor ? 'pending' : ''),
     address: patient?.address ?? '',
   }
 }
@@ -40,10 +43,12 @@ export function PatientForm({ open, onClose, patient, onCreated, zIndex }: Patie
   const [email, setEmail] = useState(initialValues.email)
   const [cpf, setCpf] = useState(initialValues.cpf)
   const [notes, setNotes] = useState(initialValues.notes)
-  const [careMode, setCareMode] = useState(initialValues.careMode)
+  const [psychotherapyEnabled, setPsychotherapyEnabled] = useState(initialValues.psychotherapyEnabled)
+  const [neuromodulationEligible, setNeuromodulationEligible] = useState(initialValues.neuromodulationEligible)
   const [psychotherapyPrice, setPsychotherapyPrice] = useState(initialValues.psychotherapyPrice)
   const [psychotherapyFrequency, setPsychotherapyFrequency] = useState(initialValues.psychotherapyFrequency)
   const [birthDate, setBirthDate] = useState(initialValues.birthDate)
+  const [parentsMeetingStatus, setParentsMeetingStatus] = useState(initialValues.parentsMeetingStatus)
   const [address, setAddress] = useState(initialValues.address)
   const [submitError, setSubmitError] = useState('')
 
@@ -56,10 +61,12 @@ export function PatientForm({ open, onClose, patient, onCreated, zIndex }: Patie
     setEmail(values.email)
     setCpf(values.cpf)
     setNotes(values.notes)
-    setCareMode(values.careMode)
+    setPsychotherapyEnabled(values.psychotherapyEnabled)
+    setNeuromodulationEligible(values.neuromodulationEligible)
     setPsychotherapyPrice(values.psychotherapyPrice)
     setPsychotherapyFrequency(values.psychotherapyFrequency)
     setBirthDate(values.birthDate)
+    setParentsMeetingStatus(values.parentsMeetingStatus)
     setAddress(values.address)
     setSubmitError('')
   }, [open, patient])
@@ -70,14 +77,24 @@ export function PatientForm({ open, onClose, patient, onCreated, zIndex }: Patie
     const normalizedCpf = cpf.trim()
     const normalizedAddress = address.trim()
     const priceCents =
-      careMode === 'psychotherapy' && psychotherapyPrice
+      psychotherapyEnabled && psychotherapyPrice
         ? Math.round(Number.parseFloat(psychotherapyPrice) * 100)
         : null
+    const isMinorPreview = isMinorFromBirthDate(birthDate)
+    const shouldShowParentsMeetingStatus = isMinorPreview || Boolean(parentsMeetingStatus)
+    const effectiveParentsMeetingStatus = shouldShowParentsMeetingStatus
+      ? ((parentsMeetingStatus || 'pending') as Patient['parentsMeetingStatus'])
+      : null
 
     setSubmitError('')
 
-    if (careMode === 'psychotherapy') {
-      if (!Number.isFinite(priceCents ?? NaN) || (priceCents ?? 0) <= 0) {
+    if (!psychotherapyEnabled && !neuromodulationEligible) {
+      setSubmitError('Ative psicoterapia, neuromodulação, ou ambos para salvar o paciente.')
+      return
+    }
+
+    if (psychotherapyEnabled) {
+      if (!Number.isFinite(priceCents ?? Number.NaN) || (priceCents ?? 0) <= 0) {
         setSubmitError('Informe o valor acordado da sessão de psicoterapia.')
         return
       }
@@ -97,10 +114,13 @@ export function PatientForm({ open, onClose, patient, onCreated, zIndex }: Patie
             phone: phone || undefined,
             email: normalizedEmail || null,
             cpf: normalizedCpf || null,
-            notes: notes || undefined,
-            careMode,
-            psychotherapyPriceCents: careMode === 'psychotherapy' ? priceCents : null,
-            psychotherapyFrequency: careMode === 'psychotherapy' ? (psychotherapyFrequency as Patient['psychotherapyFrequency']) : null,
+            notes: notes || null,
+            psychotherapyPriceCents: psychotherapyEnabled ? priceCents ?? undefined : null,
+            psychotherapyFrequency: psychotherapyEnabled
+              ? (psychotherapyFrequency as Patient['psychotherapyFrequency'])
+              : null,
+            neuromodulationEligible,
+            parentsMeetingStatus: effectiveParentsMeetingStatus,
             birthDate: birthDate || null,
             address: normalizedAddress || null,
           },
@@ -112,32 +132,39 @@ export function PatientForm({ open, onClose, patient, onCreated, zIndex }: Patie
           },
         },
       )
-    } else {
-      createPatient.mutate(
-        {
-          name,
-          phone: phone || undefined,
-          email: normalizedEmail || undefined,
-          cpf: normalizedCpf || undefined,
-          notes: notes || undefined,
-          careMode,
-          psychotherapyPriceCents: careMode === 'psychotherapy' ? priceCents ?? undefined : undefined,
-          psychotherapyFrequency: careMode === 'psychotherapy' ? (psychotherapyFrequency as Patient['psychotherapyFrequency']) : undefined,
-          birthDate: birthDate || undefined,
-          address: normalizedAddress || undefined,
-        },
-        {
-          onSuccess: (created) => {
-            onCreated?.(created.id)
-            onClose()
-          },
-          onError: (error) => {
-            setSubmitError(error instanceof Error ? error.message : 'Erro ao criar paciente')
-          },
-        },
-      )
+      return
     }
+
+    createPatient.mutate(
+      {
+        name,
+        phone: phone || undefined,
+        email: normalizedEmail || undefined,
+        cpf: normalizedCpf || undefined,
+        notes: notes || undefined,
+        psychotherapyPriceCents: psychotherapyEnabled ? priceCents ?? undefined : undefined,
+        psychotherapyFrequency: psychotherapyEnabled
+          ? (psychotherapyFrequency as Patient['psychotherapyFrequency'])
+          : undefined,
+        neuromodulationEligible,
+        parentsMeetingStatus: effectiveParentsMeetingStatus ?? undefined,
+        birthDate: birthDate || undefined,
+        address: normalizedAddress || undefined,
+      },
+      {
+        onSuccess: (created) => {
+          onCreated?.(created.id)
+          onClose()
+        },
+        onError: (error) => {
+          setSubmitError(error instanceof Error ? error.message : 'Erro ao criar paciente')
+        },
+      },
+    )
   }
+
+  const isMinorPreview = isMinorFromBirthDate(birthDate)
+  const showParentsMeetingStatus = isMinorPreview || Boolean(parentsMeetingStatus)
 
   return (
     <Modal open={open} onClose={onClose} zIndex={zIndex}>
@@ -154,22 +181,40 @@ export function PatientForm({ open, onClose, patient, onCreated, zIndex }: Patie
             autoComplete="off"
             required
           />
-          <Select
-            label="Modo de cuidado"
-            value={careMode}
-            onChange={(e) => {
-              const nextCareMode = e.target.value as Patient['careMode']
-              setCareMode(nextCareMode)
-              if (nextCareMode === 'neuromodulation') {
-                setPsychotherapyPrice('')
-                setPsychotherapyFrequency('')
-              }
-            }}
-            options={[
-              { value: 'psychotherapy', label: 'Psicoterapia' },
-              { value: 'neuromodulation', label: 'Neuromodulação' },
-            ]}
-          />
+
+          <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <div>
+              <div className="text-sm font-medium text-gray-800">Perfil de cuidado</div>
+              <p className="mt-1 text-xs text-gray-500">
+                Ative psicoterapia, neuromodulação, ou ambos no mesmo cadastro.
+              </p>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={psychotherapyEnabled}
+                onChange={(e) => {
+                  setPsychotherapyEnabled(e.target.checked)
+                  if (!e.target.checked) {
+                    setPsychotherapyPrice('')
+                    setPsychotherapyFrequency('')
+                  }
+                }}
+                className="rounded border-gray-300 text-primary-500 focus:ring-primary-300"
+              />
+              Psicoterapia
+            </label>
+            <label className="flex items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={neuromodulationEligible}
+                onChange={(e) => setNeuromodulationEligible(e.target.checked)}
+                className="rounded border-gray-300 text-primary-500 focus:ring-primary-300"
+              />
+              Neuromodulação
+            </label>
+          </div>
+
           <Input
             label="Telefone"
             value={phone}
@@ -185,7 +230,8 @@ export function PatientForm({ open, onClose, patient, onCreated, zIndex }: Patie
             autoComplete="off"
           />
           <Input label="CPF" value={cpf} onChange={(e) => setCpf(e.target.value)} autoComplete="off" />
-          {careMode === 'psychotherapy' && (
+
+          {psychotherapyEnabled && (
             <>
               <Input
                 label="Valor acordado (R$)"
@@ -209,6 +255,7 @@ export function PatientForm({ open, onClose, patient, onCreated, zIndex }: Patie
               />
             </>
           )}
+
           <Input
             label="Data de nascimento"
             type="date"
@@ -216,6 +263,25 @@ export function PatientForm({ open, onClose, patient, onCreated, zIndex }: Patie
             onChange={(e) => setBirthDate(e.target.value)}
             autoComplete="off"
           />
+
+          {isMinorPreview && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              Paciente menor de idade identificado pela data de nascimento.
+            </div>
+          )}
+
+          {showParentsMeetingStatus && (
+            <Select
+              label="Reunião com responsáveis"
+              value={parentsMeetingStatus || 'pending'}
+              onChange={(e) => setParentsMeetingStatus(e.target.value)}
+              options={[
+                { value: 'pending', label: 'Pendente' },
+                { value: 'completed', label: 'Concluída' },
+              ]}
+            />
+          )}
+
           <Textarea
             label="Endereço"
             value={address}

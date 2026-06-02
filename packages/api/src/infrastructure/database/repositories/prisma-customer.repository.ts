@@ -65,9 +65,10 @@ export class PrismaCustomerRepository implements CustomerRepository {
     email?: string;
     cpf?: string;
     notes?: string | null;
-    careMode?: CustomerEntity['careMode'];
     psychotherapyPriceCents?: number | null;
     psychotherapyFrequency?: CustomerEntity['psychotherapyFrequency'];
+    neuromodulationEligible?: boolean;
+    parentsMeetingStatus?: CustomerEntity['parentsMeetingStatus'];
     birthDate?: Date | null;
     address?: string | null;
   }): Promise<CustomerEntity> {

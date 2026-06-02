@@ -17,9 +17,10 @@ const psychotherapyPatient: CustomerEntity = {
   cpf: null,
   email: null,
   notes: null,
-  careMode: 'psychotherapy',
   psychotherapyPriceCents: 22000,
   psychotherapyFrequency: 'biweekly',
+  neuromodulationEligible: true,
+  parentsMeetingStatus: null,
   birthDate: null,
   address: null,
 };

@@ -22,6 +22,12 @@ import {
 } from '@/config/constants'
 import { isRevenueProtocolLink } from '@/lib/appointment-pricing'
 import { dateInputToIso, getTodayDateInputValue, toDateInputValue } from '@/lib/format'
+import {
+  getAllowedSessionTypes,
+  hasPsychotherapyTrack,
+  isMinorFromBirthDate,
+  supportsSessionType,
+} from '@/lib/patient-care'
 import type {
   Appointment,
   PaymentMethod,
@@ -117,10 +123,12 @@ export function AppointmentForm({
   const [newName, setNewName] = useState('')
   const [newPhone, setNewPhone] = useState('')
   const [newEmail, setNewEmail] = useState('')
-  const [newCareMode, setNewCareMode] = useState<'psychotherapy' | 'neuromodulation'>('psychotherapy')
+  const [newPsychotherapyEnabled, setNewPsychotherapyEnabled] = useState(true)
+  const [newNeuromodulationEligible, setNewNeuromodulationEligible] = useState(false)
   const [newPsychotherapyPrice, setNewPsychotherapyPrice] = useState('')
   const [newPsychotherapyFrequency, setNewPsychotherapyFrequency] = useState('')
   const [newBirthDate, setNewBirthDate] = useState('')
+  const [newParentsMeetingStatus, setNewParentsMeetingStatus] = useState('')
   const [newAddress, setNewAddress] = useState('')
   const [createError, setCreateError] = useState('')
   const { data: protocols = [] } = usePatientProtocols(patientId || undefined)
@@ -158,10 +166,12 @@ export function AppointmentForm({
     setNewName('')
     setNewPhone('')
     setNewEmail('')
-    setNewCareMode('psychotherapy')
+    setNewPsychotherapyEnabled(true)
+    setNewNeuromodulationEligible(false)
     setNewPsychotherapyPrice('')
     setNewPsychotherapyFrequency('')
     setNewBirthDate('')
+    setNewParentsMeetingStatus('')
     setNewAddress('')
     setCreateError('')
     setPatientSearch('')
@@ -174,14 +184,23 @@ export function AppointmentForm({
     const patient = patients.find((item) => item.id === patientId)
     if (!patient) return
 
-    setType(patient.careMode)
-    setProtocolId('')
-    if (patient.careMode === 'neuromodulation') {
+    const allowedSessionTypes = getAllowedSessionTypes(patient)
+    const nextType = allowedSessionTypes.includes(type) ? type : allowedSessionTypes[0]
+
+    if (nextType !== type) {
+      setType(nextType)
+    }
+
+    if (!patient.neuromodulationEligible) {
+      setProtocolId('')
+    }
+
+    if (nextType === 'neuromodulation') {
       setMode('session')
       setRecurring(false)
     }
 
-    if (patient.careMode === 'psychotherapy') {
+    if (nextType === 'psychotherapy' && hasPsychotherapyTrack(patient)) {
       if (patient.psychotherapyPriceCents) {
         setValue(String(patient.psychotherapyPriceCents / 100))
       }
@@ -194,7 +213,7 @@ export function AppointmentForm({
         setIntervalWeeks('2')
       }
     }
-  }, [isEditMode, patientId, patients])
+  }, [isEditMode, patientId, patients, type])
 
   function handleSuccessfulSubmit(message?: string) {
     if (onSuccess) {
@@ -206,15 +225,28 @@ export function AppointmentForm({
   }
 
   function handleTypeChange(newType: SessionType) {
+    const selectedPatient = patients.find((patient) => patient.id === patientId)
+    if (selectedPatient && !supportsSessionType(selectedPatient, newType)) {
+      return
+    }
+
     setType(newType)
     if (newType === 'neuromodulation') {
       setMode('session')
       setRecurring(false)
+    } else {
+      setProtocolId('')
     }
 
-    const selectedPatient = patients.find((patient) => patient.id === patientId)
     if (newType === 'psychotherapy' && selectedPatient?.psychotherapyPriceCents) {
       setValue(String(selectedPatient.psychotherapyPriceCents / 100))
+      if (selectedPatient.psychotherapyFrequency === 'weekly') {
+        setIntervalWeeks('1')
+      }
+
+      if (selectedPatient.psychotherapyFrequency === 'biweekly') {
+        setIntervalWeeks('2')
+      }
       return
     }
 
@@ -240,11 +272,18 @@ export function AppointmentForm({
     e.preventDefault()
     setCreateError('')
     const psychotherapyPriceCents =
-      newCareMode === 'psychotherapy' && newPsychotherapyPrice
+      newPsychotherapyEnabled && newPsychotherapyPrice
         ? Math.round(Number.parseFloat(newPsychotherapyPrice) * 100)
         : undefined
+    const isMinorPreview = isMinorFromBirthDate(newBirthDate)
+    const shouldShowParentsMeetingStatus = isMinorPreview || Boolean(newParentsMeetingStatus)
 
-    if (newCareMode === 'psychotherapy') {
+    if (!newPsychotherapyEnabled && !newNeuromodulationEligible) {
+      setCreateError('Ative psicoterapia, neuromodulação, ou ambos para criar o paciente.')
+      return
+    }
+
+    if (newPsychotherapyEnabled) {
       if (!Number.isFinite(psychotherapyPriceCents ?? NaN) || (psychotherapyPriceCents ?? 0) <= 0) {
         setCreateError('Informe o valor acordado da psicoterapia.')
         return
@@ -260,16 +299,17 @@ export function AppointmentForm({
       name: newName,
       phone: newPhone || undefined,
       email: newEmail || undefined,
-      careMode: newCareMode,
       psychotherapyPriceCents,
-      psychotherapyFrequency: newCareMode === 'psychotherapy' ? newPsychotherapyFrequency as 'weekly' | 'biweekly' : undefined,
+      psychotherapyFrequency: newPsychotherapyEnabled ? newPsychotherapyFrequency as 'weekly' | 'biweekly' : undefined,
+      neuromodulationEligible: newNeuromodulationEligible,
+      parentsMeetingStatus: shouldShowParentsMeetingStatus ? (newParentsMeetingStatus || 'pending') as 'pending' | 'completed' : undefined,
       birthDate: newBirthDate || undefined,
       address: newAddress.trim() || undefined,
     }
     createPatient.mutate(data, {
       onSuccess: (created) => {
         setPatientId(created.id)
-        setType(created.careMode)
+        setType(getAllowedSessionTypes(created)[0])
         setStep('appointment')
       },
       onError: (error) => {
@@ -454,10 +494,6 @@ export function AppointmentForm({
   }
 
   const timeOptions = TIME_SLOTS.map((t) => ({ value: t, label: t }))
-  const typeOptions = Object.entries(SESSION_TYPE_LABELS).map(([v, l]) => ({
-    value: v,
-    label: l,
-  }))
   const statusOptions = Object.entries(STATUS_LABELS).map(([optionValue, label]) => ({
     value: optionValue,
     label,
@@ -486,8 +522,15 @@ export function AppointmentForm({
   }, [])
 
   const selectedPatient = patients.find((p) => p.id === patientId)
+  const allowedSessionTypes = getAllowedSessionTypes(selectedPatient)
+  const typeOptions = allowedSessionTypes.map((sessionType) => ({
+    value: sessionType,
+    label: SESSION_TYPE_LABELS[sessionType],
+  }))
   const selectedProtocol = protocols.find((item) => item.id === protocolId)
-  const isNeuromodulationPatient = selectedPatient?.careMode === 'neuromodulation'
+  const supportsPsychotherapy = supportsSessionType(selectedPatient, 'psychotherapy')
+  const supportsNeuromodulation = supportsSessionType(selectedPatient, 'neuromodulation')
+  const showPackageMode = !isEditMode && type === 'psychotherapy' && supportsPsychotherapy
   const isLinkedToRevenueProtocol = isRevenueProtocolLink({
     protocolId: protocolId || undefined,
     protocolStatus: selectedProtocol?.status,
@@ -526,23 +569,34 @@ export function AppointmentForm({
               value={newBirthDate}
               onChange={(e) => setNewBirthDate(e.target.value)}
             />
-            <Select
-              label="Modo de cuidado"
-              value={newCareMode}
-              onChange={(e) => {
-                const nextMode = e.target.value as 'psychotherapy' | 'neuromodulation'
-                setNewCareMode(nextMode)
-                if (nextMode === 'neuromodulation') {
-                  setNewPsychotherapyPrice('')
-                  setNewPsychotherapyFrequency('')
-                }
-              }}
-              options={[
-                { value: 'psychotherapy', label: 'Psicoterapia' },
-                { value: 'neuromodulation', label: 'Neuromodulação' },
-              ]}
-            />
-            {newCareMode === 'psychotherapy' && (
+            <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
+              <div className="text-sm font-medium text-gray-800">Perfil de cuidado</div>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={newPsychotherapyEnabled}
+                  onChange={(e) => {
+                    setNewPsychotherapyEnabled(e.target.checked)
+                    if (!e.target.checked) {
+                      setNewPsychotherapyPrice('')
+                      setNewPsychotherapyFrequency('')
+                    }
+                  }}
+                  className="rounded border-gray-300 text-primary-500 focus:ring-primary-300"
+                />
+                Psicoterapia
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={newNeuromodulationEligible}
+                  onChange={(e) => setNewNeuromodulationEligible(e.target.checked)}
+                  className="rounded border-gray-300 text-primary-500 focus:ring-primary-300"
+                />
+                Neuromodulação
+              </label>
+            </div>
+            {newPsychotherapyEnabled && (
               <>
                 <Input
                   label="Valor acordado (R$)"
@@ -562,6 +616,22 @@ export function AppointmentForm({
                   ]}
                   placeholder="Selecione a frequência"
                   required
+                />
+              </>
+            )}
+            {isMinorFromBirthDate(newBirthDate) && (
+              <>
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  Paciente menor de idade identificado pela data de nascimento.
+                </div>
+                <Select
+                  label="Reunião com responsáveis"
+                  value={newParentsMeetingStatus || 'pending'}
+                  onChange={(e) => setNewParentsMeetingStatus(e.target.value)}
+                  options={[
+                    { value: 'pending', label: 'Pendente' },
+                    { value: 'completed', label: 'Concluída' },
+                  ]}
                 />
               </>
             )}
@@ -590,7 +660,7 @@ export function AppointmentForm({
       <Modal.Header>{isEditMode ? 'Editar Sessão' : 'Novo Agendamento'}</Modal.Header>
       <form onSubmit={handleSubmit}>
         <Modal.Body>
-          {!isEditMode && !isNeuromodulationPatient && (
+          {showPackageMode && (
             <div className="flex gap-2 rounded-lg bg-gray-100 p-1">
               <button
                 type="button"
@@ -707,10 +777,9 @@ export function AppointmentForm({
             value={type}
             onChange={(e) => handleTypeChange(e.target.value as SessionType)}
             options={typeOptions}
-            disabled={Boolean(selectedPatient)}
           />
 
-          {isNeuromodulationPatient && mode === 'session' && (
+          {supportsNeuromodulation && type === 'neuromodulation' && mode === 'session' && (
             <div className="space-y-3 rounded-lg border border-primary-100 bg-primary-50 p-3">
               <div>
                 <div className="text-sm font-medium text-primary-900">Vínculo com protocolo</div>
@@ -902,7 +971,7 @@ export function AppointmentForm({
                     </>
                   )}
                 </>
-              ) : (
+              ) : type === 'psychotherapy' ? (
                 <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-3">
                   <label className="flex items-center gap-2 text-sm text-gray-700">
                     <input
@@ -931,7 +1000,7 @@ export function AppointmentForm({
                     </>
                   )}
                 </div>
-              )}
+              ) : null}
               {isEditMode && appointment?.protocolLinkType === 'protocol' && (status === 'cancelled' || protocolId !== (appointment.protocolId ?? '')) && (
                 <Select
                   label="Crédito do protocolo"

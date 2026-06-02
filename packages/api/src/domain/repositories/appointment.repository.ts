@@ -45,6 +45,31 @@ export interface DayStat {
   revenueCents: number;
 }
 
+export interface PatientHistoryFilters {
+  from?: Date;
+  to?: Date;
+  type?: 'psychotherapy' | 'neuromodulation';
+  status?: AppointmentWithDetails['status'];
+  paymentStatus?: AppointmentWithDetails['paymentStatus'];
+}
+
+export interface PatientFinancialSummary {
+  sessionReceivables: {
+    totalCount: number;
+    paidCount: number;
+    pendingCount: number;
+    paidTotalCents: number;
+    pendingTotalCents: number;
+  };
+  protocolSales: {
+    totalCount: number;
+    paidCount: number;
+    pendingCount: number;
+    paidTotalCents: number;
+    pendingTotalCents: number;
+  };
+}
+
 export interface AppointmentRepository {
   create(data: CreateAppointmentData): Promise<AppointmentWithDetails>;
   findByCancelToken(token: string): Promise<AppointmentWithDetails | null>;
@@ -66,6 +91,8 @@ export interface AppointmentRepository {
   updateCustomer(id: string, customerId: string): Promise<void>;
   updatePaymentStatus(id: string, paidAt: Date): Promise<AppointmentWithDetails>;
   getFinancialSummary(providerId: string, from: Date, to: Date): Promise<FinancialSummary>;
+  findPatientHistory(providerId: string, patientId: string, filters: PatientHistoryFilters): Promise<AppointmentWithDetails[]>;
+  getPatientFinancialSummary(providerId: string, patientId: string): Promise<PatientFinancialSummary>;
   updateDetails(id: string, data: {
     customerId?: string;
     serviceId?: string;

@@ -4,6 +4,7 @@ import { format, addDays, startOfWeek } from 'date-fns'
 import type {
   Appointment,
   AppointmentFormData,
+  AppointmentHistoryFilters,
   ProtocolCreditAction,
   SessionType,
 } from '@/schemas/appointment.schema'
@@ -12,11 +13,8 @@ type CreateData = AppointmentFormData
 
 export type AppointmentReceivableScope = 'all' | 'operations-only'
 
-export type AppointmentListFilters = {
-  from?: string
-  to?: string
+export type AppointmentListFilters = AppointmentHistoryFilters & {
   patientId?: string
-  paymentStatus?: Appointment['paymentStatus']
   excludeCancelled?: boolean
   dueOnly?: boolean
   receivableScope?: AppointmentReceivableScope
@@ -79,6 +77,8 @@ function buildAppointmentsQueryString(filters: AppointmentListFilters = {}): str
   if (filters.from) params.set('from', filters.from)
   if (filters.to) params.set('to', filters.to)
   if (filters.patientId) params.set('patientId', filters.patientId)
+  if (filters.type) params.set('type', filters.type)
+  if (filters.status) params.set('status', filters.status)
   if (filters.paymentStatus) params.set('paymentStatus', filters.paymentStatus)
   if (filters.excludeCancelled) params.set('excludeCancelled', 'true')
   if (filters.dueOnly) params.set('dueOnly', 'true')
@@ -133,11 +133,7 @@ export function useWeekAppointments(weekStartDate: Date) {
 }
 
 export function usePatientAppointments(patientId: string | undefined) {
-  return useQuery({
-    queryKey: getAppointmentsQueryKey({ patientId }),
-    queryFn: () => apiFetch<Appointment[]>(getAppointmentsQueryPath({ patientId })),
-    enabled: !!patientId,
-  })
+  return useAppointments({ patientId })
 }
 
 export function useDateRangeAppointments(from: string, to: string, patientId?: string) {
@@ -227,8 +223,8 @@ export function useUpdateAppointment() {
         method: 'PATCH',
         body: JSON.stringify(data),
       }),
-    onSuccess: async (_, variables) => {
-      await invalidateAppointmentContext(qc, variables.data.patientId)
+    onSuccess: async (updated, variables) => {
+      await invalidateAppointmentContext(qc, variables.data.patientId ?? updated.patientId)
     },
   })
 }

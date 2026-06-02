@@ -6,8 +6,19 @@ import type {
   CreateAppointmentData,
   DayStat,
   FinancialSummary,
+  PatientFinancialSummary,
+  PatientHistoryFilters,
 } from '../../../domain/repositories/appointment.repository.js';
 import type { NeuromodulationProtocolWithCounters } from '../../../domain/entities/neuromodulation-protocol.js';
+
+const LEGACY_PSYCHOTHERAPY_SERVICE_SLUGS = [
+  'individual',
+  'couple',
+  'family',
+  'casal',
+  'familiar',
+  'psychotherapy',
+] as const;
 
 const includeRelations = {
   provider: {
@@ -275,6 +286,107 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
       include: includeRelations,
     });
     return mapAppointment(raw);
+  }
+
+  async findPatientHistory(
+    providerId: string,
+    patientId: string,
+    filters: PatientHistoryFilters,
+  ): Promise<AppointmentWithDetails[]> {
+    const rows = await this.db.appointment.findMany({
+      where: {
+        providerId,
+        customerId: patientId,
+        ...(filters.from || filters.to
+          ? {
+              date: {
+                ...(filters.from ? { gte: filters.from } : {}),
+                ...(filters.to ? { lte: filters.to } : {}),
+              },
+            }
+          : {}),
+        ...(filters.status ? { status: filters.status } : {}),
+        ...(filters.paymentStatus ? { paymentStatus: filters.paymentStatus } : {}),
+        ...(filters.type === 'psychotherapy'
+          ? {
+              service: {
+                slug: {
+                  in: [...LEGACY_PSYCHOTHERAPY_SERVICE_SLUGS],
+                },
+              },
+            }
+          : {}),
+        ...(filters.type === 'neuromodulation'
+          ? {
+              service: {
+                slug: {
+                  notIn: [...LEGACY_PSYCHOTHERAPY_SERVICE_SLUGS],
+                },
+              },
+            }
+          : {}),
+      },
+      include: includeRelations,
+      orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
+    });
+
+    return rows.map(mapAppointment);
+  }
+
+  async getPatientFinancialSummary(
+    providerId: string,
+    patientId: string,
+  ): Promise<PatientFinancialSummary> {
+    const [appointmentRows, protocolRows] = await this.db.$transaction([
+      this.db.appointment.findMany({
+        where: {
+          providerId,
+          customerId: patientId,
+          OR: [
+            { protocolId: null },
+            { protocolCreditOutcome: 'maintenance' },
+          ],
+        },
+        select: {
+          id: true,
+          priceCents: true,
+          paymentStatus: true,
+        },
+      }),
+      this.db.neuromodulationProtocol.findMany({
+        where: {
+          providerId,
+          customerId: patientId,
+        },
+        select: {
+          id: true,
+          totalPriceCents: true,
+          paymentStatus: true,
+        },
+      }),
+    ]);
+
+    const sessionPaidRows = appointmentRows.filter((appointment: { paymentStatus: string }) => appointment.paymentStatus === 'paid');
+    const sessionPendingRows = appointmentRows.filter((appointment: { paymentStatus: string }) => appointment.paymentStatus !== 'paid');
+    const protocolPaidRows = protocolRows.filter((protocol: { paymentStatus: string }) => protocol.paymentStatus === 'paid');
+    const protocolPendingRows = protocolRows.filter((protocol: { paymentStatus: string }) => protocol.paymentStatus !== 'paid');
+
+    return {
+      sessionReceivables: {
+        totalCount: appointmentRows.length,
+        paidCount: sessionPaidRows.length,
+        pendingCount: sessionPendingRows.length,
+        paidTotalCents: sessionPaidRows.reduce((sum: number, appointment: { priceCents: number }) => sum + appointment.priceCents, 0),
+        pendingTotalCents: sessionPendingRows.reduce((sum: number, appointment: { priceCents: number }) => sum + appointment.priceCents, 0),
+      },
+      protocolSales: {
+        totalCount: protocolRows.length,
+        paidCount: protocolPaidRows.length,
+        pendingCount: protocolPendingRows.length,
+        paidTotalCents: protocolPaidRows.reduce((sum: number, protocol: { totalPriceCents: number }) => sum + protocol.totalPriceCents, 0),
+        pendingTotalCents: protocolPendingRows.reduce((sum: number, protocol: { totalPriceCents: number }) => sum + protocol.totalPriceCents, 0),
+      },
+    };
   }
 
   async getFinancialSummary(providerId: string, from: Date, to: Date): Promise<FinancialSummary> {
