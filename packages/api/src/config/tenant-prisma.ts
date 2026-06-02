@@ -1,12 +1,17 @@
 import { prisma } from './database.js';
 
-const TENANT_SCOPED_MODELS = new Set([
+export const TENANT_SCOPED_MODELS = new Set([
   'Provider',
   'ProviderShift',
   'ProviderAbsence',
   'Service',
   'Customer',
   'Appointment',
+  'Document',
+  'SessionReport',
+  'NeuromodulationProtocol',
+  'RecurringAppointmentSeries',
+  'CustomerPackage',
 ]);
 
 const CREATE_OPERATIONS = new Set(['create', 'createMany', 'createManyAndReturn', 'upsert']);

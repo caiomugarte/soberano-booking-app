@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { createTenantPrisma } from '../../../../config/tenant-prisma.js';
+import { TENANT_SCOPED_MODELS, createTenantPrisma } from '../../../../config/tenant-prisma.js';
 
 describe('tenant isolation', () => {
   it('createTenantPrisma injects tenantId into create args', () => {
@@ -48,5 +48,13 @@ describe('tenant isolation', () => {
     expect(resultA.tenantId).toBe(TENANT_A);
     expect(resultB.tenantId).toBe(TENANT_B);
     expect(resultA.tenantId).not.toBe(resultB.tenantId);
+  });
+
+  it('scopes recurring-series and psychology-only models by tenant', () => {
+    expect(TENANT_SCOPED_MODELS.has('Document')).toBe(true);
+    expect(TENANT_SCOPED_MODELS.has('SessionReport')).toBe(true);
+    expect(TENANT_SCOPED_MODELS.has('NeuromodulationProtocol')).toBe(true);
+    expect(TENANT_SCOPED_MODELS.has('RecurringAppointmentSeries')).toBe(true);
+    expect(TENANT_SCOPED_MODELS.has('CustomerPackage')).toBe(true);
   });
 });
