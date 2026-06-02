@@ -39,4 +39,6 @@ export interface NeuromodulationProtocolRepository {
   findCurrentByCustomerId(customerId: string): Promise<NeuromodulationProtocolEntity | null>;
   update(id: string, data: UpdateNeuromodulationProtocolData): Promise<NeuromodulationProtocolEntity>;
   getUsageSnapshot(protocolId: string, excludeAppointmentId?: string): Promise<NeuromodulationProtocolUsageSnapshot>;
+  countLinkedAppointments(protocolId: string): Promise<number>;
+  deleteById(id: string): Promise<void>;
 }

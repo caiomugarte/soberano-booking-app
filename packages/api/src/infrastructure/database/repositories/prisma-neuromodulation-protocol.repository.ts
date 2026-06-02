@@ -173,4 +173,16 @@ export class PrismaNeuromodulationProtocolRepository implements NeuromodulationP
       remainingSessions: mapped.remainingSessions,
     };
   }
+
+  async countLinkedAppointments(protocolId: string): Promise<number> {
+    return this.db.appointment.count({
+      where: { protocolId },
+    });
+  }
+
+  async deleteById(id: string): Promise<void> {
+    await this.db.neuromodulationProtocol.delete({
+      where: { id },
+    });
+  }
 }

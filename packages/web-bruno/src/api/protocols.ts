@@ -73,3 +73,17 @@ export function useChangeProtocolStatus() {
     },
   })
 }
+
+export function useDeleteProtocol() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id }: { id: string; patientId: string }) =>
+      apiFetch<void>(`/api/psychology/protocols/${id}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: async (_, variables) => {
+      await invalidateProtocolContext(qc, variables.patientId)
+      await qc.invalidateQueries({ queryKey: ['protocols', variables.id] })
+    },
+  })
+}

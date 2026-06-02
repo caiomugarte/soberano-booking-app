@@ -20,6 +20,7 @@
 7. `PatientHistory` in `packages/web-bruno/src/components/patients/PatientHistory.tsx` now exposes the cleanup actions needed to unblock patient deletion: single-session delete for any visible session and recurring-series stop for upcoming active recurring sessions.
 8. `DELETE /api/psychology/patients/:id` does not cascade. Before calling `customer.delete`, the route counts linked `documents`, `appointments`, and `recurringAppointmentSeries` rows and returns `409 PATIENT_HAS_DEPENDENCIES` with a human-readable summary when any related records still exist.
 9. The delete route now auto-prunes recurring-series rows that have zero linked appointments before it decides whether deletion is blocked. This resolves the dead-end where `PatientHistory` showed `Nenhuma sessão registrada` but a stopped or manually drained recurrence still prevented deleting the patient.
+10. Finished neuromodulation protocols are now deletable from `PatientProtocolsPanel`, but only when they have no linked appointments. That closes the prior dead-end where protocol-only blockers could not be cleared from the Bruno UI at all.
 
 ## Gotcha
 
