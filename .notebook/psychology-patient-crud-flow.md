@@ -18,10 +18,12 @@
 5. Patient duplicate protection is hybrid: the route pre-checks normalized `cpf` and normalized non-empty `email`, and Prisma unique constraints remain the final guard for `phone`, `cpf`, and `email`.
 6. Patient deletion is initiated from `packages/web-bruno/src/pages/PatientDetailPage.tsx`, which now uses a custom confirmation modal and shows backend delete-blocker messages inline before attempting navigation back to `/pacientes`.
 7. `PatientHistory` in `packages/web-bruno/src/components/patients/PatientHistory.tsx` now exposes the cleanup actions needed to unblock patient deletion: single-session delete for any visible session and recurring-series stop for upcoming active recurring sessions.
-8. `DELETE /api/psychology/patients/:id` does not cascade. Before calling `customer.delete`, the route now counts linked `documents`, `appointments`, and `recurringAppointmentSeries` rows and returns `409 PATIENT_HAS_DEPENDENCIES` with a human-readable summary when any related records still exist.
+8. `DELETE /api/psychology/patients/:id` does not cascade. Before calling `customer.delete`, the route counts linked `documents`, `appointments`, and `recurringAppointmentSeries` rows and returns `409 PATIENT_HAS_DEPENDENCIES` with a human-readable summary when any related records still exist.
+9. The delete route now auto-prunes recurring-series rows that have zero linked appointments before it decides whether deletion is blocked. This resolves the dead-end where `PatientHistory` showed `Nenhuma sessão registrada` but a stopped or manually drained recurrence still prevented deleting the patient.
 
 ## Gotcha
 
 - In this patient patch flow, `undefined` means "leave the field unchanged" while `null` means "clear the stored nullable value". That matters for optional fields like `email` and `cpf` when the edit modal submits blanks.
 - Email is normalized with `trim().toLowerCase()` before duplicate checks and persistence, so `Foo@Bar.com` and ` foo@bar.com ` are treated as the same address.
 - Patient deletion can fail even when the UI only surfaces "documents" or "pending sessions" as likely causes, because the database also restricts deletion when historical appointments or recurring-series rows still reference the patient.
+- A recurring series with zero appointments is dead state, not actionable history. The delete route treats it as cleanup, not as a user-facing blocker.

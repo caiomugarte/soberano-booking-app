@@ -35,6 +35,7 @@ import {
 import { AppError } from '../../shared/errors.js';
 import { tenantConfigSchema } from '@soberano/shared';
 import type { PatientFinancialSummary } from '../../domain/repositories/appointment.repository.js';
+import { resolvePatientDeleteRecurringSeriesDependencies } from './patient-delete.utils.js';
 
 const MAX_DATA_LENGTH = 6_800_000;
 const CPF_INPUT_REGEX = /^[\d.\-\s]*$/;
@@ -493,20 +494,46 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(404).send({ error: 'NOT_FOUND', message: 'Paciente não encontrado.' });
     }
 
-    const [documentsCount, sessionsCount, recurringSeriesCount, protocolsCount] = await request.tenantPrisma.$transaction([
+    const [documentsCount, sessionsCount, recurringSeriesRows, protocolsCount] = await request.tenantPrisma.$transaction([
       request.tenantPrisma.document.count({
         where: { customerId: request.params.id },
       }),
       request.tenantPrisma.appointment.count({
         where: { customerId: request.params.id },
       }),
-      request.tenantPrisma.recurringAppointmentSeries.count({
+      request.tenantPrisma.recurringAppointmentSeries.findMany({
         where: { customerId: request.params.id },
+        select: {
+          id: true,
+          _count: {
+            select: {
+              appointments: true,
+            },
+          },
+        },
       }),
       request.tenantPrisma.neuromodulationProtocol.count({
         where: { customerId: request.params.id },
       }),
     ]);
+
+    const { blockingCount: recurringSeriesCount, orphanIds: orphanRecurringSeriesIds } =
+      resolvePatientDeleteRecurringSeriesDependencies(
+        recurringSeriesRows.map((row) => ({
+          id: row.id,
+          appointmentCount: row._count.appointments,
+        })),
+      );
+
+    if (orphanRecurringSeriesIds.length > 0) {
+      await request.tenantPrisma.recurringAppointmentSeries.deleteMany({
+        where: {
+          id: {
+            in: orphanRecurringSeriesIds,
+          },
+        },
+      });
+    }
 
     if (documentsCount > 0 || sessionsCount > 0 || recurringSeriesCount > 0 || protocolsCount > 0) {
       return reply.status(409).send({
