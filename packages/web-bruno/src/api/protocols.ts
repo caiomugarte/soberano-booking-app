@@ -26,6 +26,7 @@ async function invalidateProtocolContext(qc: ReturnType<typeof useQueryClient>, 
     qc.invalidateQueries({ queryKey: ['patients', patientId] }),
     qc.invalidateQueries({ queryKey: ['appointments'] }),
     qc.invalidateQueries({ queryKey: ['protocols'] }),
+    qc.invalidateQueries({ queryKey: ['protocols', 'patient', patientId] }),
     qc.invalidateQueries({ queryKey: ['financial'] }),
   ])
 }

@@ -107,6 +107,7 @@ export function AppointmentForm({
   )
   const [paymentDate, setPaymentDate] = useState(getAppointmentPaymentDate(appointment))
   const [submitError, setSubmitError] = useState('')
+  const [protocolSelectionNotice, setProtocolSelectionNotice] = useState('')
 
   // --- Package multi-slot state ---
   const [slots, setSlots] = useState<SlotEntry[]>(
@@ -131,7 +132,7 @@ export function AppointmentForm({
   const [newParentsMeetingStatus, setNewParentsMeetingStatus] = useState('')
   const [newAddress, setNewAddress] = useState('')
   const [createError, setCreateError] = useState('')
-  const { data: protocols = [] } = usePatientProtocols(patientId || undefined)
+  const { data: protocols = [], isFetched: areProtocolsFetched } = usePatientProtocols(patientId || undefined)
 
   useEffect(() => {
     if (!open) return
@@ -154,6 +155,7 @@ export function AppointmentForm({
     setPaymentMethod(appointment?.paymentMethod ?? '')
     setPaymentDate(getAppointmentPaymentDate(appointment))
     setSubmitError('')
+    setProtocolSelectionNotice('')
     setPackageValue('')
     setSlots(
       !appointment && defaultDate && defaultTime
@@ -193,6 +195,7 @@ export function AppointmentForm({
 
     if (!patient.neuromodulationEligible) {
       setProtocolId('')
+      setProtocolSelectionNotice('')
     }
 
     if (nextType === 'neuromodulation') {
@@ -215,6 +218,33 @@ export function AppointmentForm({
     }
   }, [isEditMode, patientId, patients, type])
 
+  useEffect(() => {
+    if (!areProtocolsFetched) {
+      return
+    }
+
+    if (type !== 'neuromodulation') {
+      return
+    }
+
+    if (!protocolId) {
+      return
+    }
+
+    const selectedProtocol = protocols.find((item) => item.id === protocolId)
+    if (!selectedProtocol) {
+      setProtocolId('')
+      setProtocolSelectionNotice('O protocolo selecionado não está mais disponível. Escolha manutenção ou deixe a sessão avulsa.')
+      return
+    }
+
+    const isCurrentAppointmentProtocol = appointment?.protocolId === selectedProtocol.id
+    if (selectedProtocol.status === 'finished' && !isCurrentAppointmentProtocol) {
+      setProtocolId('')
+      setProtocolSelectionNotice('O protocolo selecionado foi finalizado e não pode receber novos vínculos. Escolha manutenção ou deixe a sessão avulsa.')
+    }
+  }, [appointment?.protocolId, areProtocolsFetched, protocolId, protocols, type])
+
   function handleSuccessfulSubmit(message?: string) {
     if (onSuccess) {
       onSuccess(message)
@@ -231,6 +261,7 @@ export function AppointmentForm({
     }
 
     setType(newType)
+    setProtocolSelectionNotice('')
     if (newType === 'neuromodulation') {
       setMode('session')
       setRecurring(false)
@@ -528,6 +559,25 @@ export function AppointmentForm({
     label: SESSION_TYPE_LABELS[sessionType],
   }))
   const selectedProtocol = protocols.find((item) => item.id === protocolId)
+  const protocolOptions = [
+    { value: '', label: 'Sessão avulsa (sem protocolo)' },
+    ...protocols
+      .filter((item) => item.status !== 'finished' || item.id === appointment?.protocolId)
+      .map((item) => ({
+        value: item.id,
+        label:
+          item.status === 'maintenance'
+            ? `Manutenção • ${item.remainingSessions} restantes`
+            : item.status === 'finished'
+              ? `Protocolo finalizado • vínculo histórico atual`
+              : `Protocolo ativo • ${item.remainingSessions} restantes`,
+      })),
+  ]
+  const isCurrentFinishedProtocol = Boolean(
+    selectedProtocol &&
+    selectedProtocol.status === 'finished' &&
+    selectedProtocol.id === appointment?.protocolId,
+  )
   const supportsPsychotherapy = supportsSessionType(selectedPatient, 'psychotherapy')
   const supportsNeuromodulation = supportsSessionType(selectedPatient, 'neuromodulation')
   const showPackageMode = !isEditMode && type === 'psychotherapy' && supportsPsychotherapy
@@ -790,20 +840,17 @@ export function AppointmentForm({
               <Select
                 label="Protocolo"
                 value={protocolId}
-                onChange={(e) => setProtocolId(e.target.value)}
-                options={[
-                  { value: '', label: 'Sessão avulsa (sem protocolo)' },
-                  ...protocols
-                    .filter((item) => item.status !== 'finished')
-                    .map((item) => ({
-                      value: item.id,
-                      label:
-                        item.status === 'maintenance'
-                          ? `Manutenção • ${item.remainingSessions} restantes`
-                          : `Protocolo ativo • ${item.remainingSessions} restantes`,
-                    })),
-                ]}
+                onChange={(e) => {
+                  setProtocolSelectionNotice('')
+                  setProtocolId(e.target.value)
+                }}
+                options={protocolOptions}
               />
+              {protocolSelectionNotice && (
+                <p className="text-xs text-amber-800">
+                  {protocolSelectionNotice}
+                </p>
+              )}
               {selectedProtocol && (
                 <div className="grid grid-cols-3 gap-2 text-center text-xs text-primary-900">
                   <div className="rounded-lg bg-white px-2 py-2">
@@ -819,6 +866,11 @@ export function AppointmentForm({
                     <div className="mt-1 text-base font-semibold">{selectedProtocol.remainingSessions}</div>
                   </div>
                 </div>
+              )}
+              {isCurrentFinishedProtocol && (
+                <p className="text-xs text-primary-800">
+                  Este protocolo já foi concluído e permanece apenas como histórico desta sessão. Para novos vínculos, escolha outro protocolo, manutenção ou deixe o atendimento avulso.
+                </p>
               )}
               {!selectedProtocol && (
                 <p className="text-xs text-primary-800">
@@ -916,7 +968,9 @@ export function AppointmentForm({
               />
               {isLinkedToRevenueProtocol ? (
                 <div className="rounded-lg border border-primary-100 bg-primary-50 p-3 text-sm text-primary-900">
-                  Sessão coberta pelo protocolo ativo. Não é necessário informar um valor operacional para este atendimento.
+                  {isCurrentFinishedProtocol
+                    ? 'Esta sessão continua coberta pela venda do protocolo já finalizado. Corrija o vínculo apenas se Bruno decidir liberar ou redirecionar o crédito.'
+                    : 'Sessão coberta pelo protocolo ativo. Não é necessário informar um valor operacional para este atendimento.'}
                 </div>
               ) : (
                 <Input

@@ -105,6 +105,7 @@ async function invalidateAppointmentContext(
   const tasks: Promise<unknown>[] = [
     qc.invalidateQueries({ queryKey: ['appointments'] }),
     qc.invalidateQueries({ queryKey: ['financial'] }),
+    qc.invalidateQueries({ queryKey: ['patients'] }),
     qc.invalidateQueries({ queryKey: ['protocols'] }),
   ]
 

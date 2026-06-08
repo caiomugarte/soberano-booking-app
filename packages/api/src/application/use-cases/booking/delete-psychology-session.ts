@@ -2,6 +2,7 @@ import type { AppointmentRepository } from '../../../domain/repositories/appoint
 import type { NeuromodulationProtocolRepository } from '../../../domain/repositories/neuromodulation-protocol.repository.js';
 import { NotFoundError, ValidationError } from '../../../shared/errors.js';
 import type { ProtocolCreditAction } from './psychology-session.utils.js';
+import { syncActiveProtocolLifecycle } from './psychology-session.utils.js';
 
 export interface DeletePsychologySessionInput {
   appointmentId: string;
@@ -47,5 +48,6 @@ export class DeletePsychologySessionUseCase {
     }
 
     await this.appointmentRepo.deleteById(appointment.id);
+    await syncActiveProtocolLifecycle(this.protocolRepo, appointment.protocolId);
   }
 }

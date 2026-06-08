@@ -15,7 +15,7 @@
 | web-bruno-agenda-event-management | Tasks draft — payment-date control added, awaiting approval | `.specs/features/web-bruno-agenda-event-management/tasks.md` |
 | web-bruno-patient-care-model | Superseded by `web-bruno-patient-care-model-v2`; original tasks describe the exclusive-care-mode baseline | `.specs/features/web-bruno-patient-care-model/tasks.md` |
 | web-bruno-patient-care-model-v2 | Tasks draft — dual-track patient profile, delete safety, history filters, and patient financial detail sequenced | `.specs/features/web-bruno-patient-care-model-v2/tasks.md` |
-| web-bruno-neuromodulation-protocols | Tasks draft — blocked by patient care model foundation, awaiting approval | `.specs/features/web-bruno-neuromodulation-protocols/tasks.md` |
+| web-bruno-neuromodulation-protocols | Tasks draft — rebased to the remaining lifecycle delta (auto-finish + finished-history cleanup), awaiting approval | `.specs/features/web-bruno-neuromodulation-protocols/tasks.md` |
 | web-bruno-operations-hub | Tasks draft — depends on patient care model and protocol receivable rules, awaiting approval | `.specs/features/web-bruno-operations-hub/tasks.md` |
 | psychology-patient-dedup | Tasks draft — awaiting approval | `.specs/features/psychology-patient-dedup/tasks.md` |
 | psychology-api | Tasks draft — awaiting approval | `.specs/features/psychology-api/tasks.md` |
@@ -65,6 +65,7 @@ _None recorded yet._
 | 004 | Make the web-bruno patient form treat blank email as optional on create and clearable on edit | 2026-05-04 | not committed | ✅ Done |
 | 005 | Highlight `Psicoterapia` and `Neuromodulação` with distinct colors in the `web-bruno` weekly agenda | 2026-05-18 | not committed | ✅ Done |
 | 006 | Add a mobile-friendly package creation entry point to `PackagesPage` using the dashboard-style floating action pattern and the existing package workspace handoff | 2026-05-28 | not committed | ✅ Done |
+| 007 | Run the existing CI workflow for pull requests targeting `develop` as well as `master` so test checks can gate merges on both branches | 2026-06-08 | not committed | ✅ Done |
 
 ## Deferred Ideas
 

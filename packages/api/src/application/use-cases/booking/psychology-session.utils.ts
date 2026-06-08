@@ -7,6 +7,7 @@ import type {
   NeuromodulationProtocolEntity,
   NeuromodulationProtocolUsageSnapshot,
 } from '../../../domain/entities/neuromodulation-protocol.js';
+import type { NeuromodulationProtocolRepository } from '../../../domain/repositories/neuromodulation-protocol.repository.js';
 import type { ServiceEntity } from '../../../domain/entities/service.js';
 import { ValidationError } from '../../../shared/errors.js';
 import { addMinutes, parseDateOnly } from './recurring-series.utils.js';
@@ -157,4 +158,27 @@ export function assertProtocolCapacity(
   if (usage.remainingSessions < 1) {
     throw new ValidationError('O protocolo não tem sessões disponíveis. Ajuste o protocolo antes de continuar.');
   }
+}
+
+export async function syncActiveProtocolLifecycle(
+  protocolRepo: NeuromodulationProtocolRepository,
+  protocolId: string | null | undefined,
+): Promise<void> {
+  if (!protocolId) {
+    return;
+  }
+
+  const protocol = await protocolRepo.findById(protocolId);
+  if (!protocol || protocol.status !== 'active') {
+    return;
+  }
+
+  const usage = await protocolRepo.getUsageSnapshot(protocol.id);
+  if (usage.consumedSessions < protocol.totalSessions) {
+    return;
+  }
+
+  await protocolRepo.update(protocol.id, {
+    status: 'finished',
+  });
 }

@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-The current Bruno package flow assumes all neuromodulation sessions are known upfront and can be batch-created immediately. That does not match the real protocol workflow: Bruno sells a long neuromodulation program, books dates gradually over months, needs to track reserved and remaining sessions, and sometimes must keep or release a credit depending on late changes. Revenue also belongs to the protocol sale, not to each later booked session.
+The current Bruno package flow assumes all neuromodulation sessions are known upfront and can be batch-created immediately. That does not match the real protocol workflow: Bruno sells a long neuromodulation program, books dates gradually over months, needs to track reserved and remaining sessions, and sometimes must keep or release a credit depending on late changes. Revenue also belongs to the protocol sale, not to each later booked session. The lifecycle also needs to close itself when the sold allowance is fully consumed and let Bruno clean up obsolete finished protocol history safely.
 
 ## Goals
 
@@ -10,6 +10,8 @@ The current Bruno package flow assumes all neuromodulation sessions are known up
 - [ ] Bruno can book neuromodulation sessions gradually instead of pre-creating all future dates
 - [ ] Protocol-linked sessions can reserve, consume, or release a session credit as Bruno manages changes
 - [ ] Bruno can move a patient from active protocol to maintenance or finished status
+- [ ] Bruno can have a protocol auto-finish when the sold session allowance is fully consumed
+- [ ] Bruno can safely remove obsolete finished neuromodulation protocol history
 - [ ] Neuromodulation revenue is recorded from the protocol sale, not from each later appointment row
 
 ## Out of Scope
@@ -74,9 +76,27 @@ The current Bruno package flow assumes all neuromodulation sessions are known up
 1. WHEN Bruno decides the active protocol is complete THEN the system SHALL allow changing the protocol status to `maintenance` or `finished`
 2. WHEN a protocol is in `maintenance` THEN the system SHALL allow Bruno to keep booking neuromodulation sessions for that patient without enforcing the original main-protocol session allowance
 3. WHEN a protocol is marked `finished` THEN the system SHALL prevent new sessions from being linked to that finished protocol
-4. WHEN Bruno reopens a patient in maintenance care later THEN the system SHALL preserve the completed protocol history separately from the new maintenance scheduling activity
+4. WHEN Bruno reopens a patient in maintenance care later THEN the system SHALL preserve the completed protocol history separately from the new maintenance scheduling activity until Bruno explicitly deletes that finished protocol record
 
 **Independent Test**: Mark an active protocol as maintenance and confirm Bruno can still book a follow-up neuromodulation session without reopening the original 36-session allowance.
+
+---
+
+### P1: Auto-Finish and Clean Up Completed Protocols ⭐ MVP
+
+**User Story**: As Bruno, I want a neuromodulation protocol to finish itself when all sold sessions are consumed and to remove obsolete history when it is no longer needed, so that the patient lifecycle stays accurate without manual cleanup.
+
+**Why P1**: Manual finalization and lingering finished-history rows create lifecycle drift in the protocol panel and make it harder to trust which protocol is still actionable.
+
+**Acceptance Criteria**:
+
+1. WHEN a protocol reaches its configured session allowance through consumed credits THEN the system SHALL automatically mark that protocol as `finished`
+2. WHEN a protocol is auto-finished THEN the Bruno UI SHALL refresh the lifecycle state and remove current protocol actions that only apply to active or maintenance protocols
+3. WHEN Bruno views a finished protocol THEN the system SHALL keep it in the finished-history state until Bruno explicitly deletes it
+4. WHEN Bruno chooses to delete a finished neuromodulation protocol that has no linked sessions THEN the system SHALL remove it from the patient's neuromodulation history
+5. WHEN Bruno tries to delete a neuromodulation protocol that is still `active` or `maintenance`, or still has linked sessions, THEN the system SHALL block the deletion with validation feedback
+
+**Independent Test**: Consume the last remaining protocol credit, confirm the protocol moves to finished automatically, then delete a finished protocol without linked sessions and confirm it disappears from history.
 
 ---
 
@@ -101,7 +121,9 @@ The current Bruno package flow assumes all neuromodulation sessions are known up
 
 - WHEN Bruno tries to reserve more sessions than the protocol currently allows THEN the system SHALL block the booking or require a protocol adjustment first
 - WHEN a protocol-linked session is deleted after reserving a credit THEN the system SHALL require Bruno to choose whether that credit stays consumed or returns to the protocol
+- WHEN a protocol has future reserved sessions but has not yet consumed the last sold credit THEN the system SHALL NOT auto-finish it before that final credit becomes consumed
 - WHEN a protocol is already `finished` THEN the Bruno UI SHALL prevent linking new sessions to it
+- WHEN Bruno tries to delete a protocol that is still `active` or `maintenance` THEN the system SHALL block the deletion and preserve the current lifecycle state
 - WHEN a patient has no active protocol and is in neuromodulation mode THEN the scheduling flow SHALL still work, but it SHALL clearly indicate the session is not consuming protocol credit
 - WHEN the same patient later starts a new protocol after a finished one THEN the system SHALL keep the old protocol history separate from the new active protocol
 
@@ -125,11 +147,15 @@ The current Bruno package flow assumes all neuromodulation sessions are known up
 | NMP-12 | P1: Move protocol to maintenance or finished | Design | Pending |
 | NMP-13 | P1: Allow booking in maintenance without the original limit | Design | Pending |
 | NMP-14 | P1: Block new links to finished protocols | Design | Pending |
-| NMP-15 | P1: Keep completed protocol history separate from maintenance activity | Design | Pending |
+| NMP-15 | P1: Keep completed protocol history separate from maintenance activity until explicitly deleted | Design | Pending |
 | NMP-16 | P1: Record revenue at protocol sale level | Design | Pending |
 | NMP-17 | P1: Attribute protocol revenue by protocol payment date | Design | Pending |
 | NMP-18 | P1: Prevent linked appointments from duplicating sale revenue | Design | Pending |
 | NMP-19 | P1: Show unpaid protocol sales as the neuromodulation receivable surface | Design | Pending |
+| NMP-20 | P1: Auto-finish a protocol when consumed credits reach the sold allowance | Design | Pending |
+| NMP-21 | P1: Refresh the Bruno lifecycle UI after an automatic finish transition | Design | Pending |
+| NMP-22 | P1: Allow deletion of finished neuromodulation history without linked sessions | Design | Pending |
+| NMP-23 | P1: Block deletion for active, maintenance, or linked protocols | Design | Pending |
 
 ---
 
@@ -138,5 +164,7 @@ The current Bruno package flow assumes all neuromodulation sessions are known up
 - [ ] Bruno can open a long neuromodulation protocol without pre-booking all future dates
 - [ ] Protocol counters accurately reflect reserved, consumed, and remaining sessions after schedule changes
 - [ ] Maintenance follow-up can continue after the main protocol ends
+- [ ] Protocols auto-finish when the sold session allowance is fully consumed
+- [ ] Bruno can safely delete obsolete finished neuromodulation history
 - [ ] The financial view treats the protocol sale as the commercial revenue event
 - [ ] Linked neuromodulation appointments stay operational and do not double-count protocol revenue
