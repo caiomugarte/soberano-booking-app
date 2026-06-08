@@ -26,6 +26,7 @@ model Tenant {
   documents        Document[]
   customerPackages CustomerPackage[]
   neuromodulationProtocols NeuromodulationProtocol[]
+  neuromodulationProtocolPayments NeuromodulationProtocolPayment[]
   recurringAppointmentSeries RecurringAppointmentSeries[]
 
   @@map("tenants")
@@ -195,9 +196,6 @@ model NeuromodulationProtocol {
   totalSessions    Int      @map("total_sessions")
   status           String   @default("active") @db.VarChar(20)
   totalPriceCents  Int      @map("total_price_cents")
-  paymentStatus    String   @default("pending") @map("payment_status") @db.VarChar(20)
-  paymentMethod    String?  @map("payment_method") @db.VarChar(20)
-  paidAt           DateTime? @map("paid_at") @db.Timestamptz
   manualConsumedCount Int   @default(0) @map("manual_consumed_count")
   notes            String?  @db.Text
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
@@ -207,10 +205,29 @@ model NeuromodulationProtocol {
   provider         Provider @relation(fields: [providerId], references: [id])
   customer         Customer @relation(fields: [customerId], references: [id])
   appointments     Appointment[]
+  payments         NeuromodulationProtocolPayment[]
 
   @@index([tenantId, customerId, status])
   @@index([providerId, status])
   @@map("neuromodulation_protocols")
+}
+
+model NeuromodulationProtocolPayment {
+  id            String   @id @default(uuid()) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  protocolId    String   @map("protocol_id") @db.Uuid
+  amountCents   Int      @map("amount_cents")
+  paymentMethod String   @map("payment_method") @db.VarChar(20)
+  paidAt        DateTime @map("paid_at") @db.Timestamptz
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant   Tenant                  @relation(fields: [tenantId], references: [id])
+  protocol NeuromodulationProtocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+
+  @@index([protocolId, paidAt])
+  @@index([tenantId, paidAt])
+  @@map("neuromodulation_protocol_payments")
 }
 
 model RecurringAppointmentSeries {

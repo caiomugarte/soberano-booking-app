@@ -14,6 +14,8 @@ import { CreateRecurringSeriesUseCase } from '../../application/use-cases/bookin
 import { StopRecurringSeriesUseCase } from '../../application/use-cases/booking/stop-recurring-series.js';
 import { CreateNeuromodulationProtocolUseCase } from '../../application/use-cases/booking/create-neuromodulation-protocol.js';
 import { UpdateNeuromodulationProtocolUseCase } from '../../application/use-cases/booking/update-neuromodulation-protocol.js';
+import { AddNeuromodulationProtocolPaymentUseCase } from '../../application/use-cases/booking/add-neuromodulation-protocol-payment.js';
+import { UpdateNeuromodulationProtocolPaymentUseCase } from '../../application/use-cases/booking/update-neuromodulation-protocol-payment.js';
 import { ChangeNeuromodulationProtocolStatusUseCase } from '../../application/use-cases/booking/change-neuromodulation-protocol-status.js';
 import { DeleteNeuromodulationProtocolUseCase } from '../../application/use-cases/booking/delete-neuromodulation-protocol.js';
 import { GetNeuromodulationProtocolUseCase } from '../../application/use-cases/booking/get-neuromodulation-protocol.js';
@@ -167,8 +169,17 @@ function mapToProtocol(raw: any) {
     totalPriceCents: raw.totalPriceCents,
     status: raw.status,
     paymentStatus: raw.paymentStatus,
-    paymentMethod: raw.paymentMethod ?? undefined,
-    paidAt: toDateTimeStr(raw.paidAt),
+    paidAmountCents: raw.paidAmountCents,
+    remainingAmountCents: raw.remainingAmountCents,
+    lastPaymentAt: toDateTimeStr(raw.lastPaymentAt),
+    payments: raw.payments.map((payment: any) => ({
+      id: payment.id,
+      amountCents: payment.amountCents,
+      paymentMethod: payment.paymentMethod,
+      paidAt: toDateTimeStr(payment.paidAt) ?? '',
+      createdAt: toDateTimeStr(payment.createdAt) ?? '',
+      updatedAt: toDateTimeStr(payment.updatedAt) ?? '',
+    })),
     notes: raw.notes ?? undefined,
     createdAt: toDateTimeStr(raw.createdAt) ?? '',
     updatedAt: toDateTimeStr(raw.updatedAt) ?? '',
@@ -603,9 +614,11 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       totalSessions: z.number().int().min(1),
       totalPriceCents: z.number().int().min(0),
       status: protocolStatusSchema.optional(),
-      paymentStatus: paymentStatusSchema.optional(),
-      paymentMethod: paymentMethodSchema.nullish(),
-      paidAt: z.string().datetime({ offset: true }).nullish(),
+      initialPayment: z.object({
+        amountCents: z.number().int(),
+        paymentMethod: paymentMethodSchema,
+        paidAt: z.string().datetime({ offset: true }),
+      }).optional(),
       notes: z.string().max(2000).nullish(),
     });
     const parsed = schema.safeParse(request.body);
@@ -625,9 +638,13 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
         totalSessions: parsed.data.totalSessions,
         totalPriceCents: parsed.data.totalPriceCents,
         status: parsed.data.status,
-        paymentStatus: parsed.data.paymentStatus,
-        paymentMethod: parsed.data.paymentMethod ?? null,
-        paidAt: parsed.data.paidAt ? new Date(parsed.data.paidAt) : null,
+        initialPayment: parsed.data.initialPayment
+          ? {
+              amountCents: parsed.data.initialPayment.amountCents,
+              paymentMethod: parsed.data.initialPayment.paymentMethod,
+              paidAt: new Date(parsed.data.initialPayment.paidAt),
+            }
+          : undefined,
         notes: parsed.data.notes ?? null,
       });
 
@@ -654,9 +671,6 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       totalSessions: z.number().int().min(1).optional(),
       totalPriceCents: z.number().int().min(0).optional(),
       status: protocolStatusSchema.optional(),
-      paymentStatus: paymentStatusSchema.optional(),
-      paymentMethod: paymentMethodSchema.nullish(),
-      paidAt: z.string().datetime({ offset: true }).nullish(),
       notes: z.string().max(2000).nullish(),
     }).refine((data) => Object.values(data).some((value) => value !== undefined), {
       message: 'Informe ao menos um campo para atualizar.',
@@ -676,15 +690,68 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
         totalSessions: parsed.data.totalSessions,
         totalPriceCents: parsed.data.totalPriceCents,
         status: parsed.data.status,
-        paymentStatus: parsed.data.paymentStatus,
-        paymentMethod: parsed.data.paymentMethod ?? null,
-        paidAt:
-          parsed.data.paidAt === undefined
+        notes:
+          parsed.data.notes === undefined
             ? undefined
-            : parsed.data.paidAt
-              ? new Date(parsed.data.paidAt)
-              : null,
-        notes: parsed.data.notes ?? null,
+            : parsed.data.notes ?? null,
+      });
+
+      return mapToProtocol(protocol);
+    } catch (error) {
+      return sendAppError(reply, error);
+    }
+  });
+
+  app.post<{ Params: { id: string } }>('/psychology/protocols/:id/payments', async (request, reply) => {
+    const schema = z.object({
+      amountCents: z.number().int(),
+      paymentMethod: paymentMethodSchema,
+      paidAt: z.string().datetime({ offset: true }),
+    });
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    }
+
+    const protocolRepo = new PrismaNeuromodulationProtocolRepository(request.tenantPrisma);
+    const useCase = new AddNeuromodulationProtocolPaymentUseCase(protocolRepo);
+
+    try {
+      const protocol = await useCase.execute({
+        tenantId: request.tenant.id,
+        protocolId: request.params.id,
+        amountCents: parsed.data.amountCents,
+        paymentMethod: parsed.data.paymentMethod,
+        paidAt: new Date(parsed.data.paidAt),
+      });
+
+      return reply.status(201).send(mapToProtocol(protocol));
+    } catch (error) {
+      return sendAppError(reply, error);
+    }
+  });
+
+  app.patch<{ Params: { id: string; paymentId: string } }>('/psychology/protocols/:id/payments/:paymentId', async (request, reply) => {
+    const schema = z.object({
+      amountCents: z.number().int(),
+      paymentMethod: paymentMethodSchema,
+      paidAt: z.string().datetime({ offset: true }),
+    });
+    const parsed = schema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
+    }
+
+    const protocolRepo = new PrismaNeuromodulationProtocolRepository(request.tenantPrisma);
+    const useCase = new UpdateNeuromodulationProtocolPaymentUseCase(protocolRepo);
+
+    try {
+      const protocol = await useCase.execute({
+        protocolId: request.params.id,
+        paymentId: request.params.paymentId,
+        amountCents: parsed.data.amountCents,
+        paymentMethod: parsed.data.paymentMethod,
+        paidAt: new Date(parsed.data.paidAt),
       });
 
       return mapToProtocol(protocol);

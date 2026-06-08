@@ -36,6 +36,10 @@
 6. Automatic protocol finishing is still a lifecycle gap:
    - counters already project `reserved`, `consumed`, and `remaining`
    - current booking mutation use cases do not auto-transition a protocol to `finished` when consumed credits reach the sold allowance
+7. Protocol commercial payment is still a scalar model reused across API and financial reporting:
+   - `NeuromodulationProtocol` stores only one `paymentStatus`, `paymentMethod`, and `paidAt`
+   - repository/query layers surface protocol-sale revenue directly from those protocol fields
+   - supporting multiple receipts for one protocol sale requires a separate ledger-style feature, not only a UI change
 
 ## Gotchas
 
@@ -43,3 +47,4 @@
 - Quick cancel/delete actions only prompt for release-vs-consume when `protocolLinkType === 'protocol'`; maintenance sessions stay operational and don’t participate in the allowance counters.
 - `GET /api/services` still has to normalize Bruno’s legacy rows until the migration/seed rollout finishes on real data; the frontend should not assume raw service slugs are already clean in the database.
 - `PatientProtocolsPanel` splits current vs finished protocols purely by status, so any future auto-finish rule will immediately move a protocol out of the current action surface unless the UI copy and invalidation stay aligned with that behavior.
+- The current protocol revenue path assumes one protocol-level `paidAt`; any partial-payment ledger must also change financial range filtering and receivable aggregation, not just the protocol form.

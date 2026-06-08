@@ -1,8 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './http-client'
-import type { Protocol, ProtocolFormData } from '@/schemas/protocol.schema'
-
-type ProtocolUpdateData = Partial<ProtocolFormData>
+import type {
+  AddProtocolPaymentData,
+  CreateProtocolData,
+  Protocol,
+  UpdateProtocolPaymentData,
+  UpdateProtocolData,
+} from '@/schemas/protocol.schema'
 
 export function usePatientProtocols(patientId: string | undefined) {
   return useQuery({
@@ -34,7 +38,7 @@ async function invalidateProtocolContext(qc: ReturnType<typeof useQueryClient>, 
 export function useCreateProtocol(patientId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: ProtocolUpdateData) =>
+    mutationFn: (data: CreateProtocolData) =>
       apiFetch<Protocol>(`/api/psychology/patients/${patientId}/protocols`, {
         method: 'POST',
         body: JSON.stringify(data),
@@ -48,7 +52,7 @@ export function useCreateProtocol(patientId: string) {
 export function useUpdateProtocol() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; patientId: string; data: ProtocolUpdateData }) =>
+    mutationFn: ({ id, data }: { id: string; patientId: string; data: UpdateProtocolData }) =>
       apiFetch<Protocol>(`/api/psychology/protocols/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(data),
@@ -56,6 +60,45 @@ export function useUpdateProtocol() {
     onSuccess: async (_, variables) => {
       await invalidateProtocolContext(qc, variables.patientId)
       await qc.invalidateQueries({ queryKey: ['protocols', variables.id] })
+    },
+  })
+}
+
+export function useAddProtocolPayment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; patientId: string; data: AddProtocolPaymentData }) =>
+      apiFetch<Protocol>(`/api/psychology/protocols/${id}/payments`, {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    onSuccess: async (_, variables) => {
+      await invalidateProtocolContext(qc, variables.patientId)
+      await qc.invalidateQueries({ queryKey: ['protocols', variables.id] })
+    },
+  })
+}
+
+export function useUpdateProtocolPayment() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      protocolId,
+      paymentId,
+      data,
+    }: {
+      protocolId: string
+      paymentId: string
+      patientId: string
+      data: UpdateProtocolPaymentData
+    }) =>
+      apiFetch<Protocol>(`/api/psychology/protocols/${protocolId}/payments/${paymentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      }),
+    onSuccess: async (_, variables) => {
+      await invalidateProtocolContext(qc, variables.patientId)
+      await qc.invalidateQueries({ queryKey: ['protocols', variables.protocolId] })
     },
   })
 }

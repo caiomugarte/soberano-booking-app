@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSendBulkPaymentReminders } from '@/api/appointments'
 import { PaymentMethodDialog } from '@/components/appointments/PaymentMethodDialog'
+import { ProtocolPaymentDialog } from '@/components/protocols/ProtocolPaymentDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -19,13 +20,19 @@ interface PendingPaymentsProps {
     amountCents: number
     reminderAppointmentId?: string
   }>
-  onMarkPaid: (
-    kind: 'appointment' | 'protocol',
+  onMarkAppointmentPaid: (
     id: string,
     patientId: string,
     paymentMethod: PaymentMethod,
     paidAt: string,
   ) => void
+  onAddProtocolPayment: (
+    id: string,
+    patientId: string,
+    payment: { amountCents: number; paymentMethod: PaymentMethod; paidAt: string },
+  ) => void
+  isAppointmentMutationPending?: boolean
+  isProtocolMutationPending?: boolean
 }
 
 type ReminderFeedback = {
@@ -37,7 +44,13 @@ function getEntryKey(entry: PendingPaymentsProps['entries'][number]) {
   return `${entry.kind}:${entry.id}`
 }
 
-export function PendingPayments({ entries, onMarkPaid }: PendingPaymentsProps) {
+export function PendingPayments({
+  entries,
+  onMarkAppointmentPaid,
+  onAddProtocolPayment,
+  isAppointmentMutationPending = false,
+  isProtocolMutationPending = false,
+}: PendingPaymentsProps) {
   const sendBulkReminders = useSendBulkPaymentReminders()
   const [selectedEntry, setSelectedEntry] = useState<PendingPaymentsProps['entries'][number] | null>(null)
   const [patientFilter, setPatientFilter] = useState('')
@@ -82,7 +95,7 @@ export function PendingPayments({ entries, onMarkPaid }: PendingPaymentsProps) {
     return (
       <EmptyState
         title="Nenhuma pendência vencida"
-        description="As sessões futuras não entram nesta bancada."
+        description="As sessões futuras e os protocolos já quitados não entram nesta bancada."
       />
     )
   }
@@ -281,15 +294,34 @@ export function PendingPayments({ entries, onMarkPaid }: PendingPaymentsProps) {
       </Panel.Body>
 
       <PaymentMethodDialog
-        open={selectedEntry !== null}
-        onClose={() => setSelectedEntry(null)}
+        open={selectedEntry?.kind === 'appointment'}
+        onClose={() => {
+          if (isAppointmentMutationPending) return
+          setSelectedEntry(null)
+        }}
         onConfirm={(paymentMethod, paidAt) => {
-          if (!selectedEntry) return
-          onMarkPaid(selectedEntry.kind, selectedEntry.id, selectedEntry.patientId, paymentMethod, paidAt)
+          if (!selectedEntry || selectedEntry.kind !== 'appointment') return
+          onMarkAppointmentPaid(selectedEntry.id, selectedEntry.patientId, paymentMethod, paidAt)
           setSelectedEntry(null)
         }}
         title="Registrar pagamento"
         confirmLabel="Marcar pago"
+        isPending={isAppointmentMutationPending}
+      />
+
+      <ProtocolPaymentDialog
+        open={selectedEntry?.kind === 'protocol'}
+        onClose={() => {
+          if (isProtocolMutationPending) return
+          setSelectedEntry(null)
+        }}
+        remainingAmountCents={selectedEntry?.kind === 'protocol' ? selectedEntry.amountCents : 0}
+        onConfirm={(payment) => {
+          if (!selectedEntry || selectedEntry.kind !== 'protocol') return
+          onAddProtocolPayment(selectedEntry.id, selectedEntry.patientId, payment)
+          setSelectedEntry(null)
+        }}
+        isPending={isProtocolMutationPending}
       />
     </Panel>
   )

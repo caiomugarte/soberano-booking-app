@@ -20,7 +20,7 @@ The current Bruno package flow assumes all neuromodulation sessions are known up
 |---|---|
 | Fully automatic 24-hour policy enforcement based on a timestamp rule | Bruno wants operational control over exceptions |
 | Customer self-service protocol portal | Admin-only workflow for now |
-| Installments, split payments, or receivable schedules for protocol sales | Single protocol sale is enough for this phase |
+| Installments, split payments, or receivable schedules for protocol sales | Deferred to the linked `web-bruno-protocol-payment-ledger` feature so the ledger/data-model change stays separate from the core protocol lifecycle scope |
 | Automated refunds or automatic credit returns | Credit outcome stays explicit and provider-managed |
 | Psychotherapy pricing and cadence defaults | Split into `web-bruno-patient-care-model` |
 

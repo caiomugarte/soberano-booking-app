@@ -4,13 +4,12 @@ import type {
   NeuromodulationProtocolStatus,
   NeuromodulationProtocolWithCounters,
   ProtocolPaymentMethod,
-  ProtocolPaymentStatus,
 } from '../../../domain/entities/neuromodulation-protocol.js';
 import { ValidationError } from '../../../shared/errors.js';
 import {
   assertCurrentProtocolAvailability,
   assertNeuromodulationPatient,
-  assertPaymentState,
+  assertPaymentEntry,
 } from './neuromodulation-protocol.utils.js';
 
 export interface CreateNeuromodulationProtocolInput {
@@ -20,9 +19,11 @@ export interface CreateNeuromodulationProtocolInput {
   totalSessions: number;
   totalPriceCents: number;
   status?: NeuromodulationProtocolStatus;
-  paymentStatus?: ProtocolPaymentStatus;
-  paymentMethod?: ProtocolPaymentMethod | null;
-  paidAt?: Date | null;
+  initialPayment?: {
+    amountCents: number;
+    paymentMethod: ProtocolPaymentMethod;
+    paidAt: Date;
+  };
   notes?: string | null;
 }
 
@@ -47,12 +48,12 @@ export class CreateNeuromodulationProtocolUseCase {
     const existingCurrentProtocol = await this.protocolRepo.findCurrentByCustomerId(input.customerId);
     assertCurrentProtocolAvailability(existingCurrentProtocol);
 
-    const paymentStatus = input.paymentStatus ?? 'pending';
-    assertPaymentState({
-      paymentStatus,
-      paymentMethod: input.paymentMethod ?? null,
-      paidAt: input.paidAt ?? null,
-    });
+    if (input.initialPayment) {
+      assertPaymentEntry(input.initialPayment);
+      if (input.initialPayment.amountCents > input.totalPriceCents) {
+        throw new ValidationError('O pagamento excede o saldo restante do protocolo.');
+      }
+    }
 
     const created = await this.protocolRepo.create({
       tenantId: input.tenantId,
@@ -61,9 +62,7 @@ export class CreateNeuromodulationProtocolUseCase {
       totalSessions: input.totalSessions,
       totalPriceCents: input.totalPriceCents,
       status: input.status ?? 'active',
-      paymentStatus,
-      paymentMethod: paymentStatus === 'paid' ? input.paymentMethod ?? null : null,
-      paidAt: paymentStatus === 'paid' ? input.paidAt ?? new Date() : null,
+      initialPayment: input.initialPayment,
       notes: input.notes ?? null,
     });
 

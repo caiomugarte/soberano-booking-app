@@ -27,6 +27,12 @@ export const PAYMENT_STATUS_LABELS: Record<string, string> = {
   paid: 'Pago',
 }
 
+export const PROTOCOL_PAYMENT_STATUS_LABELS: Record<string, string> = {
+  pending: 'Pendente',
+  partial: 'Parcial',
+  paid: 'Pago',
+}
+
 export const PAYMENT_METHOD_LABELS: Record<string, string> = {
   card: 'Cartão',
   pix: 'PIX',

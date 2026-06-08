@@ -16,6 +16,7 @@
 | web-bruno-patient-care-model | Superseded by `web-bruno-patient-care-model-v2`; original tasks describe the exclusive-care-mode baseline | `.specs/features/web-bruno-patient-care-model/tasks.md` |
 | web-bruno-patient-care-model-v2 | Tasks draft — dual-track patient profile, delete safety, history filters, and patient financial detail sequenced | `.specs/features/web-bruno-patient-care-model-v2/tasks.md` |
 | web-bruno-neuromodulation-protocols | Tasks draft — rebased to the remaining lifecycle delta (auto-finish + finished-history cleanup), awaiting approval | `.specs/features/web-bruno-neuromodulation-protocols/tasks.md` |
+| web-bruno-protocol-payment-ledger | Tasks draft — linked to `web-bruno-neuromodulation-protocols`, awaiting approval | `.specs/features/web-bruno-protocol-payment-ledger/tasks.md` |
 | web-bruno-operations-hub | Tasks draft — depends on patient care model and protocol receivable rules, awaiting approval | `.specs/features/web-bruno-operations-hub/tasks.md` |
 | psychology-patient-dedup | Tasks draft — awaiting approval | `.specs/features/psychology-patient-dedup/tasks.md` |
 | psychology-api | Tasks draft — awaiting approval | `.specs/features/psychology-api/tasks.md` |
@@ -46,6 +47,7 @@
 | 2026-05-18 | Bruno psychology changes split into three linked specs | Separating patient/domain foundation, neuromodulation protocols, and operations keeps later execution atomic and reduces cross-package ambiguity |
 | 2026-05-18 | Neuromodulation revenue belongs to the protocol sale, not to later operational session rows | Bruno sells long protocols first and books dates over time, so financial attribution must follow the protocol agreement |
 | 2026-06-02 | `web-bruno-patient-care-model-v2` replaces the original patient-care-model execution track | The codebase already implements the exclusive `careMode` assumption, but Bruno now needs dual-track patients plus patient-detail operational improvements before further execution |
+| 2026-06-08 | Protocol payment ledger was split into its own linked spec | Multiple payment dates and amounts cannot fit the current scalar protocol payment fields, so the change must be specified as a separate data-model and financial feature instead of being buried in neuromodulation UI work |
 
 ## Blockers
 
