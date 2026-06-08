@@ -84,6 +84,8 @@ export default function FinancialPage() {
             : 'sem entradas registradas'
         }`,
         amountCents: entry.protocol.remainingAmountCents,
+        bulkActionLimitation:
+          'Cobrança de protocolo: use o fluxo individual até o recebimento em lote desse tipo ser definido.',
       }))
     const pendingSummaryItems = [...duePendingItems, ...pendingProtocolItems]
 

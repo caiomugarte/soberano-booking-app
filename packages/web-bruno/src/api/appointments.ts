@@ -5,6 +5,7 @@ import type {
   Appointment,
   AppointmentFormData,
   AppointmentHistoryFilters,
+  PaymentMethod,
   ProtocolCreditAction,
   SessionType,
 } from '@/schemas/appointment.schema'
@@ -20,12 +21,14 @@ export type AppointmentListFilters = AppointmentHistoryFilters & {
   receivableScope?: AppointmentReceivableScope
 }
 
-export type PaymentReminderResult = {
+export type AppointmentActionResult = {
   appointmentId: string
   success: boolean
   code?: string
   message?: string
 }
+
+export type PaymentReminderResult = AppointmentActionResult
 
 type RecurringSeriesData = {
   patientId: string
@@ -117,6 +120,27 @@ async function invalidateAppointmentContext(
   }
 
   await Promise.all(tasks)
+}
+
+function mapAppointmentActionError(
+  appointmentId: string,
+  error: unknown,
+  fallbackMessage: string,
+): AppointmentActionResult {
+  if (error instanceof ApiError) {
+    return {
+      appointmentId,
+      success: false,
+      code: error.code,
+      message: error.message,
+    }
+  }
+
+  return {
+    appointmentId,
+    success: false,
+    message: error instanceof Error ? error.message : fallbackMessage,
+  }
 }
 
 export function useAppointments(filters: AppointmentListFilters = {}) {
@@ -253,6 +277,47 @@ export function useSendPaymentReminder() {
   })
 }
 
+export function useBulkMarkAppointmentsPaid() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      appointmentIds,
+      paymentMethod,
+      paidAt,
+    }: {
+      appointmentIds: string[]
+      paymentMethod: PaymentMethod
+      paidAt: string
+    }) =>
+      Promise.all(
+        appointmentIds.map(async (appointmentId): Promise<AppointmentActionResult> => {
+          try {
+            await apiFetch<Appointment>(`/api/psychology/sessions/${appointmentId}`, {
+              method: 'PATCH',
+              body: JSON.stringify({
+                paymentStatus: 'paid',
+                paymentMethod,
+                paidAt,
+              }),
+            })
+
+            return { appointmentId, success: true }
+          } catch (error) {
+            return mapAppointmentActionError(
+              appointmentId,
+              error,
+              'Erro ao registrar pagamento.',
+            )
+          }
+        }),
+      ),
+    onSuccess: async () => {
+      await invalidateAppointmentContext(qc)
+    },
+  })
+}
+
 export function useSendBulkPaymentReminders() {
   return useMutation({
     mutationFn: async (appointmentIds: string[]) => {
@@ -266,20 +331,11 @@ export function useSendBulkPaymentReminders() {
 
             return { appointmentId, success: true }
           } catch (error) {
-            if (error instanceof ApiError) {
-              return {
-                appointmentId,
-                success: false,
-                code: error.code,
-                message: error.message,
-              }
-            }
-
-            return {
+            return mapAppointmentActionError(
               appointmentId,
-              success: false,
-              message: error instanceof Error ? error.message : 'Erro ao enviar lembrete',
-            }
+              error,
+              'Erro ao enviar lembrete.',
+            )
           }
         }),
       )
