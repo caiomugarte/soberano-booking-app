@@ -5,9 +5,10 @@ import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
-import type { Protocol } from '@/schemas/protocol.schema'
-import type { PaymentMethod, PaymentStatus, ProtocolStatus } from '@/schemas/appointment.schema'
-import { dateInputToIso, getTodayDateInputValue, toDateInputValue } from '@/lib/format'
+import { formatCurrency } from '@/lib/format'
+import { dateInputToIso, getTodayDateInputValue } from '@/lib/format'
+import type { PaymentMethod, ProtocolStatus } from '@/schemas/appointment.schema'
+import type { CreateProtocolData, Protocol, UpdateProtocolData } from '@/schemas/protocol.schema'
 
 interface ProtocolFormProps {
   open: boolean
@@ -24,10 +25,11 @@ export function ProtocolForm({ open, onClose, patientId, protocol }: ProtocolFor
   const [totalSessions, setTotalSessions] = useState(protocol?.totalSessions ? String(protocol.totalSessions) : '')
   const [totalPrice, setTotalPrice] = useState(protocol ? String(protocol.totalPriceCents / 100) : '')
   const [status, setStatus] = useState<ProtocolStatus>(protocol?.status ?? 'active')
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(protocol?.paymentStatus ?? 'pending')
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | ''>(protocol?.paymentMethod ?? '')
-  const [paidAt, setPaidAt] = useState(toDateInputValue(protocol?.paidAt) || getTodayDateInputValue())
   const [notes, setNotes] = useState(protocol?.notes ?? '')
+  const [captureInitialPayment, setCaptureInitialPayment] = useState(false)
+  const [initialPaymentAmount, setInitialPaymentAmount] = useState('')
+  const [initialPaymentMethod, setInitialPaymentMethod] = useState<PaymentMethod | ''>('')
+  const [initialPaymentDate, setInitialPaymentDate] = useState(getTodayDateInputValue())
   const [submitError, setSubmitError] = useState('')
 
   useEffect(() => {
@@ -36,10 +38,11 @@ export function ProtocolForm({ open, onClose, patientId, protocol }: ProtocolFor
     setTotalSessions(protocol?.totalSessions ? String(protocol.totalSessions) : '')
     setTotalPrice(protocol ? String(protocol.totalPriceCents / 100) : '')
     setStatus(protocol?.status ?? 'active')
-    setPaymentStatus(protocol?.paymentStatus ?? 'pending')
-    setPaymentMethod(protocol?.paymentMethod ?? '')
-    setPaidAt(toDateInputValue(protocol?.paidAt) || getTodayDateInputValue())
     setNotes(protocol?.notes ?? '')
+    setCaptureInitialPayment(false)
+    setInitialPaymentAmount('')
+    setInitialPaymentMethod('')
+    setInitialPaymentDate(getTodayDateInputValue())
     setSubmitError('')
   }, [open, protocol])
 
@@ -60,22 +63,16 @@ export function ProtocolForm({ open, onClose, patientId, protocol }: ProtocolFor
       return
     }
 
-    if (paymentStatus === 'paid' && !paymentMethod) {
-      setSubmitError('Selecione a forma de pagamento do protocolo.')
-      return
-    }
-
-    const payload = {
-      totalSessions: parsedTotalSessions,
-      totalPriceCents: parsedTotalPriceCents,
-      status,
-      paymentStatus,
-      paymentMethod: paymentStatus === 'paid' ? paymentMethod || undefined : undefined,
-      paidAt: paymentStatus === 'paid' ? dateInputToIso(paidAt) : undefined,
-      notes: notes || undefined,
-    }
+    const normalizedNotes = notes.trim()
 
     if (protocol) {
+      const payload: UpdateProtocolData = {
+        totalSessions: parsedTotalSessions,
+        totalPriceCents: parsedTotalPriceCents,
+        status,
+        notes: normalizedNotes || null,
+      }
+
       updateProtocol.mutate(
         {
           id: protocol.id,
@@ -90,6 +87,45 @@ export function ProtocolForm({ open, onClose, patientId, protocol }: ProtocolFor
         },
       )
       return
+    }
+
+    let initialPayment: CreateProtocolData['initialPayment']
+    if (captureInitialPayment) {
+      const amountCents = Math.round(Number.parseFloat(initialPaymentAmount || '0') * 100)
+
+      if (!Number.isFinite(amountCents) || amountCents <= 0) {
+        setSubmitError('Informe um valor inicial maior que zero.')
+        return
+      }
+
+      if (amountCents > parsedTotalPriceCents) {
+        setSubmitError('O pagamento inicial não pode exceder o valor do protocolo.')
+        return
+      }
+
+      if (!initialPaymentMethod) {
+        setSubmitError('Selecione a forma de pagamento inicial.')
+        return
+      }
+
+      if (!initialPaymentDate) {
+        setSubmitError('Informe a data do pagamento inicial.')
+        return
+      }
+
+      initialPayment = {
+        amountCents,
+        paymentMethod: initialPaymentMethod,
+        paidAt: dateInputToIso(initialPaymentDate),
+      }
+    }
+
+    const payload: CreateProtocolData = {
+      totalSessions: parsedTotalSessions,
+      totalPriceCents: parsedTotalPriceCents,
+      status,
+      notes: normalizedNotes || null,
+      ...(initialPayment ? { initialPayment } : {}),
     }
 
     createProtocol.mutate(payload, {
@@ -108,6 +144,16 @@ export function ProtocolForm({ open, onClose, patientId, protocol }: ProtocolFor
           {submitError ? (
             <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{submitError}</div>
           ) : null}
+          {protocol && (
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              Recebido: <span className="font-semibold text-slate-900">{formatCurrency(protocol.paidAmountCents)}</span>
+              {' • '}
+              Saldo restante: <span className="font-semibold text-slate-900">{formatCurrency(protocol.remainingAmountCents)}</span>
+              <div className="mt-1 text-xs text-slate-500">
+                O histórico de pagamentos é preservado e deve ser atualizado pelo fluxo de registrar pagamento.
+              </div>
+            </div>
+          )}
           <Input
             label="Total de sessões"
             type="number"
@@ -135,43 +181,64 @@ export function ProtocolForm({ open, onClose, patientId, protocol }: ProtocolFor
               { value: 'finished', label: 'Finalizado' },
             ]}
           />
-          <Select
-            label="Pagamento"
-            value={paymentStatus}
-            onChange={(e) => {
-              const nextStatus = e.target.value as PaymentStatus
-              setPaymentStatus(nextStatus)
-              if (nextStatus === 'pending') {
-                setPaymentMethod('')
-              }
-            }}
-            options={[
-              { value: 'pending', label: 'Pendente' },
-              { value: 'paid', label: 'Pago' },
-            ]}
-          />
-          {paymentStatus === 'paid' && (
-            <>
-              <Select
-                label="Forma de pagamento"
-                value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                options={[
-                  { value: 'card', label: 'Cartão' },
-                  { value: 'pix', label: 'PIX' },
-                  { value: 'cash', label: 'Dinheiro' },
-                ]}
-                placeholder="Selecione a forma de pagamento"
-                required
-              />
-              <Input
-                label="Data do pagamento"
-                type="date"
-                value={paidAt}
-                onChange={(e) => setPaidAt(e.target.value)}
-                required
-              />
-            </>
+          {!isEditMode && (
+            <div className="rounded-lg border border-gray-200 p-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-sm font-medium text-gray-800">Pagamento inicial</div>
+                  <p className="text-xs text-gray-500">
+                    Opcional. Registre a primeira entrada sem misturar a venda com edições futuras do protocolo.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant={captureInitialPayment ? 'ghost' : 'secondary'}
+                  size="sm"
+                  onClick={() => {
+                    setCaptureInitialPayment((current) => !current)
+                    setInitialPaymentAmount('')
+                    setInitialPaymentMethod('')
+                    setInitialPaymentDate(getTodayDateInputValue())
+                  }}
+                >
+                  {captureInitialPayment ? 'Remover pagamento inicial' : 'Adicionar pagamento inicial'}
+                </Button>
+              </div>
+
+              {captureInitialPayment && (
+                <div className="mt-4 space-y-3">
+                  <Input
+                    label="Valor recebido (R$)"
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={initialPaymentAmount}
+                    onChange={(event) => setInitialPaymentAmount(event.target.value)}
+                    required
+                  />
+                  <Select
+                    label="Forma de pagamento"
+                    value={initialPaymentMethod}
+                    onChange={(event) => setInitialPaymentMethod(event.target.value as PaymentMethod)}
+                    options={[
+                      { value: 'card', label: 'Cartão' },
+                      { value: 'pix', label: 'PIX' },
+                      { value: 'cash', label: 'Dinheiro' },
+                    ]}
+                    placeholder="Selecione a forma de pagamento"
+                    required
+                  />
+                  <Input
+                    label="Data do pagamento"
+                    type="date"
+                    value={initialPaymentDate}
+                    max={getTodayDateInputValue()}
+                    onChange={(event) => setInitialPaymentDate(event.target.value)}
+                    required
+                  />
+                </div>
+              )}
+            </div>
           )}
           <Textarea
             label="Observações"

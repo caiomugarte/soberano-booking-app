@@ -1,11 +1,17 @@
 import type {
   NeuromodulationProtocolEntity,
+  NeuromodulationProtocolPaymentEntity,
   NeuromodulationProtocolStatus,
   NeuromodulationProtocolUsageSnapshot,
   NeuromodulationProtocolWithCounters,
   ProtocolPaymentMethod,
-  ProtocolPaymentStatus,
 } from '../entities/neuromodulation-protocol.js';
+
+export interface ProtocolPaymentEntryData {
+  amountCents: number;
+  paymentMethod: ProtocolPaymentMethod;
+  paidAt: Date;
+}
 
 export interface CreateNeuromodulationProtocolData {
   tenantId: string;
@@ -14,9 +20,7 @@ export interface CreateNeuromodulationProtocolData {
   totalSessions: number;
   totalPriceCents: number;
   status?: NeuromodulationProtocolStatus;
-  paymentStatus?: ProtocolPaymentStatus;
-  paymentMethod?: ProtocolPaymentMethod | null;
-  paidAt?: Date | null;
+  initialPayment?: ProtocolPaymentEntryData;
   notes?: string | null;
 }
 
@@ -24,15 +28,14 @@ export interface UpdateNeuromodulationProtocolData {
   totalSessions?: number;
   totalPriceCents?: number;
   status?: NeuromodulationProtocolStatus;
-  paymentStatus?: ProtocolPaymentStatus;
-  paymentMethod?: ProtocolPaymentMethod | null;
-  paidAt?: Date | null;
   manualConsumedCount?: number;
   notes?: string | null;
 }
 
 export interface NeuromodulationProtocolRepository {
   create(data: CreateNeuromodulationProtocolData): Promise<NeuromodulationProtocolEntity>;
+  addPayment(protocolId: string, tenantId: string, data: ProtocolPaymentEntryData): Promise<NeuromodulationProtocolPaymentEntity>;
+  updatePayment(paymentId: string, data: ProtocolPaymentEntryData): Promise<NeuromodulationProtocolPaymentEntity>;
   findById(id: string): Promise<NeuromodulationProtocolEntity | null>;
   findWithCountersById(id: string): Promise<NeuromodulationProtocolWithCounters | null>;
   findByCustomerId(customerId: string): Promise<NeuromodulationProtocolWithCounters[]>;

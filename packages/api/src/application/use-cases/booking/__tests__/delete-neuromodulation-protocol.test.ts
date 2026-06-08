@@ -12,8 +12,10 @@ const finishedProtocol: NeuromodulationProtocolEntity = {
   status: 'finished',
   totalPriceCents: 200000,
   paymentStatus: 'paid',
-  paymentMethod: 'pix',
-  paidAt: new Date('2026-01-10T00:00:00Z'),
+  paidAmountCents: 200000,
+  remainingAmountCents: 0,
+  lastPaymentAt: new Date('2026-01-10T00:00:00Z'),
+  payments: [],
   manualConsumedCount: 0,
   notes: null,
   createdAt: new Date('2026-01-01T00:00:00Z'),
@@ -24,6 +26,8 @@ describe('DeleteNeuromodulationProtocolUseCase', () => {
   it('deletes finished protocols without linked appointments', async () => {
     const protocolRepo: NeuromodulationProtocolRepository = {
       create: vi.fn(),
+      addPayment: vi.fn(),
+      updatePayment: vi.fn(),
       findById: vi.fn().mockResolvedValue(finishedProtocol),
       findWithCountersById: vi.fn(),
       findByCustomerId: vi.fn(),
@@ -47,6 +51,8 @@ describe('DeleteNeuromodulationProtocolUseCase', () => {
   it('rejects deletion when appointments are still linked', async () => {
     const protocolRepo: NeuromodulationProtocolRepository = {
       create: vi.fn(),
+      addPayment: vi.fn(),
+      updatePayment: vi.fn(),
       findById: vi.fn().mockResolvedValue(finishedProtocol),
       findWithCountersById: vi.fn(),
       findByCustomerId: vi.fn(),
@@ -72,6 +78,8 @@ describe('DeleteNeuromodulationProtocolUseCase', () => {
   it('rejects deletion for active protocols', async () => {
     const protocolRepo: NeuromodulationProtocolRepository = {
       create: vi.fn(),
+      addPayment: vi.fn(),
+      updatePayment: vi.fn(),
       findById: vi.fn().mockResolvedValue({ ...finishedProtocol, status: 'active' }),
       findWithCountersById: vi.fn(),
       findByCustomerId: vi.fn(),
@@ -97,6 +105,8 @@ describe('DeleteNeuromodulationProtocolUseCase', () => {
   it('rejects deletion for maintenance protocols', async () => {
     const protocolRepo: NeuromodulationProtocolRepository = {
       create: vi.fn(),
+      addPayment: vi.fn(),
+      updatePayment: vi.fn(),
       findById: vi.fn().mockResolvedValue({ ...finishedProtocol, status: 'maintenance' }),
       findWithCountersById: vi.fn(),
       findByCustomerId: vi.fn(),

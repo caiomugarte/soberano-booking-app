@@ -1,5 +1,5 @@
-import type { AppointmentWithDetails } from '../entities/appointment.js';
-import type { NeuromodulationProtocolWithCounters, ProtocolPaymentMethod, ProtocolPaymentStatus } from '../entities/neuromodulation-protocol.js';
+import type { AppointmentEntity, AppointmentWithDetails } from '../entities/appointment.js';
+import type { NeuromodulationProtocolWithCounters } from '../entities/neuromodulation-protocol.js';
 
 export interface FinancialSummary {
   totalSessions: number;
@@ -103,8 +103,8 @@ export interface AppointmentRepository {
     endTime?: string;
     priceCents?: number;
     status?: string;
-    paymentStatus?: ProtocolPaymentStatus;
-    paymentMethod?: ProtocolPaymentMethod | null;
+    paymentStatus?: AppointmentEntity['paymentStatus'];
+    paymentMethod?: AppointmentEntity['paymentMethod'];
     paidAt?: Date | null;
     appointmentNotes?: string | null;
     cancelToken?: string;

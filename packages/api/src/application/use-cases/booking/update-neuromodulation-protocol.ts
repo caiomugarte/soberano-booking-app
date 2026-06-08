@@ -3,15 +3,13 @@ import type { NeuromodulationProtocolRepository } from '../../../domain/reposito
 import type {
   NeuromodulationProtocolStatus,
   NeuromodulationProtocolWithCounters,
-  ProtocolPaymentMethod,
-  ProtocolPaymentStatus,
 } from '../../../domain/entities/neuromodulation-protocol.js';
 import { NotFoundError, ValidationError } from '../../../shared/errors.js';
 import {
   assertCurrentProtocolAvailability,
   assertNeuromodulationPatient,
-  assertPaymentState,
   assertAllowedStatusTransition,
+  assertProtocolPriceAtLeastPaid,
 } from './neuromodulation-protocol.utils.js';
 
 export interface UpdateNeuromodulationProtocolInput {
@@ -19,9 +17,6 @@ export interface UpdateNeuromodulationProtocolInput {
   totalSessions?: number;
   totalPriceCents?: number;
   status?: NeuromodulationProtocolStatus;
-  paymentStatus?: ProtocolPaymentStatus;
-  paymentMethod?: ProtocolPaymentMethod | null;
-  paidAt?: Date | null;
   notes?: string | null;
 }
 
@@ -58,27 +53,14 @@ export class UpdateNeuromodulationProtocolUseCase {
       assertCurrentProtocolAvailability(existingCurrentProtocol, protocol.id);
     }
 
-    const paymentStatus = input.paymentStatus ?? protocol.paymentStatus;
-    assertPaymentState({
-      paymentStatus,
-      paymentMethod: input.paymentMethod ?? protocol.paymentMethod,
-      paidAt: input.paidAt ?? protocol.paidAt,
-    });
+    const nextTotalPriceCents = input.totalPriceCents ?? protocol.totalPriceCents;
+    assertProtocolPriceAtLeastPaid(nextTotalPriceCents, protocol.paidAmountCents);
 
     await this.protocolRepo.update(protocol.id, {
       totalSessions: nextTotalSessions,
-      totalPriceCents: input.totalPriceCents ?? protocol.totalPriceCents,
+      totalPriceCents: nextTotalPriceCents,
       status: nextStatus,
-      paymentStatus,
-      paymentMethod:
-        paymentStatus === 'paid'
-          ? input.paymentMethod ?? protocol.paymentMethod
-          : null,
-      paidAt:
-        paymentStatus === 'paid'
-          ? input.paidAt ?? protocol.paidAt ?? new Date()
-          : null,
-      notes: input.notes ?? protocol.notes,
+      notes: input.notes !== undefined ? input.notes : protocol.notes,
     });
 
     return (await this.protocolRepo.findWithCountersById(protocol.id))!;

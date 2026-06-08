@@ -11,11 +11,11 @@ import {
 import { useFinancialSummary, mapToAppointment } from '@/api/financial'
 import { useDuePendingAppointments, useUpdateAppointment } from '@/api/appointments'
 import { usePatients } from '@/api/patients'
-import { useUpdateProtocol } from '@/api/protocols'
+import { useAddProtocolPayment } from '@/api/protocols'
 import { RevenueSummary } from '@/components/financial/RevenueSummary'
 import { RevenueChart } from '@/components/financial/RevenueChart'
 import { PendingPayments } from '@/components/financial/PendingPayments'
-import { dateInputToIso, formatDate, toDateInputValue } from '@/lib/format'
+import { formatCurrency, formatDate, toDateInputValue } from '@/lib/format'
 import type { PaymentMethod } from '@/schemas/appointment.schema'
 
 export default function FinancialPage() {
@@ -27,29 +27,35 @@ export default function FinancialPage() {
   const { data: patients = [] } = usePatients()
   const { data: duePendingAppointments = [] } = useDuePendingAppointments()
   const updateAppointment = useUpdateAppointment()
-  const updateProtocol = useUpdateProtocol()
+  const addProtocolPayment = useAddProtocolPayment()
 
-  const { summaryStats, revenueEntries, pendingEntries, pendingProtocolSales } = useMemo(() => {
+  const { summaryStats, revenueEntries, pendingEntries } = useMemo(() => {
     const rawAppointments = summary?.appointments ?? []
     const mappedAppointments = rawAppointments.map(mapToAppointment)
     const paidAppointments = mappedAppointments.filter((appointment) => appointment.paymentStatus === 'paid')
-    const paidProtocols = (summary?.protocolSales ?? []).filter((entry) => entry.protocol.paymentStatus === 'paid')
+    const protocolSales = summary?.protocolSales ?? []
     const patientById = new Map(patients.map((patient) => [patient.id, patient]))
 
     const weekStart = format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd')
     const weekEnd = format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd')
     const monthStart = format(startOfMonth(now), 'yyyy-MM-dd')
     const monthEnd = format(endOfMonth(now), 'yyyy-MM-dd')
+
     const revenueItems = [
       ...paidAppointments.map((appointment) => ({
         revenueDate: toDateInputValue(appointment.paidAt) || appointment.date,
         value: appointment.value,
       })),
-      ...paidProtocols.map((entry) => ({
-        revenueDate: toDateInputValue(entry.protocol.paidAt) || toDateInputValue(entry.protocol.createdAt),
-        value: entry.protocol.totalPriceCents,
-      })),
+      ...protocolSales.flatMap((entry) =>
+        entry.protocol.payments
+          .map((payment) => ({
+            revenueDate: toDateInputValue(payment.paidAt),
+            value: payment.amountCents,
+          }))
+          .filter((payment) => payment.revenueDate >= yearStart && payment.revenueDate <= yearEnd),
+      ),
     ]
+
     const duePendingItems = duePendingAppointments.map((appointment) => {
       const patient = patientById.get(appointment.patientId)
 
@@ -64,23 +70,26 @@ export default function FinancialPage() {
         reminderAppointmentId: appointment.id,
       }
     })
-    const pendingProtocolItems = (summary?.protocolSales ?? [])
-      .filter((entry) => entry.protocol.paymentStatus === 'pending')
+    const pendingProtocolItems = protocolSales
+      .filter((entry) => entry.protocol.remainingAmountCents > 0)
       .map((entry) => ({
         kind: 'protocol' as const,
         id: entry.protocol.id,
         patientId: entry.customer.id,
         patientName: entry.customer.name,
         patientPhone: entry.customer.phone ?? undefined,
-        subtitle: `Protocolo ${entry.protocol.status === 'maintenance' ? 'em manutenção' : 'de neuromodulação'}`,
-        amountCents: entry.protocol.totalPriceCents,
+        subtitle: `Protocolo ${entry.protocol.status === 'maintenance' ? 'em manutenção' : 'de neuromodulação'} • ${
+          entry.protocol.paidAmountCents > 0
+            ? `recebido ${formatCurrency(entry.protocol.paidAmountCents)}`
+            : 'sem entradas registradas'
+        }`,
+        amountCents: entry.protocol.remainingAmountCents,
       }))
     const pendingSummaryItems = [...duePendingItems, ...pendingProtocolItems]
 
     return {
       revenueEntries: revenueItems,
-      pendingEntries: duePendingItems,
-      pendingProtocolSales: pendingProtocolItems,
+      pendingEntries: pendingSummaryItems,
       summaryStats: {
         weeklyRevenue: revenueItems
           .filter((entry) => {
@@ -99,32 +108,18 @@ export default function FinancialPage() {
     }
   }, [duePendingAppointments, now, patients, summary])
 
-  function handleMarkPaid(
-    kind: 'appointment' | 'protocol',
+  function handleMarkAppointmentPaid(
     id: string,
-    patientId: string,
+    _patientId: string,
     paymentMethod: PaymentMethod,
     paidAt: string,
   ) {
-    if (kind === 'appointment') {
-      updateAppointment.mutate({
-        id,
-        data: {
-          paymentStatus: 'paid',
-          paymentMethod,
-          paidAt,
-        },
-      })
-      return
-    }
-
-    updateProtocol.mutate({
+    updateAppointment.mutate({
       id,
-      patientId,
       data: {
         paymentStatus: 'paid',
         paymentMethod,
-        paidAt: dateInputToIso(paidAt),
+        paidAt,
       },
     })
   }
@@ -140,15 +135,18 @@ export default function FinancialPage() {
 
         <RevenueChart entries={revenueEntries} />
 
-        {pendingProtocolSales.length > 0 && (
-          <p className="text-xs text-gray-500">
-            As vendas de protocolo continuam no resumo financeiro e entram nesta bancada quando o fluxo de recebíveis do protocolo for concluído.
-          </p>
-        )}
-
         <PendingPayments
           entries={pendingEntries}
-          onMarkPaid={handleMarkPaid}
+          onMarkAppointmentPaid={handleMarkAppointmentPaid}
+          onAddProtocolPayment={(id, patientId, payment) => {
+            addProtocolPayment.mutate({
+              id,
+              patientId,
+              data: payment,
+            })
+          }}
+          isAppointmentMutationPending={updateAppointment.isPending}
+          isProtocolMutationPending={addProtocolPayment.isPending}
         />
       </div>
     </div>

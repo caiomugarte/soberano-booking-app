@@ -70,6 +70,64 @@ function mapAppointment(raw: any): AppointmentWithDetails {
   } as AppointmentWithDetails;
 }
 
+function sumProtocolPayments(payments: Array<{ amountCents: number }>): number {
+  return payments.reduce((sum: number, payment: { amountCents: number }) => sum + payment.amountCents, 0);
+}
+
+function mapProtocolWithCounters(raw: any): NeuromodulationProtocolWithCounters {
+  const reservedSessions = raw.appointments.filter(
+    (appointment: { protocolCreditOutcome: string | null }) => appointment.protocolCreditOutcome === 'reserved',
+  ).length;
+  const consumedSessions =
+    raw.appointments.filter(
+      (appointment: { protocolCreditOutcome: string | null }) => appointment.protocolCreditOutcome === 'consumed',
+    ).length + raw.manualConsumedCount;
+  const paidAmountCents = sumProtocolPayments(raw.payments ?? []);
+  const remainingAmountCents = Math.max(raw.totalPriceCents - paidAmountCents, 0);
+  const orderedPayments = (raw.payments ?? []).slice().sort((left: any, right: any) => {
+    const paidAtDelta = left.paidAt.getTime() - right.paidAt.getTime();
+    if (paidAtDelta !== 0) return paidAtDelta;
+    return left.createdAt.getTime() - right.createdAt.getTime();
+  });
+  const lastPayment = orderedPayments.length > 0 ? orderedPayments[orderedPayments.length - 1] : null;
+
+  return {
+    id: raw.id,
+    tenantId: raw.tenantId,
+    providerId: raw.providerId,
+    customerId: raw.customerId,
+    totalSessions: raw.totalSessions,
+    status: raw.status,
+    totalPriceCents: raw.totalPriceCents,
+    paymentStatus:
+      paidAmountCents <= 0
+        ? 'pending'
+        : remainingAmountCents === 0
+          ? 'paid'
+          : 'partial',
+    paidAmountCents,
+    remainingAmountCents,
+    lastPaymentAt: lastPayment?.paidAt ?? null,
+    payments: orderedPayments.map((payment: any) => ({
+      id: payment.id,
+      tenantId: payment.tenantId,
+      protocolId: payment.protocolId,
+      amountCents: payment.amountCents,
+      paymentMethod: payment.paymentMethod,
+      paidAt: payment.paidAt,
+      createdAt: payment.createdAt,
+      updatedAt: payment.updatedAt,
+    })),
+    manualConsumedCount: raw.manualConsumedCount,
+    notes: raw.notes,
+    createdAt: raw.createdAt,
+    updatedAt: raw.updatedAt,
+    reservedSessions,
+    consumedSessions,
+    remainingSessions: Math.max(raw.totalSessions - reservedSessions - consumedSessions, 0),
+  };
+}
+
 export class PrismaAppointmentRepository implements AppointmentRepository {
   constructor(private db: PrismaClientOrExtended) {}
 
@@ -361,15 +419,37 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
         select: {
           id: true,
           totalPriceCents: true,
-          paymentStatus: true,
+          payments: {
+            select: {
+              amountCents: true,
+            },
+          },
         },
       }),
     ]);
 
     const sessionPaidRows = appointmentRows.filter((appointment: { paymentStatus: string }) => appointment.paymentStatus === 'paid');
     const sessionPendingRows = appointmentRows.filter((appointment: { paymentStatus: string }) => appointment.paymentStatus !== 'paid');
-    const protocolPaidRows = protocolRows.filter((protocol: { paymentStatus: string }) => protocol.paymentStatus === 'paid');
-    const protocolPendingRows = protocolRows.filter((protocol: { paymentStatus: string }) => protocol.paymentStatus !== 'paid');
+    const protocolSummaries: Array<{
+      paymentStatus: 'pending' | 'partial' | 'paid';
+      paidAmountCents: number;
+      remainingAmountCents: number;
+    }> = protocolRows.map((protocol: { totalPriceCents: number; payments: Array<{ amountCents: number }> }) => {
+      const paidAmountCents = sumProtocolPayments(protocol.payments);
+      const remainingAmountCents = Math.max(protocol.totalPriceCents - paidAmountCents, 0);
+      const paymentStatus =
+        paidAmountCents <= 0
+          ? 'pending'
+          : remainingAmountCents === 0
+            ? 'paid'
+            : 'partial';
+
+      return {
+        paymentStatus,
+        paidAmountCents,
+        remainingAmountCents,
+      };
+    });
 
     return {
       sessionReceivables: {
@@ -381,10 +461,13 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
       },
       protocolSales: {
         totalCount: protocolRows.length,
-        paidCount: protocolPaidRows.length,
-        pendingCount: protocolPendingRows.length,
-        paidTotalCents: protocolPaidRows.reduce((sum: number, protocol: { totalPriceCents: number }) => sum + protocol.totalPriceCents, 0),
-        pendingTotalCents: protocolPendingRows.reduce((sum: number, protocol: { totalPriceCents: number }) => sum + protocol.totalPriceCents, 0),
+        paidCount: protocolSummaries.filter((protocol) => protocol.paymentStatus === 'paid').length,
+        pendingCount: protocolSummaries.filter((protocol) => protocol.paymentStatus !== 'paid').length,
+        paidTotalCents: protocolSummaries.reduce((sum: number, protocol) => sum + protocol.paidAmountCents, 0),
+        pendingTotalCents: protocolSummaries.reduce(
+          (sum: number, protocol) => sum + (protocol.paymentStatus === 'paid' ? 0 : protocol.remainingAmountCents),
+          0,
+        ),
       },
     };
   }
@@ -424,16 +507,6 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
     const protocolRows = await this.db.neuromodulationProtocol.findMany({
       where: {
         providerId,
-        OR: [
-          {
-            paymentStatus: 'paid',
-            paidAt: { gte: from, lte: to },
-          },
-          {
-            paymentStatus: { not: 'paid' },
-            createdAt: { gte: from, lte: to },
-          },
-        ],
       },
       include: {
         customer: {
@@ -449,51 +522,32 @@ export class PrismaAppointmentRepository implements AppointmentRepository {
             protocolCreditOutcome: true,
           },
         },
+        payments: {
+          orderBy: [{ paidAt: 'asc' }, { createdAt: 'asc' }],
+        },
       },
       orderBy: [{ createdAt: 'asc' }],
     });
-    const protocolSales = protocolRows.map((protocolRow: any) => {
-      const reservedSessions = protocolRow.appointments.filter(
-        (appointment: { protocolCreditOutcome: string | null }) => appointment.protocolCreditOutcome === 'reserved',
-      ).length;
-      const consumedSessions =
-        protocolRow.appointments.filter(
-          (appointment: { protocolCreditOutcome: string | null }) => appointment.protocolCreditOutcome === 'consumed',
-        ).length + protocolRow.manualConsumedCount;
-      const protocol = {
-        id: protocolRow.id,
-        tenantId: protocolRow.tenantId,
-        providerId: protocolRow.providerId,
-        customerId: protocolRow.customerId,
-        totalSessions: protocolRow.totalSessions,
-        status: protocolRow.status,
-        totalPriceCents: protocolRow.totalPriceCents,
-        paymentStatus: protocolRow.paymentStatus,
-        paymentMethod: protocolRow.paymentMethod,
-        paidAt: protocolRow.paidAt,
-        manualConsumedCount: protocolRow.manualConsumedCount,
-        notes: protocolRow.notes,
-        createdAt: protocolRow.createdAt,
-        updatedAt: protocolRow.updatedAt,
-        reservedSessions,
-        consumedSessions,
-        remainingSessions: Math.max(protocolRow.totalSessions - reservedSessions - consumedSessions, 0),
-      } satisfies NeuromodulationProtocolWithCounters;
-
-      return {
-        protocol,
-        customer: protocolRow.customer,
-      };
-    });
-    const protocolRevenueCents = protocolSales
-      .filter((entry: { protocol: NeuromodulationProtocolWithCounters }) => entry.protocol.paymentStatus === 'paid')
-      .reduce((sum: number, entry: { protocol: NeuromodulationProtocolWithCounters }) => sum + entry.protocol.totalPriceCents, 0);
+    const protocolSales: FinancialSummary['protocolSales'] = protocolRows.map((protocolRow: any) => ({
+      protocol: mapProtocolWithCounters(protocolRow),
+      customer: protocolRow.customer,
+    }));
+    const protocolRevenueCents = protocolSales.reduce((sum: number, entry: FinancialSummary['protocolSales'][number]) => {
+      const paymentsInRange = entry.protocol.payments.filter((payment) => payment.paidAt >= from && payment.paidAt <= to);
+      return sum + paymentsInRange.reduce(
+        (paymentsSum: number, payment: NeuromodulationProtocolWithCounters['payments'][number]) => paymentsSum + payment.amountCents,
+        0,
+      );
+    }, 0);
+    const protocolPaidEntryCount = protocolSales.reduce((sum: number, entry: FinancialSummary['protocolSales'][number]) => {
+      return sum + entry.protocol.payments.filter((payment) => payment.paidAt >= from && payment.paidAt <= to).length;
+    }, 0);
     const protocolPendingCount = protocolSales.filter(
       (entry: { protocol: NeuromodulationProtocolWithCounters }) => entry.protocol.paymentStatus !== 'paid',
     ).length;
     return {
       totalSessions: billableAppointments.length,
-      paidCount: paidCount + protocolSales.filter((entry: { protocol: NeuromodulationProtocolWithCounters }) => entry.protocol.paymentStatus === 'paid').length,
+      paidCount: paidCount + protocolPaidEntryCount,
       pendingCount: (billableAppointments.length - paidCount) + protocolPendingCount,
       revenueCents: revenueCents + protocolRevenueCents,
       appointments: billableAppointments,

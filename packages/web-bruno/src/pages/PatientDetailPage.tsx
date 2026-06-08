@@ -193,8 +193,8 @@ export default function PatientDetailPage() {
                   <div className="space-y-2">
                     <div className="text-sm font-medium text-gray-800">Vendas de protocolo</div>
                     <div className="grid grid-cols-2 gap-2">
-                      <FinancialStat label="Pagos" value={`${patient.financialSummary.protocolSales.paidCount}`} />
-                      <FinancialStat label="Pendentes" value={`${patient.financialSummary.protocolSales.pendingCount}`} />
+                      <FinancialStat label="Quitados" value={`${patient.financialSummary.protocolSales.paidCount}`} />
+                      <FinancialStat label="Em aberto" value={`${patient.financialSummary.protocolSales.pendingCount}`} />
                       <FinancialStat label="Total pago" value={formatCurrency(patient.financialSummary.protocolSales.paidTotalCents)} />
                       <FinancialStat label="Total pendente" value={formatCurrency(patient.financialSummary.protocolSales.pendingTotalCents)} />
                     </div>

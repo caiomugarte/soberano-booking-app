@@ -1,6 +1,17 @@
 export type NeuromodulationProtocolStatus = 'active' | 'maintenance' | 'finished';
-export type ProtocolPaymentStatus = 'pending' | 'paid';
+export type ProtocolPaymentStatus = 'pending' | 'partial' | 'paid';
 export type ProtocolPaymentMethod = 'card' | 'pix' | 'cash';
+
+export interface NeuromodulationProtocolPaymentEntity {
+  id: string;
+  tenantId: string;
+  protocolId: string;
+  amountCents: number;
+  paymentMethod: ProtocolPaymentMethod;
+  paidAt: Date;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export interface NeuromodulationProtocolEntity {
   id: string;
@@ -11,8 +22,10 @@ export interface NeuromodulationProtocolEntity {
   status: NeuromodulationProtocolStatus;
   totalPriceCents: number;
   paymentStatus: ProtocolPaymentStatus;
-  paymentMethod: ProtocolPaymentMethod | null;
-  paidAt: Date | null;
+  paidAmountCents: number;
+  remainingAmountCents: number;
+  lastPaymentAt: Date | null;
+  payments: NeuromodulationProtocolPaymentEntity[];
   manualConsumedCount: number;
   notes: string | null;
   createdAt: Date;

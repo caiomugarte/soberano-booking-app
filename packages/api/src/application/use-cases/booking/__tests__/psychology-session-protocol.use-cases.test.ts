@@ -62,8 +62,10 @@ const protocol: NeuromodulationProtocolEntity = {
   status: 'active',
   totalPriceCents: 200000,
   paymentStatus: 'pending',
-  paymentMethod: null,
-  paidAt: null,
+  paidAmountCents: 0,
+  remainingAmountCents: 200000,
+  lastPaymentAt: null,
+  payments: [],
   manualConsumedCount: 0,
   notes: null,
   createdAt: new Date(),
@@ -149,6 +151,8 @@ describe('Psychology session protocol credit use cases', () => {
     }
     const protocolRepo: NeuromodulationProtocolRepository = {
       create: vi.fn(),
+      addPayment: vi.fn(),
+      updatePayment: vi.fn(),
       findById: vi.fn().mockResolvedValue(protocol),
       findWithCountersById: vi.fn(),
       findByCustomerId: vi.fn(),
