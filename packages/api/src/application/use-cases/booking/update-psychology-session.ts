@@ -13,6 +13,7 @@ import {
   normalizePsychologySessionType,
   resolveProtocolOutcome,
   resolvePsychologySessionPrice,
+  syncActiveProtocolLifecycle,
   type ProtocolCreditAction,
   type PsychologySessionType,
 } from './psychology-session.utils.js';
@@ -188,7 +189,7 @@ export class UpdatePsychologySessionUseCase {
               service,
             });
 
-    return this.appointmentRepo.updateDetails(appointment.id, {
+    const updatedAppointment = await this.appointmentRepo.updateDetails(appointment.id, {
       customerId: nextPatientId,
       serviceId: service.id,
       protocolId: nextProtocolId,
@@ -203,5 +204,19 @@ export class UpdatePsychologySessionUseCase {
       paidAt: nextPaidAt,
       appointmentNotes: input.notes ?? appointment.appointmentNotes,
     });
+
+    const protocolIdsToSync = new Set<string>();
+    if (appointment.protocolId) {
+      protocolIdsToSync.add(appointment.protocolId);
+    }
+    if (nextProtocolId) {
+      protocolIdsToSync.add(nextProtocolId);
+    }
+
+    await Promise.all(
+      Array.from(protocolIdsToSync).map((protocolId) => syncActiveProtocolLifecycle(this.protocolRepo, protocolId)),
+    );
+
+    return updatedAppointment;
   }
 }

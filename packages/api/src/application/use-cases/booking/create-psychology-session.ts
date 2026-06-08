@@ -13,6 +13,7 @@ import {
   buildEndTime,
   resolveProtocolOutcome,
   resolvePsychologySessionPrice,
+  syncActiveProtocolLifecycle,
   type PsychologySessionType,
 } from './psychology-session.utils.js';
 
@@ -111,7 +112,7 @@ export class CreatePsychologySessionUseCase {
           service,
         });
 
-    return this.appointmentRepo.create({
+    const appointment = await this.appointmentRepo.create({
       tenantId: input.tenantId,
       barberId: input.providerId,
       serviceId: service.id,
@@ -129,5 +130,9 @@ export class CreatePsychologySessionUseCase {
       paidAt: paymentStatus === 'paid' ? input.paidAt ?? new Date() : null,
       appointmentNotes: input.notes ?? null,
     });
+
+    await syncActiveProtocolLifecycle(this.protocolRepo, protocolId);
+
+    return appointment;
   }
 }

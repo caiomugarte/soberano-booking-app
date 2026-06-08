@@ -15,7 +15,7 @@
 | web-bruno-agenda-event-management | Tasks draft — payment-date control added, awaiting approval | `.specs/features/web-bruno-agenda-event-management/tasks.md` |
 | web-bruno-patient-care-model | Superseded by `web-bruno-patient-care-model-v2`; original tasks describe the exclusive-care-mode baseline | `.specs/features/web-bruno-patient-care-model/tasks.md` |
 | web-bruno-patient-care-model-v2 | Tasks draft — dual-track patient profile, delete safety, history filters, and patient financial detail sequenced | `.specs/features/web-bruno-patient-care-model-v2/tasks.md` |
-| web-bruno-neuromodulation-protocols | Tasks draft — blocked by patient care model foundation, awaiting approval | `.specs/features/web-bruno-neuromodulation-protocols/tasks.md` |
+| web-bruno-neuromodulation-protocols | Tasks draft — rebased to the remaining lifecycle delta (auto-finish + finished-history cleanup), awaiting approval | `.specs/features/web-bruno-neuromodulation-protocols/tasks.md` |
 | web-bruno-operations-hub | Tasks draft — depends on patient care model and protocol receivable rules, awaiting approval | `.specs/features/web-bruno-operations-hub/tasks.md` |
 | psychology-patient-dedup | Tasks draft — awaiting approval | `.specs/features/psychology-patient-dedup/tasks.md` |
 | psychology-api | Tasks draft — awaiting approval | `.specs/features/psychology-api/tasks.md` |

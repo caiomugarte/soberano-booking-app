@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { NeuromodulationProtocolRepository } from '../../../../domain/repositories/neuromodulation-protocol.repository.js';
 import type { NeuromodulationProtocolEntity } from '../../../../domain/entities/neuromodulation-protocol.js';
-import { ValidationError } from '../../../../shared/errors.js';
 import { DeleteNeuromodulationProtocolUseCase } from '../delete-neuromodulation-protocol.js';
 
 const finishedProtocol: NeuromodulationProtocolEntity = {
@@ -65,10 +64,37 @@ describe('DeleteNeuromodulationProtocolUseCase', () => {
         protocolId: finishedProtocol.id,
         providerId: finishedProtocol.providerId,
       }),
-    ).rejects.toBeInstanceOf(ValidationError);
+    ).rejects.toMatchObject({
+      message: 'Este protocolo não pode ser excluído porque possui sessões vinculadas.',
+    });
   });
 
-  it('rejects deletion for non-finished protocols', async () => {
+  it('rejects deletion for active protocols', async () => {
+    const protocolRepo: NeuromodulationProtocolRepository = {
+      create: vi.fn(),
+      findById: vi.fn().mockResolvedValue({ ...finishedProtocol, status: 'active' }),
+      findWithCountersById: vi.fn(),
+      findByCustomerId: vi.fn(),
+      findCurrentByCustomerId: vi.fn(),
+      update: vi.fn(),
+      getUsageSnapshot: vi.fn(),
+      countLinkedAppointments: vi.fn(),
+      deleteById: vi.fn(),
+    };
+
+    const useCase = new DeleteNeuromodulationProtocolUseCase(protocolRepo);
+
+    await expect(
+      useCase.execute({
+        protocolId: finishedProtocol.id,
+        providerId: finishedProtocol.providerId,
+      }),
+    ).rejects.toMatchObject({
+      message: 'Somente protocolos finalizados podem ser excluídos.',
+    });
+  });
+
+  it('rejects deletion for maintenance protocols', async () => {
     const protocolRepo: NeuromodulationProtocolRepository = {
       create: vi.fn(),
       findById: vi.fn().mockResolvedValue({ ...finishedProtocol, status: 'maintenance' }),
@@ -88,6 +114,8 @@ describe('DeleteNeuromodulationProtocolUseCase', () => {
         protocolId: finishedProtocol.id,
         providerId: finishedProtocol.providerId,
       }),
-    ).rejects.toBeInstanceOf(ValidationError);
+    ).rejects.toMatchObject({
+      message: 'Somente protocolos finalizados podem ser excluídos.',
+    });
   });
 });

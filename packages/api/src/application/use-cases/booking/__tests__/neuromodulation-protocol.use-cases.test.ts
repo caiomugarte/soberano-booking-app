@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { CreateNeuromodulationProtocolUseCase } from '../create-neuromodulation-protocol.js'
 import { UpdateNeuromodulationProtocolUseCase } from '../update-neuromodulation-protocol.js'
 import { ChangeNeuromodulationProtocolStatusUseCase } from '../change-neuromodulation-protocol-status.js'
+import { ListPatientNeuromodulationProtocolsUseCase } from '../list-patient-neuromodulation-protocols.js'
 import type { CustomerRepository } from '../../../../domain/repositories/customer.repository.js'
 import type { NeuromodulationProtocolRepository } from '../../../../domain/repositories/neuromodulation-protocol.repository.js'
 import type { CustomerEntity } from '../../../../domain/entities/customer.js'
@@ -56,6 +57,78 @@ function withCounters(protocol: NeuromodulationProtocolEntity, counters: Pick<Ne
 }
 
 describe('Neuromodulation protocol use cases', () => {
+  it('keeps finished protocols in the patient history listing until Bruno deletes them', async () => {
+    const finishedOlder = withCounters(
+      {
+        ...activeProtocol,
+        id: 'protocol-finished-1',
+        status: 'finished',
+        createdAt: new Date('2026-01-10T00:00:00Z'),
+      },
+      {
+        reservedSessions: 0,
+        consumedSessions: 36,
+        remainingSessions: 0,
+      },
+    )
+    const maintenanceProtocol = withCounters(
+      {
+        ...activeProtocol,
+        id: 'protocol-maintenance',
+        status: 'maintenance',
+        createdAt: new Date('2026-01-20T00:00:00Z'),
+      },
+      {
+        reservedSessions: 0,
+        consumedSessions: 36,
+        remainingSessions: 0,
+      },
+    )
+    const finishedNewer = withCounters(
+      {
+        ...activeProtocol,
+        id: 'protocol-finished-2',
+        status: 'finished',
+        createdAt: new Date('2026-02-10T00:00:00Z'),
+      },
+      {
+        reservedSessions: 0,
+        consumedSessions: 36,
+        remainingSessions: 0,
+      },
+    )
+    const protocolRepo: NeuromodulationProtocolRepository = {
+      create: vi.fn(),
+      findById: vi.fn(),
+      findWithCountersById: vi.fn(),
+      findByCustomerId: vi.fn().mockResolvedValue([
+        finishedOlder,
+        withCounters(activeProtocol, {
+          reservedSessions: 2,
+          consumedSessions: 10,
+          remainingSessions: 24,
+        }),
+        finishedNewer,
+        maintenanceProtocol,
+      ]),
+      findCurrentByCustomerId: vi.fn(),
+      update: vi.fn(),
+      getUsageSnapshot: vi.fn(),
+      countLinkedAppointments: vi.fn(),
+      deleteById: vi.fn(),
+    }
+
+    const useCase = new ListPatientNeuromodulationProtocolsUseCase(protocolRepo)
+    const result = await useCase.execute(neuromodulationPatient.id)
+
+    expect(result.map((item) => item.id)).toEqual([
+      activeProtocol.id,
+      maintenanceProtocol.id,
+      finishedNewer.id,
+      finishedOlder.id,
+    ])
+  })
+
   it('rejects protocol creation for psychotherapy patients', async () => {
     const customerRepo: CustomerRepository = {
       findByPhone: vi.fn(),
@@ -153,6 +226,8 @@ describe('Neuromodulation protocol use cases', () => {
     await expect(useCase.execute({
       protocolId: activeProtocol.id,
       status: 'active',
-    })).rejects.toBeInstanceOf(ValidationError)
+    })).rejects.toMatchObject({
+      message: 'Protocolos finalizados devem permanecer no histórico. Crie um novo protocolo para retomar o cuidado.',
+    })
   })
 })

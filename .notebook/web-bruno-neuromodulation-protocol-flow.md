@@ -29,9 +29,17 @@
    - patient detail protocol management in `PatientProtocolsPanel`
    - agenda booking/editing via protocol selection and consume-vs-release overrides in `AppointmentForm`
    - pending/revenue surfaces through the mixed appointment + protocol payload in `FinancialPage`
+5. Protocol deletion is already implemented end-to-end, but only for finished protocols without linked appointments:
+   - application guard lives in `packages/api/src/application/use-cases/booking/delete-neuromodulation-protocol.ts`
+   - Bruno exposes the action from the finished-history block in `packages/web-bruno/src/components/protocols/PatientProtocolsPanel.tsx`
+   - older spec/tasks drafts did not fully capture that delete lifecycle
+6. Automatic protocol finishing is still a lifecycle gap:
+   - counters already project `reserved`, `consumed`, and `remaining`
+   - current booking mutation use cases do not auto-transition a protocol to `finished` when consumed credits reach the sold allowance
 
 ## Gotchas
 
 - Deleting a protocol-linked appointment without a ledger would lose credit history; `manualConsumedCount` is the compensating store for delete/unlink flows where Bruno chooses to keep a credit consumed.
 - Quick cancel/delete actions only prompt for release-vs-consume when `protocolLinkType === 'protocol'`; maintenance sessions stay operational and don’t participate in the allowance counters.
 - `GET /api/services` still has to normalize Bruno’s legacy rows until the migration/seed rollout finishes on real data; the frontend should not assume raw service slugs are already clean in the database.
+- `PatientProtocolsPanel` splits current vs finished protocols purely by status, so any future auto-finish rule will immediately move a protocol out of the current action surface unless the UI copy and invalidation stay aligned with that behavior.

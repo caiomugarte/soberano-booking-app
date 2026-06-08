@@ -142,9 +142,14 @@ export function PatientProtocolsPanel({ patientId }: PatientProtocolsPanelProps)
                 </div>
               ))}
 
-              {finishedProtocols.length > 0 && (
+          {finishedProtocols.length > 0 && (
                 <div className="space-y-3">
-                  <div className="text-sm font-medium text-gray-700">Histórico finalizado</div>
+                  <div className="space-y-1">
+                    <div className="text-sm font-medium text-gray-700">Histórico finalizado</div>
+                    <p className="text-xs text-gray-500">
+                      Protocolos concluídos automaticamente ou finalizados manualmente permanecem aqui até Bruno decidir excluir um item sem sessões vinculadas.
+                    </p>
+                  </div>
                   {finishedProtocols.map((protocol) => (
                     <div key={protocol.id} className="rounded-xl border border-dashed border-gray-200 p-4">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -161,7 +166,14 @@ export function PatientProtocolsPanel({ patientId }: PatientProtocolsPanelProps)
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-2 sm:justify-end">
-                          <Button variant="danger" size="sm" onClick={() => setProtocolToDelete(protocol)}>
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            onClick={() => {
+                              deleteProtocol.reset()
+                              setProtocolToDelete(protocol)
+                            }}
+                          >
                             Excluir
                           </Button>
                         </div>
@@ -186,6 +198,7 @@ export function PatientProtocolsPanel({ patientId }: PatientProtocolsPanelProps)
         open={protocolToDelete !== null}
         onClose={() => {
           if (deleteProtocol.isPending) return
+          deleteProtocol.reset()
           setProtocolToDelete(null)
         }}
         onConfirm={handleDeleteProtocol}
