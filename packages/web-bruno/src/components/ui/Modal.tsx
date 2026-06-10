@@ -20,10 +20,12 @@ export function Modal({ open, onClose, children, zIndex }: ModalProps) {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: zIndex ?? 50 }}>
+    <div className="fixed inset-0 overflow-y-auto" style={{ zIndex: zIndex ?? 50 }}>
       <div className="fixed inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative z-10 max-h-[90vh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6">
-        {children}
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="relative z-10 w-full max-w-lg overflow-visible rounded-xl bg-white p-4 shadow-xl sm:p-6">
+          {children}
+        </div>
       </div>
     </div>
   )

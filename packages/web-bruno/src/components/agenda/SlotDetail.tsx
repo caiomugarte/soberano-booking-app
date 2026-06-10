@@ -1,15 +1,65 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { PaymentMethodDialog } from '@/components/appointments/PaymentMethodDialog'
 import { ProtocolCreditActionDialog } from '@/components/appointments/ProtocolCreditActionDialog'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { AppointmentStatusBadge, PaymentStatusBadge } from '@/components/ui/StatusBadge'
-import { WhatsAppButton } from '@/components/whatsapp/WhatsAppButton'
 import { formatAppointmentCharge } from '@/lib/appointment-pricing'
 import { formatDate, toDateInputValue } from '@/lib/format'
 import { PAYMENT_METHOD_LABELS, PROTOCOL_LINK_TYPE_LABELS, SESSION_TYPE_LABELS } from '@/config/constants'
 import type { Appointment, PaymentMethod, ProtocolCreditAction } from '@/schemas/appointment.schema'
 import type { Patient } from '@/schemas/patient.schema'
+
+type ActionTone = 'neutral' | 'primary' | 'success' | 'warning' | 'danger'
+
+function ActionIconButton({
+  label,
+  title,
+  tone,
+  onClick,
+  disabled = false,
+  iconOnly = false,
+  className = '',
+  children,
+}: {
+  label: string
+  title?: string
+  tone: ActionTone
+  onClick: () => void
+  disabled?: boolean
+  iconOnly?: boolean
+  className?: string
+  children: ReactNode
+}) {
+  const toneClasses: Record<ActionTone, string> = {
+    neutral:
+      'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50 hover:text-gray-700 focus:ring-gray-200',
+    primary:
+      'border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 hover:border-primary-300 focus:ring-primary-200',
+    success:
+      'border-emerald-500 bg-emerald-500 text-white hover:border-emerald-600 hover:bg-emerald-600 focus:ring-emerald-200',
+    warning:
+      'border-amber-500 bg-amber-500 text-white hover:border-amber-600 hover:bg-amber-600 focus:ring-amber-200',
+    danger:
+      'border-red-500 bg-red-500 text-white hover:border-red-600 hover:bg-red-600 focus:ring-red-200',
+  }
+
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={title ?? label}
+      className={`inline-flex h-9 items-center justify-center gap-2 rounded-full border text-sm font-medium transition-colors focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-50 ${
+        iconOnly ? 'w-9' : 'px-3'
+      } ${toneClasses[tone]} ${className}`}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+      {iconOnly ? <span className="sr-only">{label}</span> : <span>{label}</span>}
+    </button>
+  )
+}
 
 interface SlotDetailProps {
   open: boolean
@@ -34,15 +84,31 @@ export function SlotDetail({
   onDelete,
   onStopRecurringSeries,
 }: SlotDetailProps) {
-  const [whatsappError, setWhatsappError] = useState('')
-  const [deleteError, setDeleteError] = useState('')
+  const moreActionsRef = useRef<HTMLDivElement | null>(null)
+  const [actionError, setActionError] = useState('')
   const [recurringError, setRecurringError] = useState('')
+  const [moreActionsOpen, setMoreActionsOpen] = useState(false)
+  const [confirmCancel, setConfirmCancel] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmStopRecurring, setConfirmStopRecurring] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isStoppingRecurring, setIsStoppingRecurring] = useState(false)
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
   const [protocolActionMode, setProtocolActionMode] = useState<'cancel' | 'delete' | null>(null)
+
+  useEffect(() => {
+    if (!moreActionsOpen) return
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!moreActionsRef.current?.contains(event.target as Node)) {
+        setMoreActionsOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown)
+    return () => document.removeEventListener('pointerdown', handlePointerDown)
+  }, [moreActionsOpen])
 
   if (!appointment) return null
 
@@ -54,15 +120,22 @@ export function SlotDetail({
   const canCancel =
     currentAppointment.status !== 'cancelled' && currentAppointment.status !== 'completed'
   const isRecurring = Boolean(currentAppointment.recurringSeriesId)
+  const canMarkPaid =
+    currentAppointment.paymentStatus === 'pending' &&
+    currentAppointment.status !== 'cancelled' &&
+    currentAppointment.protocolLinkType !== 'protocol'
+  const canStopRecurring = isRecurring && currentAppointment.recurrenceStatus === 'active'
+  const hasSecondaryActions = canComplete || canCancel || canStopRecurring
   const recurrenceLabel =
     currentAppointment.recurrenceIntervalWeeks === 1
       ? 'Toda semana'
       : `A cada ${currentAppointment.recurrenceIntervalWeeks ?? 1} semanas`
 
   function handleClose() {
-    setWhatsappError('')
-    setDeleteError('')
+    setActionError('')
     setRecurringError('')
+    setMoreActionsOpen(false)
+    setConfirmCancel(false)
     setConfirmDelete(false)
     setConfirmStopRecurring(false)
     setPaymentDialogOpen(false)
@@ -71,14 +144,14 @@ export function SlotDetail({
   }
 
   async function handleDelete(protocolCreditAction?: ProtocolCreditAction) {
-    setDeleteError('')
+    setActionError('')
     setIsDeleting(true)
 
     try {
       await onDelete(currentAppointment.id, protocolCreditAction)
     } catch (error) {
       console.error('[SlotDetail] Failed to delete appointment:', error)
-      setDeleteError(error instanceof Error ? error.message : 'Erro ao excluir sessão')
+      setActionError(error instanceof Error ? error.message : 'Erro ao excluir sessão')
       setIsDeleting(false)
       return
     }
@@ -86,14 +159,30 @@ export function SlotDetail({
     setIsDeleting(false)
   }
 
-  async function handleCancel(protocolCreditAction?: ProtocolCreditAction) {
-    setDeleteError('')
+  async function handleStatusUpdate(
+    status: Appointment['status'],
+    options?: { protocolCreditAction?: ProtocolCreditAction; fallbackMessage?: string },
+  ) {
+    setActionError('')
+    setIsUpdatingStatus(true)
+
     try {
-      await onUpdateStatus(currentAppointment.id, 'cancelled', protocolCreditAction)
+      await onUpdateStatus(currentAppointment.id, status, options?.protocolCreditAction)
       setProtocolActionMode(null)
     } catch (error) {
-      setDeleteError(error instanceof Error ? error.message : 'Erro ao cancelar sessão')
+      setActionError(error instanceof Error ? error.message : (options?.fallbackMessage ?? 'Erro ao atualizar sessão'))
+      setIsUpdatingStatus(false)
+      return
     }
+
+    setIsUpdatingStatus(false)
+  }
+
+  async function handleCancel(protocolCreditAction?: ProtocolCreditAction) {
+    await handleStatusUpdate('cancelled', {
+      protocolCreditAction,
+      fallbackMessage: 'Erro ao desmarcar sessão',
+    })
   }
 
   async function handleStopRecurringSeries() {
@@ -117,7 +206,187 @@ export function SlotDetail({
 
   return (
     <Modal open={open} onClose={handleClose}>
-      <Modal.Header>Detalhes da Sessão</Modal.Header>
+      <Modal.Header>
+        <div className="flex items-start justify-between gap-2">
+          <span>Detalhes da Sessão</span>
+          <div className="flex shrink-0 items-center gap-2">
+            <ActionIconButton
+              label="Editar"
+              tone="neutral"
+              onClick={() => onEdit(currentAppointment)}
+              disabled={isDeleting || isStoppingRecurring || isUpdatingStatus}
+            >
+              <svg
+                viewBox="0 0 20 20"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4"
+                aria-hidden="true"
+              >
+                <path d="M3.75 13.75V16.25H6.25L14.5 8L12 5.5L3.75 13.75Z" />
+                <path d="M10.75 6.75L13.25 9.25" />
+                <path d="M11.25 4.75L13.25 2.75L15.75 5.25L13.75 7.25" />
+              </svg>
+            </ActionIconButton>
+
+            {!confirmDelete && (
+              <ActionIconButton
+                label="Excluir"
+                tone="danger"
+                onClick={() => {
+                  setMoreActionsOpen(false)
+                  setConfirmDelete(true)
+                  setActionError('')
+                }}
+                disabled={isStoppingRecurring || isUpdatingStatus}
+              >
+                <svg
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-4 w-4"
+                  aria-hidden="true"
+                >
+                  <path d="M4.5 5.5H15.5" />
+                  <path d="M7.25 5.5V4.5H12.75V5.5" />
+                  <path d="M6.25 5.5V15.5H13.75V5.5" />
+                  <path d="M8.5 8V13" />
+                  <path d="M11.5 8V13" />
+                </svg>
+              </ActionIconButton>
+            )}
+
+            {hasSecondaryActions && (
+              <div className="relative" ref={moreActionsRef}>
+                <ActionIconButton
+                  label={moreActionsOpen ? 'Fechar ações' : 'Mais ações'}
+                  title={moreActionsOpen ? 'Fechar ações' : 'Mais ações'}
+                  tone="neutral"
+                  onClick={() => {
+                    setMoreActionsOpen((current) => !current)
+                    setActionError('')
+                    setRecurringError('')
+                  }}
+                  disabled={isDeleting || isStoppingRecurring || isUpdatingStatus}
+                >
+                  <svg
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                    aria-hidden="true"
+                  >
+                    <path d="M4 10H4.01" />
+                    <path d="M10 10H10.01" />
+                    <path d="M16 10H16.01" />
+                  </svg>
+                </ActionIconButton>
+
+                {moreActionsOpen && (
+                  <div className="absolute right-0 top-[calc(100%+0.5rem)] z-20 sm:left-[calc(100%+0.5rem)] sm:right-auto sm:top-0">
+                    <div className="rounded-2xl border border-gray-200 bg-white p-2 shadow-xl ring-1 ring-black/5">
+                      <div className="flex min-w-[12rem] flex-col gap-2">
+                        {canComplete && (
+                          <ActionIconButton
+                            label="Falta"
+                            tone="warning"
+                            className="w-full justify-start"
+                            onClick={() => {
+                              setMoreActionsOpen(false)
+                              void handleStatusUpdate('no_show', {
+                                fallbackMessage: 'Erro ao marcar sessão como falta',
+                              })
+                            }}
+                            disabled={isDeleting || isStoppingRecurring || isUpdatingStatus}
+                          >
+                            <svg
+                              viewBox="0 0 20 20"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="h-4 w-4"
+                              aria-hidden="true"
+                            >
+                              <path d="M6 6L14 14" />
+                              <path d="M14 6L6 14" />
+                            </svg>
+                          </ActionIconButton>
+                        )}
+
+                        {canCancel && !confirmCancel && (
+                          <ActionIconButton
+                            label="Desmarcar"
+                            tone="warning"
+                            className="w-full justify-start"
+                            onClick={() => {
+                              setMoreActionsOpen(false)
+                              setConfirmCancel(true)
+                              setActionError('')
+                            }}
+                            disabled={isDeleting || isStoppingRecurring || isUpdatingStatus}
+                          >
+                            <svg
+                              viewBox="0 0 20 20"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="h-4 w-4"
+                              aria-hidden="true"
+                            >
+                              <path d="M5.5 10H14.5" />
+                            </svg>
+                          </ActionIconButton>
+                        )}
+
+                        {canStopRecurring && !confirmStopRecurring && (
+                          <ActionIconButton
+                            label="Parar recorrência"
+                            tone="neutral"
+                            className="w-full justify-start"
+                            onClick={() => {
+                              setMoreActionsOpen(false)
+                              setConfirmStopRecurring(true)
+                              setRecurringError('')
+                            }}
+                            disabled={isDeleting || isUpdatingStatus}
+                          >
+                            <svg
+                              viewBox="0 0 20 20"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              className="h-4 w-4"
+                              aria-hidden="true"
+                            >
+                              <path d="M4.5 4.5V9.5H9.5" />
+                              <path d="M5 10A5 5 0 1 0 7 6.5" />
+                            </svg>
+                          </ActionIconButton>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </Modal.Header>
       <Modal.Body>
         <div className="space-y-3">
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
@@ -188,163 +457,178 @@ export function SlotDetail({
               <p className="mt-1 text-sm text-gray-700">{currentAppointment.notes}</p>
             </div>
           )}
-          {confirmDelete && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600">
-              Confirma a exclusão desta sessão? Esta ação não pode ser desfeita.
-            </div>
-          )}
-          {deleteError && (
-            <p className="text-sm text-red-500">{deleteError}</p>
+          {actionError && (
+            <p className="text-sm text-red-500">{actionError}</p>
           )}
           {recurringError && (
             <p className="text-sm text-red-500">{recurringError}</p>
           )}
-          {whatsappError && (
-            <p className="text-sm text-red-500">{whatsappError}</p>
-          )}
+
+          <div className="space-y-2 pt-1">
+            <div className="flex flex-wrap gap-2">
+              {canMarkPaid && (
+                <ActionIconButton
+                  label="Marcar pago"
+                  tone="primary"
+                  onClick={() => setPaymentDialogOpen(true)}
+                  disabled={isDeleting || isStoppingRecurring || isUpdatingStatus}
+                >
+                  <svg
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                    aria-hidden="true"
+                  >
+                    <path d="M3.5 6.5H16.5V13.5H3.5Z" />
+                    <path d="M3.5 9H16.5" />
+                    <path d="M6.5 12H8.5" />
+                  </svg>
+                </ActionIconButton>
+              )}
+
+              {canComplete && (
+                <ActionIconButton
+                  label="Realizado"
+                  tone="success"
+                  onClick={() => {
+                    setMoreActionsOpen(false)
+                    void handleStatusUpdate('completed', {
+                      fallbackMessage: 'Erro ao marcar sessão como realizada',
+                    })
+                  }}
+                  disabled={isDeleting || isStoppingRecurring || isUpdatingStatus}
+                >
+                  <svg
+                    viewBox="0 0 20 20"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="h-4 w-4"
+                    aria-hidden="true"
+                  >
+                    <path d="M4.5 10.5L8 14L15.5 6.5" />
+                  </svg>
+                </ActionIconButton>
+              )}
+            </div>
+
+            {canCancel && confirmCancel && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-amber-900">Confirmar desmarque da sessão?</p>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setConfirmCancel(false)
+                        setActionError('')
+                      }}
+                      disabled={isUpdatingStatus}
+                    >
+                      Voltar
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="bg-amber-500 text-white hover:bg-amber-600 focus:ring-amber-200"
+                      onClick={() => {
+                        if (currentAppointment.protocolLinkType === 'protocol') {
+                          setConfirmCancel(false)
+                          setProtocolActionMode('cancel')
+                          return
+                        }
+
+                        void handleCancel()
+                      }}
+                      disabled={isUpdatingStatus}
+                    >
+                      {isUpdatingStatus ? 'Salvando...' : 'Confirmar desmarque'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {canStopRecurring && (
+              confirmStopRecurring ? (
+                <div className="rounded-lg border border-primary-200 bg-primary-50 p-2">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-primary-900">Encerrar a recorrência a partir desta sessão?</p>
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setConfirmStopRecurring(false)
+                          setRecurringError('')
+                        }}
+                        disabled={isStoppingRecurring}
+                      >
+                        Voltar
+                      </Button>
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={handleStopRecurringSeries}
+                        disabled={isStoppingRecurring}
+                      >
+                        {isStoppingRecurring ? 'Encerrando...' : 'Encerrar recorrência'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ) : null
+            )}
+
+            {confirmDelete ? (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-red-700">Confirmar exclusão permanente da sessão?</p>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setConfirmDelete(false)
+                        setActionError('')
+                      }}
+                      disabled={isDeleting}
+                    >
+                      Voltar
+                    </Button>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      onClick={() => {
+                        if (currentAppointment.protocolLinkType === 'protocol') {
+                          setConfirmDelete(false)
+                          setProtocolActionMode('delete')
+                          return
+                        }
+
+                        void handleDelete()
+                      }}
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? 'Excluindo...' : 'Confirmar exclusão'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
       </Modal.Body>
       <Modal.Footer>
-        <div className="flex w-full flex-wrap gap-2">
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => onEdit(currentAppointment)}
-          >
-            Editar
-          </Button>
-          {patient?.phone && currentAppointment.paymentStatus === 'pending' && currentAppointment.protocolLinkType !== 'protocol' && (
-            <WhatsAppButton appointmentId={currentAppointment.id} onError={setWhatsappError} />
-          )}
-          {currentAppointment.paymentStatus === 'pending' && currentAppointment.status !== 'cancelled' && currentAppointment.protocolLinkType !== 'protocol' && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setPaymentDialogOpen(true)}
-            >
-              Marcar Pago
-            </Button>
-          )}
-          {canComplete && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                void onUpdateStatus(currentAppointment.id, 'completed')
-              }}
-            >
-              Realizado
-            </Button>
-          )}
-          {canComplete && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                void onUpdateStatus(currentAppointment.id, 'no_show')
-              }}
-            >
-              Falta
-            </Button>
-          )}
-          {canCancel && (
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => {
-                if (currentAppointment.protocolLinkType === 'protocol') {
-                  setProtocolActionMode('cancel')
-                  return
-                }
-
-                void onUpdateStatus(currentAppointment.id, 'cancelled')
-              }}
-            >
-              Desmarcado
-            </Button>
-          )}
-          {isRecurring && currentAppointment.recurrenceStatus === 'active' && (
-            confirmStopRecurring ? (
-              <>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setConfirmStopRecurring(false)
-                    setRecurringError('')
-                  }}
-                  disabled={isStoppingRecurring}
-                >
-                  Manter recorrência
-                </Button>
-                <Button
-                  variant="danger"
-                  size="sm"
-                  onClick={handleStopRecurringSeries}
-                  disabled={isStoppingRecurring}
-                >
-                  {isStoppingRecurring ? 'Encerrando...' : 'Encerrar recorrência'}
-                </Button>
-              </>
-            ) : (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => {
-                  setConfirmStopRecurring(true)
-                  setRecurringError('')
-                }}
-              >
-                Parar recorrência
-              </Button>
-            )
-          )}
-          {confirmDelete ? (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setConfirmDelete(false)
-                  setDeleteError('')
-                }}
-                disabled={isDeleting}
-              >
-                Cancelar exclusão
-              </Button>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => {
-                  if (currentAppointment.protocolLinkType === 'protocol') {
-                    setConfirmDelete(false)
-                    setProtocolActionMode('delete')
-                    return
-                  }
-
-                  handleDelete()
-                }}
-                disabled={isDeleting}
-              >
-                {isDeleting ? 'Excluindo...' : 'Confirmar exclusão'}
-              </Button>
-            </>
-          ) : (
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => {
-                setConfirmDelete(true)
-                setDeleteError('')
-              }}
-            >
-              Excluir
-            </Button>
-          )}
-          <Button variant="ghost" size="sm" onClick={handleClose}>
-            Fechar
-          </Button>
-        </div>
+        <Button variant="ghost" size="sm" onClick={handleClose}>
+          Fechar
+        </Button>
       </Modal.Footer>
 
       <PaymentMethodDialog
@@ -383,8 +667,8 @@ export function SlotDetail({
             ? 'Escolha se o crédito deve voltar ao protocolo ou ficar consumido ao desmarcar esta sessão.'
             : 'Escolha se o crédito deve voltar ao protocolo ou ficar consumido antes de excluir esta sessão.'
         }
-        isPending={isDeleting}
-        error={deleteError || null}
+        isPending={isDeleting || isUpdatingStatus}
+        error={actionError || null}
       />
     </Modal>
   )

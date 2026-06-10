@@ -42,10 +42,10 @@ Phase 1:
 Phase 2:
   T2 done, then in parallel:
     ├── T3 [P]  appointment.schema.ts + appointments.ts + financial.ts — align session typing and payment-date hooks
-    └── T4 [P]  AppointmentForm.tsx — support edit mode and paid-method/date capture
+    └── T4 [P]  AppointmentForm.tsx — support edit mode, paid-method/date capture, zero-cost psychotherapy, and scroll-safe price inputs
 
 Phase 3:
-  T3 + T4 done → T5  SlotDetail.tsx — add Editar/Excluir flows + paid-method quick action
+  T3 + T4 done → T5  SlotDetail.tsx — add Editar/Excluir flows, paid-method quick action, and button-hierarchy polish
   T5 done       → T6  WeeklyGrid.tsx + DashboardPage.tsx — wire modal lifecycle and refresh
   T3 + T4 done → T7  PendingPayments.tsx + PatientHistory.tsx + Financial surfaces — require paid-method/date and use paidAt for revenue
 ```
@@ -136,13 +136,13 @@ Phase 3:
 
 ---
 
-### T4 [P]: Make AppointmentForm reusable in edit mode and capture paid method/date
+### T4 [P]: Make AppointmentForm reusable in edit mode, capture paid method/date, and polish value entry
 
-**What**: Extend the session form so it can open prefilled for an existing session, submit an update instead of only creating new sessions, and require `paymentMethod` plus an editable payment date whenever a session is saved as paid.
+**What**: Extend the session form so it can open prefilled for an existing session, submit an update instead of only creating new sessions, require `paymentMethod` plus an editable payment date whenever a session is saved as paid, and fix the value-entry UX for free psychotherapy sessions.
 **Where**: `packages/web-bruno/src/components/appointments/AppointmentForm.tsx`
 **Depends on**: T2
 **Reuses**: Existing create-mode modal layout, patient picker, and service/type defaults
-**Requirement**: WBAEM-01, WBAEM-03, WBAEM-04, WBAEM-05
+**Requirement**: WBAEM-01, WBAEM-03, WBAEM-04, WBAEM-05, WBAEM-06
 
 **Done when**:
 - [ ] The component accepts edit-mode props for the selected session and initial values
@@ -153,21 +153,25 @@ Phase 3:
 - [ ] The form shows a payment-method selector and payment-date field whenever `paymentStatus = paid`
 - [ ] The payment-date field is prefilled from the existing session when present and defaults to today when a pending session is switched to paid
 - [ ] The form can update patient, date, time, type, value, notes, status, payment status, payment method, and payment date
+- [ ] Price inputs in `AppointmentForm` do not change when Bruno scrolls the mouse wheel or trackpad while the input is focused or hovered
+- [ ] Non-package psychotherapy create/edit flows allow `value = 0` and submit it through the existing mutations
+- [ ] Negative or invalid manual session values remain blocked by client-side validation
+- [ ] Package total validation remains `> 0`
 - [ ] Create flows that submit already-paid sessions also require `paymentMethod` and `paidAt`
-- [ ] Create mode behavior remains unchanged
+- [ ] Other create-mode behavior remains unchanged aside from zero-cost psychotherapy allowance and scroll protection
 - [ ] `cd packages/web-bruno && npm run build` exits 0
 
 **Commit**: deferred — commit alongside T5/T6
 
 ---
 
-### T5: Add edit/delete actions to SlotDetail and capture payment details in quick actions
+### T5: Add edit/delete actions to SlotDetail, capture payment details in quick actions, and repaginate the action buttons
 
-**What**: Replace the one-way agenda actions with a detail view that can open edit mode, confirm deletion, and collect `paymentMethod` plus payment date before a quick mark-paid mutation.
+**What**: Replace the one-way agenda actions with a detail view that can open edit mode, confirm deletion, collect `paymentMethod` plus payment date before a quick mark-paid mutation, and give the footer actions clearer visual hierarchy.
 **Where**: `packages/web-bruno/src/components/agenda/SlotDetail.tsx`
 **Depends on**: T3, T4
 **Reuses**: Existing modal structure, status badges, and button variants
-**Requirement**: WBAEM-01, WBAEM-02, WBAEM-03, WBAEM-04, WBAEM-05
+**Requirement**: WBAEM-01, WBAEM-02, WBAEM-03, WBAEM-04, WBAEM-05, WBAEM-07
 
 **Done when**:
 - [ ] `SlotDetail` shows an `Editar` action for existing sessions
@@ -176,6 +180,8 @@ Phase 3:
 - [ ] Status/payment quick actions no longer represent the only recovery path
 - [ ] Already-paid sessions display the current payment method
 - [ ] Already-paid sessions can surface the recorded payment date where relevant
+- [ ] `SlotDetail` buttons have clearer visual hierarchy across edit/payment, status, and destructive actions
+- [ ] The refreshed layout remains readable on smaller screens while preserving the existing action availability rules
 - [ ] Delete failures surface an error message without closing the modal prematurely
 - [ ] Edit action delegates cleanly to the parent agenda state
 - [ ] `cd packages/web-bruno && npm run build` exits 0
@@ -242,8 +248,8 @@ Phase 3:
 | T1: Add payment controls + financial backend semantics | Prisma + backend contract/query files | ✅ Cohesive |
 | T2: Add DELETE session endpoint | 1 route | ✅ Granular |
 | T3: Align schemas + hooks | 3 tightly related frontend contract files | ✅ Cohesive |
-| T4: Reuse AppointmentForm in edit mode | 1 component | ✅ Granular |
-| T5: Add SlotDetail edit/delete UX | 1 component | ✅ Granular |
+| T4: Reuse AppointmentForm in edit mode + value-entry polish | 1 component | ✅ Granular |
+| T5: Add SlotDetail edit/delete UX + button polish | 1 component | ✅ Granular |
 | T6: Wire agenda modal lifecycle | 2 tightly coupled UI files | ✅ Cohesive |
 | T7: Update payment shortcuts + financial UI attribution | 5 tightly related payment UI files | ✅ Cohesive |
 
@@ -261,6 +267,10 @@ Phase 3:
   - Mark a session as paid and confirm the UI requires `card`, `pix`, or `cash` plus a payment date
   - Revert an accidental `paid` back to `pending`
   - Revert an accidental `completed` or `cancelled` back to an active status
+  - Scroll over the `AppointmentForm` price input and confirm the value does not change
+  - Create or edit a psychotherapy session with `R$ 0,00` and confirm it saves successfully
+  - Confirm package total validation still rejects `0`
   - Mark a session as paid from pending-payments and patient-history shortcuts
   - Set a session date in one month and a payment date in a later month, then confirm the amount appears in the later month's revenue
+  - Review the refreshed `SlotDetail` action layout on desktop and a narrow/mobile viewport
   - Delete a mistaken session and confirm it disappears from the week grid
