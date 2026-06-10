@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, type FormEvent } from 'react'
+import { useState, useRef, useEffect, type FormEvent, type WheelEvent } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -48,6 +48,18 @@ function splitPackageValue(totalCents: number, slotCount: number): number[] {
   const remainder = totalCents % slotCount
 
   return Array.from({ length: slotCount }, (_, index) => baseValue + (index < remainder ? 1 : 0))
+}
+
+function parseCurrencyInputToCents(rawValue: string): number | null {
+  const normalizedValue = rawValue.trim().replace(',', '.')
+  if (normalizedValue === '') return null
+
+  const parsedValue = Math.round(Number.parseFloat(normalizedValue) * 100)
+  return Number.isFinite(parsedValue) ? parsedValue : null
+}
+
+function preventNumberInputScroll(event: WheelEvent<HTMLInputElement>) {
+  event.preventDefault()
 }
 
 function getAppointmentPaymentDate(appointment: Appointment | null | undefined): string {
@@ -359,9 +371,24 @@ export function AppointmentForm({
       return
     }
 
+    const parsedManualValue = isLinkedToRevenueProtocol ? null : parseCurrencyInputToCents(value)
+    const allowsZeroValue = type === 'psychotherapy'
+    const hasValidManualValue =
+      parsedManualValue !== null &&
+      (allowsZeroValue ? parsedManualValue >= 0 : parsedManualValue > 0)
+
     if (isEditMode && appointment) {
-      if (!date || !startTime || (!isLinkedToRevenueProtocol && !value)) {
+      if (!date || !startTime || (!isLinkedToRevenueProtocol && parsedManualValue === null)) {
         setSubmitError('Preencha data, horário e valor para salvar a sessão.')
+        return
+      }
+
+      if (!isLinkedToRevenueProtocol && !hasValidManualValue) {
+        setSubmitError(
+          allowsZeroValue
+            ? 'Informe um valor de sessão igual ou maior que zero.'
+            : 'Informe um valor de sessão maior que zero.',
+        )
         return
       }
 
@@ -383,7 +410,7 @@ export function AppointmentForm({
             date,
             startTime,
             type,
-            ...(isLinkedToRevenueProtocol ? {} : { value: Math.round(parseFloat(value || '0') * 100) }),
+            ...(parsedManualValue !== null ? { value: parsedManualValue } : {}),
             notes: notes || null,
             status,
             protocolId: protocolId || null,
@@ -414,7 +441,7 @@ export function AppointmentForm({
       }
 
       if (slots.length === 0) return
-      const totalPackageValue = Math.round(parseFloat(packageValue || '0') * 100)
+      const totalPackageValue = parseCurrencyInputToCents(packageValue) ?? 0
       if (!Number.isFinite(totalPackageValue) || totalPackageValue <= 0) {
         setSubmitError('Informe um valor total de pacote maior que zero.')
         return
@@ -439,7 +466,7 @@ export function AppointmentForm({
         },
       })
     } else {
-      if (!date || !startTime || (!isLinkedToRevenueProtocol && !value)) {
+      if (!date || !startTime || (!isLinkedToRevenueProtocol && parsedManualValue === null)) {
         setSubmitError('Preencha data, horário e valor para criar a sessão.')
         return
       }
@@ -454,11 +481,12 @@ export function AppointmentForm({
         return
       }
 
-      const parsedValue = isLinkedToRevenueProtocol
-        ? undefined
-        : Math.round(parseFloat(value || '0') * 100)
-      if (!isLinkedToRevenueProtocol && (!Number.isFinite(parsedValue) || (parsedValue ?? 0) <= 0)) {
-        setSubmitError('Informe um valor de sessão maior que zero.')
+      if (!isLinkedToRevenueProtocol && !hasValidManualValue) {
+        setSubmitError(
+          allowsZeroValue
+            ? 'Informe um valor de sessão igual ou maior que zero.'
+            : 'Informe um valor de sessão maior que zero.',
+        )
         return
       }
 
@@ -467,7 +495,7 @@ export function AppointmentForm({
         startTime,
         type,
         status: 'scheduled' as const,
-        ...(parsedValue !== undefined ? { value: parsedValue } : {}),
+        ...(parsedManualValue !== null ? { value: parsedManualValue } : {}),
         paymentStatus: recurring ? ('pending' as const) : paymentStatus,
         notes: notes || undefined,
         protocolId: protocolId || undefined,
@@ -650,10 +678,11 @@ export function AppointmentForm({
               <>
                 <Input
                   label="Valor acordado (R$)"
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={newPsychotherapyPrice}
                   onChange={(e) => setNewPsychotherapyPrice(e.target.value)}
+                  onWheel={preventNumberInputScroll}
                   required
                 />
                 <Select
@@ -885,10 +914,11 @@ export function AppointmentForm({
               {/* Package value */}
               <Input
                 label="Valor Total do Pacote (R$)"
-                type="number"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={packageValue}
                 onChange={(e) => setPackageValue(e.target.value)}
+                onWheel={preventNumberInputScroll}
                 required
               />
 
@@ -975,10 +1005,11 @@ export function AppointmentForm({
               ) : (
                 <Input
                   label="Valor (R$)"
-                  type="number"
-                  step="0.01"
+                  type="text"
+                  inputMode="decimal"
                   value={value}
                   onChange={(e) => setValue(e.target.value)}
+                  onWheel={preventNumberInputScroll}
                   required
                 />
               )}

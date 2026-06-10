@@ -12,6 +12,9 @@ This traps incorrect data in the weekly agenda and forces manual workarounds in 
 
 4. There is no way to record how a paid session was settled (`card`, `pix`, or `cash`), so the agenda and financial flows lose an important control detail.
 5. There is no way to record a payment date independently from the session date, so late or end-of-month payments are booked into the wrong financial month.
+6. The appointment price inputs can be changed accidentally by mouse-wheel or trackpad scroll while Bruno is filling the form, which silently alters the intended charge.
+7. The frontend still rejects `value = 0` even though the psychology session API already accepts it, so Bruno cannot register legitimate free psychotherapy sessions.
+8. The session-detail action buttons have weak visual hierarchy, making corrective and destructive actions harder to scan quickly.
 
 ## Scope Decision
 
@@ -36,6 +39,9 @@ It still does **not** need a separate design document because the change stays l
 - [ ] The recorded payment method is available in the agenda and financial flows for later control
 - [ ] Paid revenue is attributed to the month/week/year of `paidAt`, not the session date
 - [ ] Agenda edits remain conflict-safe and scoped to the authenticated provider
+- [ ] Bruno can create or edit a free psychotherapy session without frontend validation rejecting `0`
+- [ ] Appointment price inputs in the booking form do not change accidentally on mouse-wheel or trackpad scroll
+- [ ] Session-detail actions have clearer visual hierarchy without changing their existing availability rules
 
 ## Out of Scope
 
@@ -50,6 +56,8 @@ It still does **not** need a separate design document because the change stays l
 | Bulk backfill or migration of historical payment dates | Existing `paidAt` values remain as-is unless Bruno edits the session manually |
 | Revenue dashboards split by payment method | Can be added later once capture is stable |
 | Receivables aging / overdue buckets | Separate financial follow-up |
+| Zero-cost package totals or protocol pricing policy changes | This polish only covers free psychotherapy session entry in `AppointmentForm` |
+| Full weekly-agenda visual redesign | This scope only repaginates the action buttons inside `SlotDetail` |
 
 ## User Stories
 
@@ -123,6 +131,29 @@ It still does **not** need a separate design document because the change stays l
 7. WHEN a session happened on `2026-01-01` and was paid on `2026-02-15` THEN the amount SHALL count toward February 2026 revenue, not January 2026 revenue
 8. WHEN a session is switched from `paid` back to `pending` THEN its amount SHALL be removed from paid totals for every financial period
 
+### WBAEM-06 — Protect appointment price entry and allow free psychotherapy sessions
+
+**User Story**: As Bruno, I want the booking form to preserve the intended price value and allow free psychotherapy entries so I can book courtesy sessions without accidental or blocked pricing.
+
+**Acceptance Criteria**:
+
+1. WHEN Bruno scrolls the page while a price input in `AppointmentForm` is focused or hovered THEN the UI SHALL NOT change the current numeric value
+2. WHEN Bruno creates or edits a non-package psychotherapy session with `value = 0` THEN the frontend SHALL allow submission and send `0` to the existing psychology session endpoints
+3. WHEN Bruno saves a free psychotherapy session THEN the agenda and detail flows SHALL treat it as a valid zero-cost session without client-side validation errors
+4. WHEN Bruno enters a negative or invalid manual session value THEN the frontend SHALL still block submission with a validation error
+5. WHEN Bruno creates or edits package totals THEN the existing `> 0` package validation SHALL remain unchanged
+
+### WBAEM-07 — Repaginate session-detail action buttons
+
+**User Story**: As Bruno, I want the session-detail actions to look clearer so I can understand the safest and most relevant action at a glance.
+
+**Acceptance Criteria**:
+
+1. WHEN Bruno opens `SlotDetail` THEN the footer SHALL present clearer visual separation between edit/payment actions, status shortcuts, and destructive actions
+2. WHEN an action is destructive THEN the refreshed styling SHALL keep it visually distinct from non-destructive actions
+3. WHEN the actions wrap on smaller screens THEN the refreshed layout SHALL remain readable and tappable
+4. WHEN the visual polish is applied THEN the existing action availability rules from WBAEM-01 through WBAEM-05 SHALL remain unchanged
+
 ## Implementation Notes
 
 ### API
@@ -171,6 +202,8 @@ It still does **not** need a separate design document because the change stays l
   - wire edit/delete flows
   - refresh the weekly query after mutations
 - Reuse or extend [packages/web-bruno/src/components/appointments/AppointmentForm.tsx](/Users/caio.mugarte/Documents/projetos/soberano/packages/web-bruno/src/components/appointments/AppointmentForm.tsx) so it can work in edit mode with initial values and an explicit payment-date field whenever the session is paid
+- Update `AppointmentForm` price inputs so mouse-wheel and trackpad scroll do not mutate their values while the modal is open
+- Align `AppointmentForm` validation with the existing psychology session API contract for non-package psychotherapy sessions so `value = 0` is allowed, while negative values remain blocked and package totals still require `> 0`
 - Update the other quick payment surfaces so they cannot mark a session as paid without a `paymentMethod` and `paymentDate`:
   - [packages/web-bruno/src/components/financial/PendingPayments.tsx](/Users/caio.mugarte/Documents/projetos/soberano/packages/web-bruno/src/components/financial/PendingPayments.tsx)
   - [packages/web-bruno/src/components/patients/PatientHistory.tsx](/Users/caio.mugarte/Documents/projetos/soberano/packages/web-bruno/src/components/patients/PatientHistory.tsx)
@@ -178,6 +211,8 @@ It still does **not** need a separate design document because the change stays l
   - [packages/web-bruno/src/pages/FinancialPage.tsx](/Users/caio.mugarte/Documents/projetos/soberano/packages/web-bruno/src/pages/FinancialPage.tsx)
   - [packages/web-bruno/src/components/financial/RevenueSummary.tsx](/Users/caio.mugarte/Documents/projetos/soberano/packages/web-bruno/src/components/financial/RevenueSummary.tsx)
   - [packages/web-bruno/src/components/financial/RevenueChart.tsx](/Users/caio.mugarte/Documents/projetos/soberano/packages/web-bruno/src/components/financial/RevenueChart.tsx)
+- Refresh [packages/web-bruno/src/components/agenda/SlotDetail.tsx](/Users/caio.mugarte/Documents/projetos/soberano/packages/web-bruno/src/components/agenda/SlotDetail.tsx) button styling/layout to create clearer hierarchy between edit/payment actions, status shortcuts, and destructive actions without changing the action rules
+- No backend contract change is required for zero-cost manual sessions because the psychology session create/update routes already accept `value >= 0`; this polish closes the frontend-only validation mismatch
 
 ## Open Questions
 
@@ -189,6 +224,8 @@ Use a status selector in edit mode and do not force a single recovery target. Th
 
 For payment control, require both `paymentMethod` and an editable `paymentDate` across every flow that transitions a session to `paid` in `web-bruno`, default the quick-pay date to today, and attribute revenue by `paidAt`. If we need to keep the UI lean, showing payment date in detail/edit surfaces is enough for now and a richer financial list redesign can stay separate.
 
+For the pricing polish, treat zero-cost support as a psychotherapy-only `AppointmentForm` capability, keep package totals positive, and prevent wheel-based numeric input changes in the booking form.
+
 ## Requirement Traceability
 
 | ID | Requirement | Status |
@@ -198,6 +235,8 @@ For payment control, require both `paymentMethod` and an editable `paymentDate` 
 | WBAEM-03 | Reverse accidental status/payment changes | Pending |
 | WBAEM-04 | Capture payment method for paid sessions | Pending |
 | WBAEM-05 | Capture payment date independently from session date | Pending |
+| WBAEM-06 | Protect price entry and allow free psychotherapy sessions | Pending |
+| WBAEM-07 | Repaginate session-detail action buttons | Pending |
 
 ## Success Criteria
 
@@ -207,3 +246,6 @@ For payment control, require both `paymentMethod` and an editable `paymentDate` 
 - [ ] Paid sessions record whether the payment was `card`, `pix`, or `cash`
 - [ ] A payment received in a later month is attributed to the month of `paidAt`, not the month of the session
 - [ ] The weekly agenda stays consistent after edit/delete operations
+- [ ] Bruno can save a psychotherapy session with `R$ 0,00` when it should be free
+- [ ] Scrolling over a booking price input no longer changes its value accidentally
+- [ ] `SlotDetail` actions are easier to scan on desktop and mobile
