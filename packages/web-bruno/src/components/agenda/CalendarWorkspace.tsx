@@ -493,6 +493,7 @@ function CalendarWorkspaceDayView({
                       appointment={appointment}
                       patient={patient}
                       onClick={() => onOpenAppointment(appointment)}
+                      compact={appointmentSpan === 1}
                       className="h-full min-h-[72px]"
                     />
                   </div>
@@ -668,6 +669,7 @@ function CalendarWorkspaceWeekView({
                             appointment={appointment}
                             patient={patient}
                             onClick={() => onOpenAppointment(appointment)}
+                            compact={appointmentSpan === 1}
                             className="h-full min-h-[96px]"
                           />
                         </div>
