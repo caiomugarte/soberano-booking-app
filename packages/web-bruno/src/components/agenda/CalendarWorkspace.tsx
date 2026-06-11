@@ -49,8 +49,8 @@ import type { Patient } from '@/schemas/patient.schema'
 
 type CalendarWorkspaceView = 'day' | 'week' | 'month'
 
-const DAY_HOUR_BLOCK_HEIGHT = 72
-const WEEK_HOUR_BLOCK_HEIGHT = 96
+const DAY_HOUR_BLOCK_HEIGHT = 104
+const WEEK_HOUR_BLOCK_HEIGHT = 112
 const DAY_HOUR_BLOCK_GAP = 8
 const WEEK_CELL_VERTICAL_PADDING = 16
 
@@ -494,7 +494,7 @@ function CalendarWorkspaceDayView({
                       patient={patient}
                       onClick={() => onOpenAppointment(appointment)}
                       compact={appointmentSpan === 1}
-                      className="h-full min-h-[72px]"
+                      className="h-full min-h-[104px]"
                     />
                   </div>
                 ) : outsideShift ? (
@@ -670,7 +670,7 @@ function CalendarWorkspaceWeekView({
                             patient={patient}
                             onClick={() => onOpenAppointment(appointment)}
                             compact={appointmentSpan === 1}
-                            className="h-full min-h-[96px]"
+                            className="h-full min-h-[112px]"
                           />
                         </div>
                       </td>
