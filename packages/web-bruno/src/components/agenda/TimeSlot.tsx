@@ -71,6 +71,8 @@ export function TimeSlot({
     )
   }
 
+  const calendarMetaBadgeClassName = compact ? 'px-2 py-0 text-[10px] leading-4' : ''
+
   return (
     <button
       onClick={onClick}
@@ -95,8 +97,14 @@ export function TimeSlot({
         </span>
       )}
       <div className={`mt-auto flex w-full flex-wrap items-center overflow-hidden ${compact ? 'gap-1' : 'gap-1.5'}`}>
-        <AppointmentStatusBadge status={appointment.status} />
-        <PaymentStatusBadge status={appointment.paymentStatus} />
+        <AppointmentStatusBadge
+          status={appointment.status}
+          className={calendarMetaBadgeClassName}
+        />
+        <PaymentStatusBadge
+          status={appointment.paymentStatus}
+          className={calendarMetaBadgeClassName}
+        />
       </div>
     </button>
   )

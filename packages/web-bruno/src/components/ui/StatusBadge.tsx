@@ -15,10 +15,28 @@ const paymentVariants: Record<PaymentStatus, 'amber' | 'green'> = {
   paid: 'green',
 }
 
-export function AppointmentStatusBadge({ status }: { status: AppointmentStatus }) {
-  return <Badge variant={statusVariants[status]}>{STATUS_LABELS[status]}</Badge>
+interface StatusBadgeProps {
+  status: AppointmentStatus
+  className?: string
 }
 
-export function PaymentStatusBadge({ status }: { status: PaymentStatus }) {
-  return <Badge variant={paymentVariants[status]}>{PAYMENT_STATUS_LABELS[status]}</Badge>
+interface PaymentBadgeProps {
+  status: PaymentStatus
+  className?: string
+}
+
+export function AppointmentStatusBadge({ status, className = '' }: StatusBadgeProps) {
+  return (
+    <Badge variant={statusVariants[status]} className={className}>
+      {STATUS_LABELS[status]}
+    </Badge>
+  )
+}
+
+export function PaymentStatusBadge({ status, className = '' }: PaymentBadgeProps) {
+  return (
+    <Badge variant={paymentVariants[status]} className={className}>
+      {PAYMENT_STATUS_LABELS[status]}
+    </Badge>
+  )
 }
