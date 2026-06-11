@@ -5,6 +5,7 @@ import type { ServiceEntity } from '../../../../domain/entities/service.js';
 import type { AppointmentRepository } from '../../../../domain/repositories/appointment.repository.js';
 import type { CustomerRepository } from '../../../../domain/repositories/customer.repository.js';
 import type { NeuromodulationProtocolRepository } from '../../../../domain/repositories/neuromodulation-protocol.repository.js';
+import type { ProviderRepository } from '../../../../domain/repositories/provider.repository.js';
 import type { ServiceRepository } from '../../../../domain/repositories/service.repository.js';
 import { ValidationError } from '../../../../shared/errors.js';
 import { CreatePsychologySessionUseCase } from '../create-psychology-session.js';
@@ -48,6 +49,9 @@ const provider = {
   avatarUrl: null,
   pixKey: null,
   messageTemplate: null,
+  workspaceStartTime: '08:00',
+  workspaceEndTime: '17:00',
+  defaultSessionDurationMinutes: 60,
   isActive: true,
 };
 
@@ -95,6 +99,12 @@ const emptyProtocolRepo = {
   getUsageSnapshot: vi.fn(),
 } as unknown as NeuromodulationProtocolRepository;
 
+const providerRepo = {
+  findAllActive: vi.fn(),
+  findById: vi.fn().mockResolvedValue(provider),
+  findByEmail: vi.fn(),
+} as unknown as ProviderRepository;
+
 describe('Psychology session defaulting use cases', () => {
   it('defaults new psychotherapy sessions from the patient agreement instead of the service price', async () => {
     const appointmentRepo: AppointmentRepository = {
@@ -137,6 +147,7 @@ describe('Psychology session defaulting use cases', () => {
       customerRepo,
       emptyProtocolRepo,
       serviceRepo,
+      providerRepo,
     );
 
     const created = await useCase.execute({
@@ -175,6 +186,7 @@ describe('Psychology session defaulting use cases', () => {
       customerRepo,
       emptyProtocolRepo,
       serviceRepo,
+      providerRepo,
     );
 
     await expect(
@@ -253,6 +265,141 @@ describe('Psychology session defaulting use cases', () => {
       currentAppointment.id,
       expect.objectContaining({
         priceCents: 18000,
+      }),
+    );
+  });
+
+  it('uses the provider default duration when creating a new session without an override', async () => {
+    const appointmentRepo: AppointmentRepository = {
+      create: vi.fn().mockImplementation(async (data) =>
+        makeAppointment({
+          startTime: data.startTime,
+          endTime: data.endTime,
+        }),
+      ),
+      findByCancelToken: vi.fn(),
+      findById: vi.fn(),
+      findBookedSlots: vi.fn(),
+      findByBarberAndDate: vi.fn(),
+      findUpcomingWithoutReminder: vi.fn(),
+      updateStatus: vi.fn(),
+      updateDateTime: vi.fn(),
+      markReminderSent: vi.fn(),
+      findUpcomingWithoutBarberReminder: vi.fn(),
+      markBarberReminderSent: vi.fn(),
+      getStatsByDateRange: vi.fn(),
+      findByBarberAndDateRange: vi.fn().mockResolvedValue([]),
+      findByRecurringSeriesId: vi.fn(),
+      findUpcomingByCustomerPhone: vi.fn(),
+      deleteFutureByRecurringSeriesId: vi.fn(),
+      deleteById: vi.fn(),
+      updateCustomer: vi.fn(),
+      updatePaymentStatus: vi.fn(),
+      getFinancialSummary: vi.fn(),
+      updateDetails: vi.fn(),
+      updateSchedule: vi.fn(),
+    } as unknown as AppointmentRepository;
+    const customerRepo = {
+      findById: vi.fn().mockResolvedValue(psychotherapyPatient),
+    } as unknown as CustomerRepository;
+    const serviceRepo = {
+      findBySlug: vi.fn().mockResolvedValue(psychotherapyService),
+    } as unknown as ServiceRepository;
+
+    const useCase = new CreatePsychologySessionUseCase(
+      appointmentRepo,
+      customerRepo,
+      emptyProtocolRepo,
+      serviceRepo,
+      providerRepo,
+    );
+
+    const created = await useCase.execute({
+      tenantId: 'tenant-1',
+      providerId: provider.id,
+      patientId: psychotherapyPatient.id,
+      date: '2099-06-15',
+      startTime: '10:00',
+      type: 'psychotherapy',
+    });
+
+    expect(created.endTime).toBe('11:00');
+    expect(appointmentRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        endTime: '11:00',
+      }),
+    );
+  });
+
+  it('preserves the current effective duration on edit unless an override is provided', async () => {
+    const currentAppointment = makeAppointment({
+      startTime: '10:00',
+      endTime: '10:50',
+    });
+    const appointmentRepo: AppointmentRepository = {
+      create: vi.fn(),
+      findByCancelToken: vi.fn(),
+      findById: vi.fn().mockResolvedValue(currentAppointment),
+      findBookedSlots: vi.fn(),
+      findByBarberAndDate: vi.fn(),
+      findUpcomingWithoutReminder: vi.fn(),
+      updateStatus: vi.fn(),
+      updateDateTime: vi.fn(),
+      markReminderSent: vi.fn(),
+      findUpcomingWithoutBarberReminder: vi.fn(),
+      markBarberReminderSent: vi.fn(),
+      getStatsByDateRange: vi.fn(),
+      findByBarberAndDateRange: vi.fn().mockResolvedValue([]),
+      findByRecurringSeriesId: vi.fn(),
+      findUpcomingByCustomerPhone: vi.fn(),
+      deleteFutureByRecurringSeriesId: vi.fn(),
+      deleteById: vi.fn(),
+      updateCustomer: vi.fn(),
+      updatePaymentStatus: vi.fn(),
+      getFinancialSummary: vi.fn(),
+      updateDetails: vi.fn().mockImplementation(async (_id, data) =>
+        makeAppointment({
+          date: data.date,
+          startTime: data.startTime,
+          endTime: data.endTime,
+        }),
+      ),
+      updateSchedule: vi.fn(),
+    } as unknown as AppointmentRepository;
+    const customerRepo = {
+      findById: vi.fn().mockResolvedValue(psychotherapyPatient),
+    } as unknown as CustomerRepository;
+    const serviceRepo = {
+      findBySlug: vi.fn(),
+    } as unknown as ServiceRepository;
+
+    const useCase = new UpdatePsychologySessionUseCase(
+      appointmentRepo,
+      customerRepo,
+      emptyProtocolRepo,
+      serviceRepo,
+    );
+
+    const updated = await useCase.execute({
+      appointmentId: currentAppointment.id,
+      providerId: provider.id,
+      startTime: '11:00',
+    });
+
+    expect(updated.endTime).toBe('11:50');
+
+    await useCase.execute({
+      appointmentId: currentAppointment.id,
+      providerId: provider.id,
+      startTime: '12:00',
+      durationMinutes: 90,
+    });
+
+    expect(appointmentRepo.updateDetails).toHaveBeenLastCalledWith(
+      currentAppointment.id,
+      expect.objectContaining({
+        startTime: '12:00',
+        endTime: '13:30',
       }),
     );
   });

@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Textarea } from '@/components/ui/Textarea'
 import { Spinner } from '@/components/ui/Spinner'
-import { DAYS_OF_WEEK } from '@/config/constants'
+import { getWorkspaceDays, resolveProviderWorkspaceConfig } from '@/lib/calendar-workspace'
 
 export default function SettingsPage() {
   const { data: profile, isLoading: profileLoading } = useProviderProfile()
@@ -30,12 +30,16 @@ export default function SettingsPage() {
   const [phone, setPhone] = useState('')
   const [pixKey, setPixKey] = useState('')
   const [messageTemplate, setMessageTemplate] = useState('')
+  const [workspaceStartTime, setWorkspaceStartTime] = useState('08:00')
+  const [workspaceEndTime, setWorkspaceEndTime] = useState('17:00')
+  const [defaultSessionDurationMinutes, setDefaultSessionDurationMinutes] = useState('60')
   const [profileSaved, setProfileSaved] = useState(false)
 
   // Shifts state (per day)
   const [localShifts, setLocalShifts] = useState<Pick<Shift, 'dayOfWeek' | 'startTime' | 'endTime'>[]>([])
   const [shiftsInitialized, setShiftsInitialized] = useState(false)
-  const [newDay, setNewDay] = useState<number>(DAYS_OF_WEEK[0].key)
+  const workspaceDays = getWorkspaceDays()
+  const [newDay, setNewDay] = useState<number>(workspaceDays[0].key)
   const [newStart, setNewStart] = useState('09:00')
   const [newEnd, setNewEnd] = useState('18:00')
 
@@ -47,9 +51,13 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!profile) return
+    const workspaceConfig = resolveProviderWorkspaceConfig(profile)
     setPhone(profile.phone ?? '')
     setPixKey(profile.pixKey ?? '')
     setMessageTemplate(profile.messageTemplate ?? '')
+    setWorkspaceStartTime(workspaceConfig.workspaceStartTime)
+    setWorkspaceEndTime(workspaceConfig.workspaceEndTime)
+    setDefaultSessionDurationMinutes(String(workspaceConfig.defaultSessionDurationMinutes))
   }, [profile])
 
   if (shiftsData && !shiftsInitialized) {
@@ -59,8 +67,24 @@ export default function SettingsPage() {
 
   function handleProfileSubmit(e: FormEvent) {
     e.preventDefault()
+    const parsedDefaultDuration = Number.parseInt(defaultSessionDurationMinutes, 10)
+    if (
+      workspaceStartTime >= workspaceEndTime ||
+      !Number.isFinite(parsedDefaultDuration) ||
+      parsedDefaultDuration < 15
+    ) {
+      return
+    }
+
     updateProfile.mutate(
-      { phone: phone || null, pixKey, messageTemplate },
+      {
+        phone: phone || null,
+        pixKey,
+        messageTemplate,
+        workspaceStartTime,
+        workspaceEndTime,
+        defaultSessionDurationMinutes: parsedDefaultDuration,
+      },
       {
         onSuccess: () => {
           setProfileSaved(true)
@@ -96,6 +120,12 @@ export default function SettingsPage() {
     setNewAbsentEnd('')
     setNewAbsentAllDay(true)
   }
+
+  const parsedDefaultDuration = Number.parseInt(defaultSessionDurationMinutes, 10)
+  const invalidWorkspaceConfig =
+    workspaceStartTime >= workspaceEndTime ||
+    !Number.isFinite(parsedDefaultDuration) ||
+    parsedDefaultDuration < 15
 
   if (profileLoading) {
     return (
@@ -138,8 +168,42 @@ export default function SettingsPage() {
               <p className="text-xs text-gray-400">
                 Use as variáveis: {'{nome}'}, {'{data}'}, {'{valor}'}, {'{pix}'}
               </p>
+              <div className="grid grid-cols-1 gap-3 rounded-xl border border-primary-100 bg-primary-50/60 p-4 lg:grid-cols-3">
+                <Input
+                  label="Primeira hora visível"
+                  type="time"
+                  value={workspaceStartTime}
+                  onChange={(e) => setWorkspaceStartTime(e.target.value)}
+                />
+                <Input
+                  label="Última hora visível"
+                  type="time"
+                  value={workspaceEndTime}
+                  onChange={(e) => setWorkspaceEndTime(e.target.value)}
+                />
+                <Input
+                  label="Duração padrão (min)"
+                  type="number"
+                  min="15"
+                  step="5"
+                  value={defaultSessionDurationMinutes}
+                  onChange={(e) => setDefaultSessionDurationMinutes(e.target.value)}
+                />
+              </div>
+              <p className="text-xs text-gray-500">
+                Esses horários alimentam o workspace do dashboard, os filtros semanais e os horários disponíveis no formulário de sessão.
+              </p>
+              {invalidWorkspaceConfig && (
+                <p className="text-sm text-red-500">
+                  Ajuste a janela do workspace: a primeira hora visível deve ser anterior à última, e a duração padrão precisa ser de pelo menos 15 minutos.
+                </p>
+              )}
               <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center">
-                <Button type="submit" className="w-full sm:w-auto" disabled={updateProfile.isPending}>
+                <Button
+                  type="submit"
+                  className="w-full sm:w-auto"
+                  disabled={updateProfile.isPending || invalidWorkspaceConfig}
+                >
                   Salvar Perfil
                 </Button>
                 {profileSaved && <span className="text-sm text-sage-600">Salvo!</span>}
@@ -159,7 +223,7 @@ export default function SettingsPage() {
             <Panel.Body className="space-y-4">
               {localShifts.length > 0 ? (
                 <div className="divide-y divide-gray-100">
-                  {DAYS_OF_WEEK.flatMap(({ key, label }) =>
+                  {workspaceDays.flatMap(({ key, label }) =>
                     localShifts
                       .map((s, i) => ({ shift: s, index: i }))
                       .filter(({ shift }) => shift.dayOfWeek === key)
@@ -191,7 +255,7 @@ export default function SettingsPage() {
                     label="Dia"
                     value={String(newDay)}
                     onChange={(e) => setNewDay(Number(e.target.value))}
-                    options={DAYS_OF_WEEK.map((d) => ({ value: String(d.key), label: d.label }))}
+                    options={workspaceDays.map((day) => ({ value: String(day.key), label: day.label }))}
                   />
                   <Input
                     label="Início"

@@ -103,8 +103,17 @@ export function assertNoScheduleConflict(params: {
   }
 }
 
-export function buildEndTime(startTime: string, service: ServiceEntity): string {
-  return addMinutes(startTime, service.duration);
+function timeToMinutes(value: string): number {
+  const [hours, minutes] = value.split(':').map(Number);
+  return hours * 60 + minutes;
+}
+
+export function getDurationMinutes(startTime: string, endTime: string): number {
+  return timeToMinutes(endTime) - timeToMinutes(startTime);
+}
+
+export function buildEndTime(startTime: string, durationMinutes: number): string {
+  return addMinutes(startTime, durationMinutes);
 }
 
 export function resolveProtocolOutcome(params: {

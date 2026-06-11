@@ -55,6 +55,9 @@ const appointment = {
     avatarUrl: null,
     pixKey: null,
     messageTemplate: null,
+    workspaceStartTime: '08:00',
+    workspaceEndTime: '17:00',
+    defaultSessionDurationMinutes: 60,
     isActive: true,
   },
   service: {

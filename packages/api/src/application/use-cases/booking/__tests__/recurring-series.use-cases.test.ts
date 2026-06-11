@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AppointmentRepository } from '../../../../domain/repositories/appointment.repository.js';
+import type { ProviderRepository } from '../../../../domain/repositories/provider.repository.js';
 import type { RecurringAppointmentSeriesRepository } from '../../../../domain/repositories/recurring-appointment-series.repository.js';
 import type { ServiceRepository } from '../../../../domain/repositories/service.repository.js';
 import type { AppointmentWithDetails } from '../../../../domain/entities/appointment.js';
@@ -32,6 +33,9 @@ const provider = {
   avatarUrl: null,
   pixKey: null,
   messageTemplate: null,
+  workspaceStartTime: '08:00',
+  workspaceEndTime: '17:00',
+  defaultSessionDurationMinutes: 60,
   isActive: true,
 };
 
@@ -222,11 +226,16 @@ function makeHarness() {
     findById: async () => service,
     findBySlug: async () => service,
   };
+  const providerRepo: ProviderRepository = {
+    findAllActive: async () => [provider],
+    findById: async () => provider,
+    findByEmail: async () => provider,
+  };
 
   return {
     appointments,
     seriesList,
-    createUseCase: new CreateRecurringSeriesUseCase(appointmentRepo, recurringSeriesRepo, serviceRepo),
+    createUseCase: new CreateRecurringSeriesUseCase(appointmentRepo, recurringSeriesRepo, serviceRepo, providerRepo),
     materializeUseCase: new MaterializeRecurringSeriesWindowUseCase(appointmentRepo, recurringSeriesRepo),
     stopUseCase: new StopRecurringSeriesUseCase(appointmentRepo, recurringSeriesRepo),
     recurringSeriesRepo,
@@ -253,6 +262,7 @@ describe('Recurring session series use cases', () => {
     expect(result.createdAppointments).toBe(harness.appointments.length);
     expect(harness.appointments[0]?.date.toISOString().slice(0, 10)).toBe('2099-06-15');
     expect(harness.appointments[1]?.date.toISOString().slice(0, 10)).toBe('2099-06-22');
+    expect(harness.appointments[0]?.endTime).toBe('11:00');
     expect(harness.appointments.every((appointment) => appointment.recurringSeriesId === result.series.id)).toBe(true);
   });
 
@@ -299,6 +309,25 @@ describe('Recurring session series use cases', () => {
       '2099-07-13',
       '2099-07-27',
     ]);
+  });
+
+  it('stores an override duration on the recurring rule for future materialization', async () => {
+    const harness = makeHarness();
+
+    const result = await harness.createUseCase.execute({
+      tenantId: 'tenant-1',
+      providerId: provider.id,
+      customerId: customer.id,
+      serviceId: service.id,
+      startDate: '2099-06-15',
+      startTime: '10:00',
+      intervalWeeks: 1,
+      durationMinutes: 90,
+      notes: 'Sessao longa',
+    });
+
+    expect(result.series.endTime).toBe('11:30');
+    expect(harness.appointments[0]?.endTime).toBe('11:30');
   });
 
   it('rejects recurring creation when a protected-horizon occurrence is already occupied', async () => {

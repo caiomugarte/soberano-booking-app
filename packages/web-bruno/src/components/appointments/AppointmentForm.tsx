@@ -12,15 +12,15 @@ import {
   useCreateBatchAppointments,
   useUpdateAppointment,
 } from '@/api/appointments'
-import { useServices } from '@/api/settings'
+import { useProviderProfile, useServices } from '@/api/settings'
 import {
   PAYMENT_METHOD_LABELS,
   PAYMENT_STATUS_LABELS,
   SESSION_TYPE_LABELS,
   STATUS_LABELS,
-  TIME_SLOTS,
 } from '@/config/constants'
 import { isRevenueProtocolLink } from '@/lib/appointment-pricing'
+import { buildStartTimeOptions, resolveProviderWorkspaceConfig } from '@/lib/calendar-workspace'
 import { dateInputToIso, getTodayDateInputValue, toDateInputValue } from '@/lib/format'
 import {
   getAllowedSessionTypes,
@@ -28,6 +28,7 @@ import {
   isMinorFromBirthDate,
   supportsSessionType,
 } from '@/lib/patient-care'
+import { getAppointmentDurationMinutes } from '@/lib/slots'
 import type {
   Appointment,
   PaymentMethod,
@@ -87,6 +88,7 @@ export function AppointmentForm({
   onSuccess,
 }: AppointmentFormProps) {
   const { data: patients = [] } = usePatients()
+  const { data: profile } = useProviderProfile()
   const { data: servicesData } = useServices()
   const createAppointment = useCreateAppointment()
   const createRecurring = useCreateRecurringAppointments()
@@ -101,6 +103,11 @@ export function AppointmentForm({
   const [patientId, setPatientId] = useState(appointment?.patientId ?? defaultPatientId ?? '')
   const [date, setDate] = useState(appointment?.date ?? defaultDate ?? '')
   const [startTime, setStartTime] = useState(appointment?.startTime ?? defaultTime ?? '')
+  const [durationMinutes, setDurationMinutes] = useState(
+    appointment
+      ? String(getAppointmentDurationMinutes(appointment))
+      : String(resolveProviderWorkspaceConfig(profile).defaultSessionDurationMinutes),
+  )
   const [type, setType] = useState<SessionType>(appointment?.type ?? 'psychotherapy')
   const [value, setValue] = useState(
     appointment ? String(appointment.value / 100) : '',
@@ -150,11 +157,16 @@ export function AppointmentForm({
     if (!open) return
 
     const selectedType = appointment?.type ?? 'psychotherapy'
+    const workspaceConfig = resolveProviderWorkspaceConfig(profile)
+    const nextDurationMinutes = appointment
+      ? getAppointmentDurationMinutes(appointment)
+      : workspaceConfig.defaultSessionDurationMinutes
 
     setMode('session')
     setPatientId(appointment?.patientId ?? defaultPatientId ?? '')
     setDate(appointment?.date ?? defaultDate ?? '')
     setStartTime(appointment?.startTime ?? defaultTime ?? '')
+    setDurationMinutes(String(nextDurationMinutes))
     setType(selectedType)
     setValue(appointment ? String(appointment.value / 100) : '')
     setNotes(appointment?.notes ?? '')
@@ -190,7 +202,7 @@ export function AppointmentForm({
     setCreateError('')
     setPatientSearch('')
     setPatientDropdownOpen(false)
-  }, [appointment, defaultDate, defaultPatientId, defaultTime, open])
+  }, [appointment, defaultDate, defaultPatientId, defaultTime, open, profile])
 
   useEffect(() => {
     if (isEditMode || !patientId) return
@@ -366,8 +378,15 @@ export function AppointmentForm({
     e.preventDefault()
     setSubmitError('')
 
+    const parsedDurationMinutes = Number.parseInt(durationMinutes, 10)
+
     if (!patientId) {
       setSubmitError('Selecione um paciente para continuar.')
+      return
+    }
+
+    if (mode === 'session' && (!Number.isFinite(parsedDurationMinutes) || parsedDurationMinutes < 15)) {
+      setSubmitError('Informe uma duração de sessão de pelo menos 15 minutos.')
       return
     }
 
@@ -409,6 +428,7 @@ export function AppointmentForm({
             patientId,
             date,
             startTime,
+            durationMinutes: parsedDurationMinutes,
             type,
             ...(parsedManualValue !== null ? { value: parsedManualValue } : {}),
             notes: notes || null,
@@ -515,6 +535,7 @@ export function AppointmentForm({
             startTime: baseData.startTime,
             type: baseData.type,
             intervalWeeks: parsedIntervalWeeks,
+            durationMinutes: parsedDurationMinutes,
             value: baseData.value,
             notes: baseData.notes,
           },
@@ -536,6 +557,7 @@ export function AppointmentForm({
           {
             ...baseData,
             date,
+            durationMinutes: parsedDurationMinutes,
             protocolId: baseData.protocolId,
             paymentMethod: baseData.paymentStatus === 'paid' ? paymentMethod || undefined : undefined,
             paidAt: baseData.paymentStatus === 'paid' ? dateInputToIso(paymentDate) : undefined,
@@ -552,7 +574,8 @@ export function AppointmentForm({
     }
   }
 
-  const timeOptions = TIME_SLOTS.map((t) => ({ value: t, label: t }))
+  const workspaceConfig = resolveProviderWorkspaceConfig(profile)
+  const timeOptions = buildStartTimeOptions(workspaceConfig)
   const statusOptions = Object.entries(STATUS_LABELS).map(([optionValue, label]) => ({
     value: optionValue,
     label,
@@ -994,6 +1017,15 @@ export function AppointmentForm({
                 onChange={(e) => setStartTime(e.target.value)}
                 options={timeOptions}
                 placeholder="Selecione o horário"
+                required
+              />
+              <Input
+                label="Duração (min)"
+                type="number"
+                min="15"
+                step="5"
+                value={durationMinutes}
+                onChange={(e) => setDurationMinutes(e.target.value)}
                 required
               />
               {isLinkedToRevenueProtocol ? (

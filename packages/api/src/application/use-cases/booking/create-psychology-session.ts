@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import type { AppointmentRepository } from '../../../domain/repositories/appointment.repository.js';
 import type { CustomerRepository } from '../../../domain/repositories/customer.repository.js';
 import type { NeuromodulationProtocolRepository } from '../../../domain/repositories/neuromodulation-protocol.repository.js';
+import type { ProviderRepository } from '../../../domain/repositories/provider.repository.js';
 import type { ServiceRepository } from '../../../domain/repositories/service.repository.js';
 import type { AppointmentWithDetails } from '../../../domain/entities/appointment.js';
 import { NotFoundError } from '../../../shared/errors.js';
@@ -30,6 +31,7 @@ export interface CreatePsychologySessionInput {
   paymentStatus?: 'pending' | 'paid';
   paymentMethod?: 'card' | 'pix' | 'cash' | null;
   paidAt?: Date | null;
+  durationMinutes?: number;
   protocolId?: string | null;
 }
 
@@ -39,6 +41,7 @@ export class CreatePsychologySessionUseCase {
     private readonly customerRepo: CustomerRepository,
     private readonly protocolRepo: NeuromodulationProtocolRepository,
     private readonly serviceRepo: ServiceRepository,
+    private readonly providerRepo: ProviderRepository,
   ) {}
 
   async execute(input: CreatePsychologySessionInput): Promise<AppointmentWithDetails> {
@@ -58,7 +61,15 @@ export class CreatePsychologySessionUseCase {
       throw new NotFoundError('Serviço');
     }
 
-    const endTime = buildEndTime(input.startTime, service);
+    const provider = await this.providerRepo.findById(input.providerId);
+    if (!provider) {
+      throw new NotFoundError('Profissional');
+    }
+
+    const endTime = buildEndTime(
+      input.startTime,
+      input.durationMinutes ?? provider.defaultSessionDurationMinutes,
+    );
     const sameDayAppointments = await this.appointmentRepo.findByBarberAndDateRange(
       input.providerId,
       new Date(`${input.date}T00:00:00`),

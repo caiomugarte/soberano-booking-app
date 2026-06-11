@@ -9,6 +9,9 @@ export interface ProviderProfile {
   avatarUrl: string | null
   pixKey: string | null
   messageTemplate: string | null
+  workspaceStartTime: string
+  workspaceEndTime: string
+  defaultSessionDurationMinutes: number
 }
 
 export interface Shift {
@@ -45,7 +48,19 @@ export function useProviderProfile() {
 export function useUpdateProviderProfile() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (data: Partial<Pick<ProviderProfile, 'phone' | 'pixKey' | 'messageTemplate'>>) =>
+    mutationFn: (
+      data: Partial<
+        Pick<
+          ProviderProfile,
+          | 'phone'
+          | 'pixKey'
+          | 'messageTemplate'
+          | 'workspaceStartTime'
+          | 'workspaceEndTime'
+          | 'defaultSessionDurationMinutes'
+        >
+      >,
+    ) =>
       apiFetch<ProviderProfile>('/api/admin/me', {
         method: 'PATCH',
         body: JSON.stringify(data),

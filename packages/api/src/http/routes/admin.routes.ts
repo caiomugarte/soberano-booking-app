@@ -14,6 +14,35 @@ import { PackageLifecycleManager } from '../../application/use-cases/booking/pac
 import { DeactivatePackage } from '../../application/use-cases/booking/deactivate-package.js';
 import { APPOINTMENT_STATUS, bookingSchema, createPackageSchema, tenantConfigSchema } from '@soberano/shared';
 import { NotFoundError, SlotTakenError, ValidationError } from '../../shared/errors.js';
+import type { BarberEntity } from '../../domain/entities/barber.js';
+
+const TIME_INPUT_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function mapProviderProfile(provider: {
+  id: string;
+  firstName: string;
+  lastName: string;
+  phone: string | null;
+  avatarUrl: string | null;
+  pixKey: string | null;
+  messageTemplate: string | null;
+  workspaceStartTime: string;
+  workspaceEndTime: string;
+  defaultSessionDurationMinutes: number;
+}) {
+  return {
+    id: provider.id,
+    firstName: provider.firstName,
+    lastName: provider.lastName,
+    phone: provider.phone,
+    avatarUrl: provider.avatarUrl,
+    pixKey: provider.pixKey,
+    messageTemplate: provider.messageTemplate,
+    workspaceStartTime: provider.workspaceStartTime,
+    workspaceEndTime: provider.workspaceEndTime,
+    defaultSessionDurationMinutes: provider.defaultSessionDurationMinutes,
+  };
+}
 
 export async function adminRoutes(app: FastifyInstance): Promise<void> {
   // All admin routes require authentication
@@ -24,15 +53,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const providerRepo = new PrismaProviderRepository(request.tenantPrisma);
     const provider = await providerRepo.findById(request.providerId!);
     if (!provider) return reply.status(404).send({ error: 'NOT_FOUND' });
-    return {
-      id: provider.id,
-      firstName: provider.firstName,
-      lastName: provider.lastName,
-      phone: provider.phone,
-      avatarUrl: provider.avatarUrl,
-      pixKey: provider.pixKey,
-      messageTemplate: provider.messageTemplate,
-    };
+    return mapProviderProfile(provider);
   });
 
   // Update the logged-in provider's profile
@@ -41,7 +62,17 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       phone: z.string().regex(/^\d{10,11}$/, 'Telefone deve ter 10 ou 11 dígitos').nullable().optional(),
       pixKey: z.string().max(255).optional(),
       messageTemplate: z.string().max(2000).optional(),
-    }).refine((d) => d.phone !== undefined || d.pixKey !== undefined || d.messageTemplate !== undefined, {
+      workspaceStartTime: z.string().regex(TIME_INPUT_REGEX, 'Horário inicial inválido').optional(),
+      workspaceEndTime: z.string().regex(TIME_INPUT_REGEX, 'Horário final inválido').optional(),
+      defaultSessionDurationMinutes: z.number().int().min(15, 'A duração padrão deve ser de pelo menos 15 minutos.').max(480, 'A duração padrão deve ser de no máximo 480 minutos.').optional(),
+    }).refine((d) =>
+      d.phone !== undefined ||
+      d.pixKey !== undefined ||
+      d.messageTemplate !== undefined ||
+      d.workspaceStartTime !== undefined ||
+      d.workspaceEndTime !== undefined ||
+      d.defaultSessionDurationMinutes !== undefined,
+    {
       message: 'Informe ao menos um campo para atualizar.',
     });
 
@@ -50,20 +81,28 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send({ error: 'VALIDATION_ERROR', message: parsed.error.errors[0].message });
     }
 
+    const currentProvider = await request.tenantPrisma.provider.findUnique({
+      where: { id: request.providerId! },
+    }) as BarberEntity | null;
+    if (!currentProvider) {
+      return reply.status(404).send({ error: 'NOT_FOUND' });
+    }
+
+    const nextWorkspaceStartTime = parsed.data.workspaceStartTime ?? currentProvider.workspaceStartTime;
+    const nextWorkspaceEndTime = parsed.data.workspaceEndTime ?? currentProvider.workspaceEndTime;
+    if (nextWorkspaceStartTime >= nextWorkspaceEndTime) {
+      return reply.status(400).send({
+        error: 'VALIDATION_ERROR',
+        message: 'O horário inicial da agenda deve ser anterior ao horário final.',
+      });
+    }
+
     const updated = await request.tenantPrisma.provider.update({
       where: { id: request.providerId! },
       data: parsed.data,
-    });
+    }) as BarberEntity;
 
-    return {
-      id: updated.id,
-      firstName: updated.firstName,
-      lastName: updated.lastName,
-      phone: updated.phone,
-      avatarUrl: updated.avatarUrl,
-      pixKey: updated.pixKey,
-      messageTemplate: updated.messageTemplate,
-    };
+    return mapProviderProfile(updated);
   });
 
   // Get provider's appointments for a date

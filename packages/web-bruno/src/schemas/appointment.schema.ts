@@ -71,5 +71,6 @@ export const AppointmentFormSchema = AppointmentSchema.omit({
   recurrenceStopDate: true,
 }).extend({
   value: AppointmentSchema.shape.value.optional(),
+  durationMinutes: z.number().int().positive().optional(),
 })
 export type AppointmentFormData = z.infer<typeof AppointmentFormSchema>

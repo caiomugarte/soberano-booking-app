@@ -6,6 +6,7 @@ import { PrismaSessionReportRepository } from '../../infrastructure/database/rep
 import { PrismaDocumentRepository } from '../../infrastructure/database/repositories/prisma-document.repository.js';
 import { PrismaAppointmentRepository } from '../../infrastructure/database/repositories/prisma-appointment.repository.js';
 import { PrismaCustomerRepository } from '../../infrastructure/database/repositories/prisma-customer.repository.js';
+import { PrismaProviderRepository } from '../../infrastructure/database/repositories/prisma-provider.repository.js';
 import { PrismaRecurringAppointmentSeriesRepository } from '../../infrastructure/database/repositories/prisma-recurring-appointment-series.repository.js';
 import { PrismaServiceRepository } from '../../infrastructure/database/repositories/prisma-service.repository.js';
 import { PrismaNeuromodulationProtocolRepository } from '../../infrastructure/database/repositories/prisma-neuromodulation-protocol.repository.js';
@@ -60,6 +61,7 @@ const paymentMethodSchema = z.enum(['card', 'pix', 'cash']);
 const protocolStatusSchema = z.enum(['active', 'maintenance', 'finished']);
 const protocolCreditActionSchema = z.enum(['release', 'consume']);
 const receivableScopeSchema = z.enum(['all', 'operations-only']);
+const sessionDurationSchema = z.number().int().min(15).max(480);
 const booleanQueryFlagSchema = z.preprocess((value) => {
   if (value === 'true') return true;
   if (value === 'false') return false;
@@ -915,6 +917,7 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       paymentStatus: paymentStatusSchema.optional(),
       paymentMethod: paymentMethodSchema.optional(),
       paidAt: z.string().datetime({ offset: true }).optional(),
+      durationMinutes: sessionDurationSchema.optional(),
       protocolId: z.string().uuid().nullable().optional(),
     });
     const parsed = schema.safeParse(request.body);
@@ -926,11 +929,13 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
     const customerRepo = new PrismaCustomerRepository(request.tenantPrisma);
     const protocolRepo = new PrismaNeuromodulationProtocolRepository(request.tenantPrisma);
     const serviceRepo = new PrismaServiceRepository(request.tenantPrisma);
+    const providerRepo = new PrismaProviderRepository(request.tenantPrisma);
     const useCase = new CreatePsychologySessionUseCase(
       appointmentRepo,
       customerRepo,
       protocolRepo,
       serviceRepo,
+      providerRepo,
     );
 
     try {
@@ -947,6 +952,7 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
         paymentStatus: parsed.data.paymentStatus,
         paymentMethod: parsed.data.paymentMethod ?? null,
         paidAt: parsed.data.paidAt ? new Date(parsed.data.paidAt) : null,
+        durationMinutes: parsed.data.durationMinutes,
         protocolId: parsed.data.protocolId ?? null,
       });
 
@@ -963,6 +969,7 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       startTime: z.string().regex(TIME_INPUT_REGEX, 'Horário inválido'),
       type: sessionTypeSchema,
       intervalWeeks: z.number().int().min(1).max(52),
+      durationMinutes: sessionDurationSchema.optional(),
       value: z.number().int().min(0).optional(),
       notes: z.string().max(2000).optional(),
     });
@@ -999,10 +1006,12 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
 
     const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
     const recurringSeriesRepo = new PrismaRecurringAppointmentSeriesRepository(request.tenantPrisma);
+    const providerRepo = new PrismaProviderRepository(request.tenantPrisma);
     const useCase = new CreateRecurringSeriesUseCase(
       appointmentRepo,
       recurringSeriesRepo,
       serviceRepo,
+      providerRepo,
     );
 
     const priceCents = resolvePsychologySessionPrice({
@@ -1021,6 +1030,7 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
         startDate: parsed.data.startDate,
         startTime: parsed.data.startTime,
         intervalWeeks: parsed.data.intervalWeeks,
+        durationMinutes: parsed.data.durationMinutes,
         priceCents,
         notes: parsed.data.notes,
       });
@@ -1102,6 +1112,7 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       customerRepo,
       new PrismaNeuromodulationProtocolRepository(request.tenantPrisma),
       serviceRepo,
+      new PrismaProviderRepository(request.tenantPrisma),
     );
 
     const baseDate = new Date(`${parsed.data.startDate}T12:00:00`);
@@ -1183,6 +1194,7 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
       type: sessionTypeSchema.optional(),
       value: z.number().int().min(0).optional(),
       notes: z.string().max(2000).nullable().optional(),
+      durationMinutes: sessionDurationSchema.optional(),
       status: appointmentStatusSchema.optional(),
       paymentStatus: paymentStatusSchema.optional(),
       paymentMethod: paymentMethodSchema.nullish(),
@@ -1227,6 +1239,7 @@ export async function psychologyRoutes(app: FastifyInstance): Promise<void> {
             : parsed.data.paidAt
               ? new Date(parsed.data.paidAt)
               : null,
+        durationMinutes: parsed.data.durationMinutes,
         protocolId: parsed.data.protocolId,
         protocolCreditAction: parsed.data.protocolCreditAction,
       });

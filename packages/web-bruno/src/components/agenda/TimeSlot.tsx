@@ -64,6 +64,9 @@ export function TimeSlot({
           {patient?.name ?? 'Paciente'}
         </span>
       </div>
+      <span className="text-[10px] font-medium text-gray-500">
+        {appointment.startTime} - {appointment.endTime}
+      </span>
       {appointment.recurringSeriesId && (
         <span className="rounded-full bg-primary-100 px-1.5 py-0.5 text-[10px] font-medium text-primary-700">
           Recorrente

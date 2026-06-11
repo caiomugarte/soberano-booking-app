@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import type { AppointmentRepository } from '../../../domain/repositories/appointment.repository.js';
+import type { ProviderRepository } from '../../../domain/repositories/provider.repository.js';
 import type { RecurringAppointmentSeriesRepository } from '../../../domain/repositories/recurring-appointment-series.repository.js';
 import type { ServiceRepository } from '../../../domain/repositories/service.repository.js';
 import type { RecurringAppointmentSeriesEntity } from '../../../domain/entities/recurring-appointment-series.js';
@@ -23,6 +24,7 @@ export interface CreateRecurringSeriesInput {
   startDate: string;
   startTime: string;
   intervalWeeks: number;
+  durationMinutes?: number;
   priceCents?: number;
   notes?: string;
 }
@@ -39,6 +41,7 @@ export class CreateRecurringSeriesUseCase {
     private readonly appointmentRepo: AppointmentRepository,
     private readonly recurringSeriesRepo: RecurringAppointmentSeriesRepository,
     private readonly serviceRepo: ServiceRepository,
+    private readonly providerRepo: ProviderRepository,
   ) {}
 
   async execute(input: CreateRecurringSeriesInput): Promise<CreateRecurringSeriesResult> {
@@ -46,9 +49,15 @@ export class CreateRecurringSeriesUseCase {
       throw new ValidationError('O intervalo da recorrência deve ser de pelo menos 1 semana.');
     }
 
-    const service = await this.serviceRepo.findById(input.serviceId);
+    const [service, provider] = await Promise.all([
+      this.serviceRepo.findById(input.serviceId),
+      this.providerRepo.findById(input.providerId),
+    ]);
     if (!service || !service.isActive) {
       throw new NotFoundError('Serviço');
+    }
+    if (!provider) {
+      throw new NotFoundError('Profissional');
     }
 
     const seriesStartDate = parseDateOnly(input.startDate);
@@ -56,7 +65,10 @@ export class CreateRecurringSeriesUseCase {
       throw new ValidationError('Não é possível iniciar uma recorrência em uma data passada.');
     }
 
-    const endTime = addMinutes(input.startTime, service.duration);
+    const endTime = addMinutes(
+      input.startTime,
+      input.durationMinutes ?? provider.defaultSessionDurationMinutes,
+    );
     const materializationEnd = endOfHorizon(seriesStartDate);
     const candidateDates = buildOccurrenceDates({
       startDate: seriesStartDate,
@@ -72,7 +84,7 @@ export class CreateRecurringSeriesUseCase {
     );
 
     const conflictingDate = candidateDates.find((date) =>
-      hasConflictingAppointment(existingAppointments, date, input.startTime),
+      hasConflictingAppointment(existingAppointments, date, input.startTime, endTime),
     );
 
     if (conflictingDate) {

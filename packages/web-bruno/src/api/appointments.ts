@@ -36,6 +36,7 @@ type RecurringSeriesData = {
   startTime: string
   type: SessionType
   intervalWeeks: number
+  durationMinutes?: number
   value?: number
   notes?: string
 }
@@ -51,6 +52,7 @@ export type AppointmentUpdateData = {
   patientId?: Appointment['patientId']
   date?: Appointment['date']
   startTime?: Appointment['startTime']
+  durationMinutes?: number
   type?: Appointment['type']
   value?: Appointment['value']
   notes?: Appointment['notes'] | null
