@@ -13,6 +13,7 @@
 | web-bruno-api-migration | Tasks ready — ready to execute | `.specs/features/web-bruno-api-migration/tasks.md` |
 | web-bruno-recurring-session-series | Tasks draft — awaiting approval | `.specs/features/web-bruno-recurring-session-series/tasks.md` |
 | web-bruno-agenda-event-management | Tasks draft — payment-date control plus `AppointmentForm`/`SlotDetail` polish added, awaiting approval | `.specs/features/web-bruno-agenda-event-management/tasks.md` |
+| web-bruno-calendar-workspace | Implemented — workspace config, duration-aware scheduling, multi-view agenda, and inline blocking landed; automated verification passed, manual workspace verification pending | `.specs/features/web-bruno-calendar-workspace/tasks.md` |
 | web-bruno-patient-care-model | Superseded by `web-bruno-patient-care-model-v2`; original tasks describe the exclusive-care-mode baseline | `.specs/features/web-bruno-patient-care-model/tasks.md` |
 | web-bruno-patient-care-model-v2 | Tasks draft — dual-track patient profile, delete safety, history filters, and patient financial detail sequenced | `.specs/features/web-bruno-patient-care-model-v2/tasks.md` |
 | web-bruno-neuromodulation-protocols | Tasks draft — rebased to the remaining lifecycle delta (auto-finish + finished-history cleanup), awaiting approval | `.specs/features/web-bruno-neuromodulation-protocols/tasks.md` |
@@ -50,6 +51,7 @@
 | 2026-06-08 | Protocol payment ledger was split into its own linked spec | Multiple payment dates and amounts cannot fit the current scalar protocol payment fields, so the change must be specified as a separate data-model and financial feature instead of being buried in neuromodulation UI work |
 | 2026-06-08 | `web-bruno-receivables-workbench` stays inside `web-bruno-operations-hub` instead of becoming a separate feature | The overdue-only session rule already exists in the API/hook path, so the remaining work is primarily Bruno-specific receivables UI hardening and verification |
 | 2026-06-08 | `web-bruno-agenda-event-management` absorbed the zero-cost/session-form/detail-button polish follow-up | The scope stays local to `AppointmentForm` and `SlotDetail`, and the psychology session API already accepts `value >= 0`, so a separate feature track would only fragment the same agenda workflow |
+| 2026-06-10 | `web-bruno-calendar-workspace` was split into its own spec | The remaining Bruno agenda gap is no longer "Saturday visibility"; the frontend still hardcodes visible days, hours, and slot math across multiple surfaces, so Sunday support, multi-view calendar behavior, 1-hour blocks, and inline blocking need a dedicated workspace spec |
 
 ## Blockers
 

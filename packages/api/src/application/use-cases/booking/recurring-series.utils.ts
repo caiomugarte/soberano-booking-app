@@ -64,16 +64,19 @@ export function hasConflictingAppointment(
   appointments: AppointmentWithDetails[],
   date: Date,
   startTime: string,
+  endTime: string,
   recurringSeriesId?: string,
 ): boolean {
-  const key = appointmentKey(date, startTime);
-
   return appointments.some((appointment) => {
     if (appointment.status === 'cancelled') return false;
     if (appointment.recurringSeriesId && recurringSeriesId && appointment.recurringSeriesId === recurringSeriesId) {
       return false;
     }
-    return appointmentKey(appointment.date, appointment.startTime) === key;
+    return (
+      formatDateKey(appointment.date) === formatDateKey(date) &&
+      appointment.startTime < endTime &&
+      appointment.endTime > startTime
+    );
   });
 }
 

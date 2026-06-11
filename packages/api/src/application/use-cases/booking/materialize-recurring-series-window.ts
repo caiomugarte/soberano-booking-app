@@ -95,7 +95,7 @@ export class MaterializeRecurringSeriesWindowUseCase {
         continue;
       }
 
-      if (hasConflictingAppointment(existingAppointments, date, series.startTime, series.id)) {
+      if (hasConflictingAppointment(existingAppointments, date, series.startTime, series.endTime, series.id)) {
         conflicts.push({
           seriesId: series.id,
           date: formatDateKey(date),

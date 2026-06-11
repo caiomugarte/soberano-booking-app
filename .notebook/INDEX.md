@@ -4,6 +4,7 @@
 
 | File | Tags | Summary |
 |---|---|---|
+| [web-bruno-calendar-workspace-hardcoding.md](web-bruno-calendar-workspace-hardcoding.md) | psychology, web-bruno, agenda, calendar, workspace, hardcoding | Bruno agenda still hides Sunday and expanded hours because multiple frontend surfaces depend on shared hardcoded day/time constants |
 | [admin-appointment-query-invalidation-gotcha.md](admin-appointment-query-invalidation-gotcha.md) | web, admin, react-query, appointments, packages, gotcha | Day, week, and stats views use separate query keys, so package-linked mutations must invalidate all of them |
 | [password-service-stale-js-gotcha.md](password-service-stale-js-gotcha.md) | api, auth, tests, vitest, gotcha | Stale JS artifact in `src/` can shadow the TS password service and break bcrypt imports |
 | [api-runtime-deploy-gotchas.md](api-runtime-deploy-gotchas.md) | deploy, api, cron, coolify, traefik | Shared API deploy model; every API instance also starts reminder cron |

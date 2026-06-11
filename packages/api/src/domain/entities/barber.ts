@@ -10,5 +10,8 @@ export interface BarberEntity {
   avatarUrl: string | null;
   pixKey: string | null;
   messageTemplate: string | null;
+  workspaceStartTime: string;
+  workspaceEndTime: string;
+  defaultSessionDurationMinutes: number;
   isActive: boolean;
 }

@@ -5,6 +5,7 @@ import { DeletePsychologySessionUseCase } from '../delete-psychology-session.js'
 import type { AppointmentRepository } from '../../../../domain/repositories/appointment.repository.js'
 import type { CustomerRepository } from '../../../../domain/repositories/customer.repository.js'
 import type { NeuromodulationProtocolRepository } from '../../../../domain/repositories/neuromodulation-protocol.repository.js'
+import type { ProviderRepository } from '../../../../domain/repositories/provider.repository.js'
 import type { ServiceRepository } from '../../../../domain/repositories/service.repository.js'
 import type { AppointmentWithDetails } from '../../../../domain/entities/appointment.js'
 import type { CustomerEntity } from '../../../../domain/entities/customer.js'
@@ -39,6 +40,9 @@ const provider = {
   avatarUrl: null,
   pixKey: null,
   messageTemplate: null,
+  workspaceStartTime: '08:00',
+  workspaceEndTime: '17:00',
+  defaultSessionDurationMinutes: 60,
   isActive: true,
 }
 
@@ -71,6 +75,12 @@ const protocol: NeuromodulationProtocolEntity = {
   createdAt: new Date(),
   updatedAt: new Date(),
 }
+
+const providerRepo = {
+  findAllActive: vi.fn(),
+  findById: vi.fn().mockResolvedValue(provider),
+  findByEmail: vi.fn(),
+} as unknown as ProviderRepository
 
 function makeAppointment(overrides: Partial<AppointmentWithDetails> = {}): AppointmentWithDetails {
   return {
@@ -172,7 +182,7 @@ describe('Psychology session protocol credit use cases', () => {
       findBySlug: vi.fn().mockResolvedValue(service),
     }
 
-    const useCase = new CreatePsychologySessionUseCase(appointmentRepo, customerRepo, protocolRepo, serviceRepo)
+    const useCase = new CreatePsychologySessionUseCase(appointmentRepo, customerRepo, protocolRepo, serviceRepo, providerRepo)
     const result = await useCase.execute({
       tenantId: 'tenant-1',
       providerId: provider.id,
@@ -246,7 +256,7 @@ describe('Psychology session protocol credit use cases', () => {
       findBySlug: vi.fn().mockResolvedValue(service),
     } as unknown as ServiceRepository
 
-    const useCase = new CreatePsychologySessionUseCase(appointmentRepo, customerRepo, protocolRepo, serviceRepo)
+    const useCase = new CreatePsychologySessionUseCase(appointmentRepo, customerRepo, protocolRepo, serviceRepo, providerRepo)
     const result = await useCase.execute({
       tenantId: 'tenant-1',
       providerId: provider.id,
@@ -315,7 +325,7 @@ describe('Psychology session protocol credit use cases', () => {
       findBySlug: vi.fn().mockResolvedValue(service),
     } as unknown as ServiceRepository
 
-    const useCase = new CreatePsychologySessionUseCase(appointmentRepo, customerRepo, protocolRepo, serviceRepo)
+    const useCase = new CreatePsychologySessionUseCase(appointmentRepo, customerRepo, protocolRepo, serviceRepo, providerRepo)
     const result = await useCase.execute({
       tenantId: 'tenant-1',
       providerId: provider.id,
@@ -349,7 +359,7 @@ describe('Psychology session protocol credit use cases', () => {
       findBySlug: vi.fn().mockResolvedValue(service),
     } as unknown as ServiceRepository
 
-    const useCase = new CreatePsychologySessionUseCase(appointmentRepo, customerRepo, protocolRepo, serviceRepo)
+    const useCase = new CreatePsychologySessionUseCase(appointmentRepo, customerRepo, protocolRepo, serviceRepo, providerRepo)
 
     await expect(useCase.execute({
       tenantId: 'tenant-1',
@@ -416,7 +426,7 @@ describe('Psychology session protocol credit use cases', () => {
       findBySlug: vi.fn().mockResolvedValue(service),
     } as unknown as ServiceRepository
 
-    const useCase = new CreatePsychologySessionUseCase(appointmentRepo, customerRepo, protocolRepo, serviceRepo)
+    const useCase = new CreatePsychologySessionUseCase(appointmentRepo, customerRepo, protocolRepo, serviceRepo, providerRepo)
     const result = await useCase.execute({
       tenantId: 'tenant-1',
       providerId: provider.id,

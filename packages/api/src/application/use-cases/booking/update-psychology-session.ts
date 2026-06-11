@@ -10,6 +10,7 @@ import {
   assertProtocolCapacity,
   assertSessionMatchesCareProfile,
   buildEndTime,
+  getDurationMinutes,
   normalizePsychologySessionType,
   resolveProtocolOutcome,
   resolvePsychologySessionPrice,
@@ -31,6 +32,7 @@ export interface UpdatePsychologySessionInput {
   paymentStatus?: 'pending' | 'paid';
   paymentMethod?: 'card' | 'pix' | 'cash' | null;
   paidAt?: Date | null;
+  durationMinutes?: number;
   protocolId?: string | null;
   protocolCreditAction?: ProtocolCreditAction;
 }
@@ -77,8 +79,11 @@ export class UpdatePsychologySessionUseCase {
     const nextDate = input.date ?? appointment.date.toISOString().slice(0, 10);
     const nextStartTime = input.startTime ?? appointment.startTime;
     const nextEndTime =
-      input.date !== undefined || input.startTime !== undefined || input.type !== undefined
-        ? buildEndTime(nextStartTime, service)
+      input.date !== undefined || input.startTime !== undefined || input.type !== undefined || input.durationMinutes !== undefined
+        ? buildEndTime(
+            nextStartTime,
+            input.durationMinutes ?? getDurationMinutes(appointment.startTime, appointment.endTime),
+          )
         : appointment.endTime;
     const nextStatus = input.status ?? appointment.status;
 

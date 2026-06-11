@@ -1,4 +1,3 @@
-import { addDays, format, startOfWeek } from 'date-fns'
 import { useState } from 'react'
 import {
   useDeleteAppointment,
@@ -11,15 +10,15 @@ import { SlotDetail } from '@/components/agenda/SlotDetail'
 import { AppointmentForm } from '@/components/appointments/AppointmentForm'
 import { AppointmentsWorkbench } from '@/components/appointments/AppointmentsWorkbench'
 import { Button } from '@/components/ui/Button'
-import { DAYS_OF_WEEK } from '@/config/constants'
+import { buildWorkspaceWeekRange } from '@/lib/calendar-workspace'
 import type { Appointment, PaymentMethod, ProtocolCreditAction } from '@/schemas/appointment.schema'
 
 function getDefaultFilters() {
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 })
+  const weekRange = buildWorkspaceWeekRange(new Date())
 
   return {
-    from: format(weekStart, 'yyyy-MM-dd'),
-    to: format(addDays(weekStart, DAYS_OF_WEEK.length - 1), 'yyyy-MM-dd'),
+    from: weekRange.from,
+    to: weekRange.to,
     patientId: '',
   }
 }
@@ -134,7 +133,7 @@ export default function AppointmentsPage() {
         <div>
           <h1 className="text-xl font-bold text-gray-800">Agendamentos</h1>
           <p className="text-sm text-gray-500">
-            Encontre sessões por período ou paciente e abra o mesmo fluxo de correção da agenda semanal.
+            Encontre sessões por período ou paciente e abra o mesmo fluxo de correção usado no workspace da agenda.
           </p>
         </div>
         <Button className="w-full sm:w-auto" onClick={handleOpenCreateForm}>

@@ -44,6 +44,9 @@ model Provider {
   avatarUrl       String?  @map("avatar_url") @db.VarChar(500)
   pixKey          String?  @map("pix_key") @db.VarChar(255)
   messageTemplate String?  @map("message_template") @db.Text
+  workspaceStartTime String @default("08:00") @map("workspace_start_time") @db.VarChar(5)
+  workspaceEndTime String @default("17:00") @map("workspace_end_time") @db.VarChar(5)
+  defaultSessionDurationMinutes Int @default(60) @map("default_session_duration_minutes")
   isActive        Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz

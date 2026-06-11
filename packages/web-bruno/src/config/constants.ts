@@ -1,18 +1,17 @@
-export const TIME_SLOTS = [
-  '08:00', '09:00', '10:00', '11:00', '12:00',
-  '13:00', '14:00', '15:00', '16:00', '17:00',
-] as const
+import {
+  DEFAULT_PROVIDER_WORKSPACE,
+  buildWorkspaceHourRows,
+  getWorkspaceDays,
+} from '@/lib/calendar-workspace'
 
-export const SESSION_DURATION_MINUTES = 50
+export const TIME_SLOTS = buildWorkspaceHourRows(DEFAULT_PROVIDER_WORKSPACE)
 
-export const DAYS_OF_WEEK = [
-  { key: 1, label: 'Segunda' },
-  { key: 2, label: 'Terça' },
-  { key: 3, label: 'Quarta' },
-  { key: 4, label: 'Quinta' },
-  { key: 5, label: 'Sexta' },
-  { key: 6, label: 'Sábado' },
-] as const
+export const SESSION_DURATION_MINUTES = DEFAULT_PROVIDER_WORKSPACE.defaultSessionDurationMinutes
+
+export const DAYS_OF_WEEK = getWorkspaceDays().map((day) => ({
+  key: day.key,
+  label: day.label,
+}))
 
 export const STATUS_LABELS: Record<string, string> = {
   scheduled: 'Agendado',

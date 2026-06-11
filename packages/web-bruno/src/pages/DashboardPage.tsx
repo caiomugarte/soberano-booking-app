@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { WeeklyGrid } from '@/components/agenda/WeeklyGrid'
+import { CalendarWorkspace } from '@/components/agenda/CalendarWorkspace'
 import { AppointmentForm } from '@/components/appointments/AppointmentForm'
 import { BirthdayReminder } from '@/components/dashboard/BirthdayReminder'
 import { Button } from '@/components/ui/Button'
@@ -48,7 +48,7 @@ export default function DashboardPage() {
   return (
     <div>
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-bold text-gray-800">Agenda Semanal</h1>
+        <h1 className="text-xl font-bold text-gray-800">Agenda de Trabalho</h1>
         <Button
           className="w-full sm:w-auto"
           onClick={() => {
@@ -76,7 +76,7 @@ export default function DashboardPage() {
         />
       )}
 
-      <WeeklyGrid
+      <CalendarWorkspace
         onCreateAppointment={handleCreateAppointment}
         onEditAppointment={handleEditAppointment}
         onNotice={setNotice}

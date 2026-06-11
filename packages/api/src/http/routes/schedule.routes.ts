@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { authGuard } from '../middleware/auth.middleware.js';
+import { PrismaAppointmentRepository } from '../../infrastructure/database/repositories/prisma-appointment.repository.js';
 import { PrismaProviderShiftRepository } from '../../infrastructure/database/repositories/prisma-provider-shift.repository.js';
 
 const shiftSchema = z.object({
@@ -14,6 +15,25 @@ const absenceSchema = z.object({
   startTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   endTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   reason: z.string().max(200).optional(),
+}).superRefine((value, context) => {
+  const hasStartTime = value.startTime !== undefined;
+  const hasEndTime = value.endTime !== undefined;
+
+  if (hasStartTime !== hasEndTime) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Informe início e fim para bloquear apenas parte do dia.',
+      path: hasStartTime ? ['endTime'] : ['startTime'],
+    });
+  }
+
+  if (value.startTime && value.endTime && value.startTime >= value.endTime) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'O horário inicial do bloqueio deve ser anterior ao horário final.',
+      path: ['startTime'],
+    });
+  }
 });
 
 function todayInCampoGrande(): string {
@@ -52,6 +72,25 @@ export async function scheduleRoutes(app: FastifyInstance): Promise<void> {
   app.post('/admin/schedule/absences', async (request, reply) => {
     const input = absenceSchema.parse(request.body);
     const shiftRepo = new PrismaProviderShiftRepository(request.tenantPrisma);
+    const appointmentRepo = new PrismaAppointmentRepository(request.tenantPrisma);
+    const activeAppointments = await appointmentRepo.findByBarberAndDateRange(
+      request.providerId!,
+      new Date(`${input.date}T00:00:00`),
+      new Date(`${input.date}T00:00:00`),
+    );
+    const hasConflict = activeAppointments.some((appointment) => {
+      if (appointment.status === 'cancelled') return false;
+      if (!input.startTime || !input.endTime) return true;
+      return appointment.startTime < input.endTime && appointment.endTime > input.startTime;
+    });
+
+    if (hasConflict) {
+      return reply.status(409).send({
+        error: 'BLOCK_CONFLICT',
+        message: 'Existe uma sessão ativa neste período. Resolva a sessão antes de bloquear a agenda.',
+      });
+    }
+
     const absence = await shiftRepo.createAbsence({
       tenantId: request.tenant.id,
       providerId: request.providerId!,
