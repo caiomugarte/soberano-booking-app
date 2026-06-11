@@ -4,6 +4,7 @@
 
 | File | Tags | Summary |
 |---|---|---|
+| [web-bruno-time-slot-compact-layout-gotcha.md](web-bruno-time-slot-compact-layout-gotcha.md) | psychology, web-bruno, agenda, calendar, layout, gotcha | Compact agenda cards clip the patient row first unless badge-heavy one-hour cards keep text rows fixed and collapse extra metadata |
 | [web-bruno-calendar-workspace-hardcoding.md](web-bruno-calendar-workspace-hardcoding.md) | psychology, web-bruno, agenda, calendar, workspace, hardcoding | Bruno agenda still hides Sunday and expanded hours because multiple frontend surfaces depend on shared hardcoded day/time constants |
 | [admin-appointment-query-invalidation-gotcha.md](admin-appointment-query-invalidation-gotcha.md) | web, admin, react-query, appointments, packages, gotcha | Day, week, and stats views use separate query keys, so package-linked mutations must invalidate all of them |
 | [password-service-stale-js-gotcha.md](password-service-stale-js-gotcha.md) | api, auth, tests, vitest, gotcha | Stale JS artifact in `src/` can shadow the TS password service and break bcrypt imports |

@@ -71,30 +71,48 @@ export function TimeSlot({
     )
   }
 
-  const calendarMetaBadgeClassName = compact ? 'px-2 py-0 text-[10px] leading-4' : ''
+  const calendarMetaBadgeClassName = compact ? 'px-1.5 py-0 text-[9px] leading-4' : ''
+  const compactMetaTextClassName = 'text-[10px] leading-4'
 
   return (
     <button
       onClick={onClick}
       className={`flex h-full min-h-[60px] w-full flex-col items-start rounded border-l-3 p-2 text-left transition-shadow hover:shadow-md ${statusBorder[appointment.status]} ${statusBg[appointment.status]} ${sessionTypeAccent[appointment.type]} ${appointment.status === 'cancelled' ? 'opacity-60' : ''} ${compact ? 'gap-0.5 overflow-hidden' : 'gap-1'} ${className}`}
     >
-      <span className="w-full text-xs font-medium text-gray-800 truncate">
+      <span className={`w-full shrink-0 font-medium text-gray-800 truncate ${compact ? 'text-[11px] leading-4' : 'text-xs'}`}>
         {patient?.name ?? 'Paciente'}
       </span>
-      <span className="w-full text-[10px] font-medium text-gray-500 truncate">
+      <span className={`w-full shrink-0 font-medium text-gray-500 truncate ${compact ? compactMetaTextClassName : 'text-[10px]'}`}>
         {appointment.startTime} - {appointment.endTime}
       </span>
-      <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border font-medium ${sessionTypeBadge[appointment.type]} ${compact ? 'px-1.5 py-0.5 text-[9px]' : 'px-2 py-0.5 text-[10px]'}`}>
-        <span
-          aria-hidden="true"
-          className={`${compact ? 'h-1.5 w-1.5' : 'h-2 w-2'} shrink-0 rounded-full ${sessionTypeDot[appointment.type]}`}
-        />
-        {compact ? sessionTypeCompactLabel[appointment.type] : SESSION_TYPE_LABELS[appointment.type]}
-      </span>
-      {appointment.recurringSeriesId && (
-        <span className={`rounded-full bg-primary-100 font-medium text-primary-700 ${compact ? 'px-1.5 py-0.5 text-[9px]' : 'px-1.5 py-0.5 text-[10px]'}`}>
-          {compact ? 'Rec.' : 'Recorrente'}
-        </span>
+      {compact ? (
+        <div className={`flex w-full shrink-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 font-medium text-gray-600 ${compactMetaTextClassName}`}>
+          <span className="inline-flex items-center gap-1">
+            <span
+              aria-hidden="true"
+              className={`h-1.5 w-1.5 shrink-0 rounded-full ${sessionTypeDot[appointment.type]}`}
+            />
+            {sessionTypeCompactLabel[appointment.type]}
+          </span>
+          {appointment.recurringSeriesId && (
+            <span className="text-primary-700">Rec.</span>
+          )}
+        </div>
+      ) : (
+        <div className="flex w-full shrink-0 flex-wrap items-center gap-1">
+          <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium ${sessionTypeBadge[appointment.type]}`}>
+            <span
+              aria-hidden="true"
+              className={`h-2 w-2 shrink-0 rounded-full ${sessionTypeDot[appointment.type]}`}
+            />
+            {SESSION_TYPE_LABELS[appointment.type]}
+          </span>
+          {appointment.recurringSeriesId && (
+            <span className="rounded-full bg-primary-100 px-1.5 py-0.5 text-[10px] font-medium text-primary-700">
+              Recorrente
+            </span>
+          )}
+        </div>
       )}
       <div className={`mt-auto flex w-full flex-wrap items-center overflow-hidden ${compact ? 'gap-1' : 'gap-1.5'}`}>
         <AppointmentStatusBadge

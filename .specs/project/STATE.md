@@ -72,6 +72,7 @@ _None recorded yet._
 | 005 | Highlight `Psicoterapia` and `Neuromodulação` with distinct colors in the `web-bruno` weekly agenda | 2026-05-18 | not committed | ✅ Done |
 | 006 | Add a mobile-friendly package creation entry point to `PackagesPage` using the dashboard-style floating action pattern and the existing package workspace handoff | 2026-05-28 | not committed | ✅ Done |
 | 007 | Run the existing CI workflow for pull requests targeting `develop` as well as `master` so test checks can gate merges on both branches | 2026-06-08 | not committed | ✅ Done |
+| 008 | Reorganize `web-bruno` compact agenda card badges so weekly-view patient names stay readable when multiple tags are present | 2026-06-11 | not committed | ✅ Done |
 
 ## Deferred Ideas
 
